@@ -87,7 +87,7 @@ export class SubdomainService {
       }
     }
     
-    // Para taskboard.com.br (domínio principal de login)
+    // Para domínio principal taskboard.com.br (sem subdomínio)
     if (hostname === 'taskboard.com.br' || hostname === 'www.taskboard.com.br') {
       return null; // Não há empresa, deve mostrar tela de login/registro
     }
@@ -108,7 +108,43 @@ export class SubdomainService {
     // Implementar lógica para lidar com subdomínio inválido
     
     if (typeof window !== 'undefined') {
-      // Redirecionar para o domínio principal
+      // Em desenvolvimento, não redirecionar - apenas logar
+      if (this.isDevelopment()) {
+        console.warn(`Empresa '${subdomain}' não encontrada em desenvolvimento. Criando automaticamente...`);
+        // Tentar criar empresa automaticamente em desenvolvimento
+        this.createDevelopmentCompany(subdomain);
+        return;
+      }
+      
+      const hostname = window.location.hostname;
+      
+      // Se já estamos no subdomínio correto mas a empresa não foi encontrada no Firebase
+      if (hostname.includes(`${subdomain}.taskboard.com.br`)) {
+        console.error(`Empresa '${subdomain}' não encontrada no Firebase.`);
+        
+        // Se for a empresa 'gobuyer', tentar criar automaticamente
+        if (subdomain === 'gobuyer') {
+          console.log('Tentando criar empresa Gobuyer automaticamente...');
+          this.companyService.seedGobuyerCompany().then(async () => {
+            // Tentar buscar novamente após criar
+            const company = await this.companyService.getCompanyBySubdomain('gobuyer');
+            if (company) {
+              this.currentCompanySubject.next(company);
+              window.location.reload();
+            }
+          }).catch(error => {
+            console.error('Erro ao criar empresa Gobuyer:', error);
+            alert(`Empresa 'gobuyer' não pôde ser criada. Entre em contato com o suporte.`);
+          });
+          return;
+        }
+        
+        // Para outras empresas, mostrar erro
+        alert(`Empresa '${subdomain}' não encontrada. Entre em contato com o suporte.`);
+        return;
+      }
+      
+      // Apenas em produção e se não estivermos no subdomínio correto, redirecionar
       window.location.href = 'https://taskboard.com.br/empresa-nao-encontrada?subdomain=' + encodeURIComponent(subdomain);
     }
   }
@@ -185,5 +221,38 @@ export class SubdomainService {
     }
     
     return `https://${company.subdomain}.taskboard.com.br/form`;
+  }
+
+  // Criar empresa automaticamente em desenvolvimento
+  private async createDevelopmentCompany(subdomain: string) {
+    try {
+      console.log(`Criando empresa de desenvolvimento: ${subdomain}`);
+      
+      const companyData = {
+        subdomain: subdomain,
+        name: `Empresa ${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}`,
+        contactEmail: `contato@${subdomain}.dev`,
+        contactPhone: '+55 11 99999-9999',
+        address: 'Desenvolvimento Local',
+        cnpj: '00.000.000/0001-00',
+        plan: 'professional',
+        status: 'active',
+        ownerId: 'dev-user',
+        ownerEmail: `admin@${subdomain}.dev`,
+        maxUsers: 50,
+        maxBoards: 100
+      };
+
+      const companyId = await this.companyService.createCompany(companyData);
+      const company = await this.companyService.getCompany(companyId);
+      
+      if (company) {
+        this.currentCompanySubject.next(company);
+        console.log(`Empresa ${subdomain} criada com sucesso:`, companyId);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao criar empresa de desenvolvimento:', error);
+    }
   }
 }
