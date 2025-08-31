@@ -1,308 +1,253 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, FormsModule } from '@angular/forms';
-import { BrandingService } from '../../services/branding.service';
+import { FormsModule } from '@angular/forms';
+import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { BrandingService } from '../../services/branding.service';
 import { Company } from '../../models/company.model';
+import { ConfigHeaderComponent } from '../config-header/config-header.component';
 
 @Component({
   selector: 'app-branding-config',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, FormsModule, ConfigHeaderComponent],
   template: `
-    <div class="branding-config-container">
-      <!-- Preview do Branding -->
-      <div class="card">
-        <div class="card-header">
-          <h3><i class="fas fa-palette"></i> Identidade Visual</h3>
-          <p class="text-muted">Personalize a aparência do sistema para sua empresa</p>
-        </div>
+    <div class="min-h-screen bg-gray-100">
+      <app-config-header title="Identidade Visual">
+        <button 
+          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          (click)="saveConfiguration()"
+          [disabled]="isSaving()">
+          @if (isSaving()) {
+            <i class="fas fa-spinner fa-spin mr-1"></i>
+            Salvando...
+          } @else {
+            <i class="fas fa-save mr-1"></i>
+            Salvar Configurações
+          }
+        </button>
+      </app-config-header>
+
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Success/Error Messages -->
+        @if (successMessage()) {
+          <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+            <i class="fas fa-check-circle mr-2"></i>
+            {{ successMessage() }}
+          </div>
+        }
         
-        <div class="card-body">
-          <!-- Preview -->
-          <div class="branding-preview mb-4">
-            <div class="preview-header" [style.background-color]="colorForm.get('primaryColor')?.value">
-              <div class="d-flex align-items-center gap-3 p-3">
-                <div class="logo-preview">
-                  <img 
-                    *ngIf="currentCompany()?.logoUrl" 
-                    [src]="currentCompany()?.logoUrl"
-                    [alt]="currentCompany()?.name + ' Logo'"
-                    class="preview-logo">
-                  <div 
-                    *ngIf="!currentCompany()?.logoUrl"
-                    class="preview-logo-placeholder">
-                    <i class="fas fa-building"></i>
-                  </div>
+        @if (errorMessage()) {
+          <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            {{ errorMessage() }}
+          </div>
+        }
+
+        <!-- Preview Section -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+          <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+              <i class="fas fa-eye text-blue-500 mr-2"></i>
+              Preview da Identidade Visual
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">Veja como ficará a aparência do sistema</p>
+          </div>
+          <div class="p-6">
+            <div class="border border-gray-300 rounded-lg p-6 bg-gray-50">
+              <!-- Simulated Header Preview -->
+              <div class="flex items-center justify-between p-4 bg-white rounded border border-gray-200 mb-4" 
+                   [style.background-color]="primaryColor()">
+                <div class="flex items-center space-x-3">
+                  @if (logoUrl()) {
+                    <img [src]="logoUrl()" alt="Logo Preview" class="h-8 w-auto">
+                  } @else {
+                    <div class="h-8 w-8 bg-gray-300 rounded flex items-center justify-center">
+                      <i class="fas fa-image text-gray-500"></i>
+                    </div>
+                  }
+                  <h2 class="text-lg font-semibold" [style.color]="getContrastColor(primaryColor())">
+                    {{ companyName() || 'Nome da Empresa' }}
+                  </h2>
                 </div>
-                <div class="text-white">
-                  <h4 class="mb-0">{{ currentCompany()?.name || 'Nome da Empresa' }}</h4>
-                  <small class="opacity-75">Sistema Kanban</small>
+                <div class="flex space-x-2">
+                  <button class="px-3 py-1 rounded text-sm font-medium"
+                          [style.background-color]="secondaryColor()"
+                          [style.color]="getContrastColor(secondaryColor())">
+                    Botão Secundário
+                  </button>
+                  <button class="px-3 py-1 rounded text-sm font-medium text-white"
+                          [style.background-color]="primaryColor()">
+                    Botão Principal
+                  </button>
                 </div>
               </div>
-            </div>
-            <div class="preview-content p-3">
-              <div class="d-flex gap-2 mb-3">
-                <button class="btn btn-primary btn-sm" [style.background-color]="colorForm.get('primaryColor')?.value">
-                  Botão Primário
-                </button>
-                <button class="btn btn-outline-primary btn-sm" [style.border-color]="colorForm.get('primaryColor')?.value" [style.color]="colorForm.get('primaryColor')?.value">
-                  Botão Secundário
-                </button>
-              </div>
-              <div class="text-muted">
-                <i class="fas fa-info-circle" [style.color]="colorForm.get('primaryColor')?.value"></i>
-                Prévia de como ficará a interface com suas cores personalizadas
+              
+              <!-- Sample Content Preview -->
+              <div class="bg-white rounded border border-gray-200 p-4">
+                <h3 class="font-semibold mb-2" [style.color]="primaryColor()">Sample Content</h3>
+                <p class="text-gray-600 text-sm mb-3">Este é um exemplo de como o conteúdo aparecerá com suas cores personalizadas.</p>
+                <div class="flex space-x-2">
+                  <span class="px-2 py-1 rounded text-xs font-medium"
+                        [style.background-color]="primaryColor() + '20'"
+                        [style.color]="primaryColor()">
+                    Tag Principal
+                  </span>
+                  <span class="px-2 py-1 rounded text-xs font-medium"
+                        [style.background-color]="secondaryColor() + '20'"
+                        [style.color]="secondaryColor()">
+                    Tag Secundária
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <form [formGroup]="colorForm" (ngSubmit)="saveColors()">
-            <div class="row">
-              <!-- Logo Upload -->
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label"><strong>Logo da Empresa</strong></label>
-                  <div class="logo-upload-area" (click)="logoFileInput.click()">
-                    <div *ngIf="!currentCompany()?.logoUrl" class="upload-placeholder">
-                      <i class="fas fa-cloud-upload-alt fa-2x mb-2"></i>
-                      <p class="mb-0">Clique para fazer upload do logo</p>
-                      <small class="text-muted">PNG, JPG ou SVG - Máx. 5MB</small>
-                    </div>
-                    <div *ngIf="currentCompany()?.logoUrl" class="current-logo">
-                      <img [src]="currentCompany()?.logoUrl" [alt]="currentCompany()?.name + ' Logo'" class="uploaded-logo">
-                      <div class="logo-overlay">
-                        <i class="fas fa-edit"></i>
-                        <p class="mb-0">Clique para alterar</p>
-                      </div>
-                    </div>
-                  </div>
-                  <input 
-                    #logoFileInput
-                    type="file" 
-                    class="d-none"
-                    accept="image/*"
-                    (change)="onLogoSelected($event)">
+        <!-- Configuration Form -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <!-- Logo Configuration -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-6 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-image text-blue-500 mr-2"></i>
+                Logo da Empresa
+              </h3>
+            </div>
+            <div class="p-6">
+              <div class="mb-6">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                     (click)="logoInput.click()">
+                  @if (logoUrl()) {
+                    <img [src]="logoUrl()" alt="Logo atual" class="max-h-20 mx-auto mb-4">
+                    <p class="text-sm text-gray-600">Clique para alterar o logo</p>
+                  } @else {
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-sm text-gray-600">Clique para fazer upload do logo</p>
+                    <p class="text-xs text-gray-500 mt-1">PNG, JPG ou SVG - Máx. 5MB</p>
+                  }
                 </div>
-
-                <!-- Ações do Logo -->
-                <div class="d-flex gap-2 mb-3" *ngIf="currentCompany()?.logoUrl">
+                <input #logoInput type="file" class="hidden" accept="image/*" (change)="onLogoSelected($event)">
+              </div>
+              
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">URL do Logo (opcional)</label>
+                  <input
+                    type="url"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    [(ngModel)]="logoUrl"
+                    (input)="logoUrl.set($any($event.target).value)"
+                    placeholder="https://exemplo.com/logo.png">
+                </div>
+                
+                @if (logoUrl()) {
                   <button 
-                    type="button"
-                    class="btn btn-sm btn-outline-danger"
+                    class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
                     (click)="removeLogo()">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash mr-1"></i>
                     Remover Logo
                   </button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Color Configuration -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-6 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-palette text-blue-500 mr-2"></i>
+                Cores da Empresa
+              </h3>
+            </div>
+            <div class="p-6 space-y-4">
+              <!-- Primary Color -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Cor Principal</label>
+                <div class="flex space-x-3">
+                  <input
+                    type="color"
+                    class="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                    [value]="primaryColor()"
+                    (input)="primaryColor.set($any($event.target).value); applyPreviewColors()">
+                  <input
+                    type="text"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    [value]="primaryColor()"
+                    (input)="primaryColor.set($any($event.target).value); applyPreviewColors()"
+                    placeholder="#3B82F6">
                 </div>
+                <p class="text-xs text-gray-500 mt-1">Cor principal da interface (botões, links, etc.)</p>
               </div>
 
-              <!-- Configurações de Cor -->
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label class="form-label"><strong>Cor Primária</strong></label>
-                  <div class="input-group">
-                    <input 
-                      type="color" 
-                      class="form-control form-control-color"
-                      formControlName="primaryColor">
-                    <input 
-                      type="text" 
-                      class="form-control"
-                      formControlName="primaryColor"
-                      placeholder="#007bff">
-                  </div>
-                  <div class="form-text">Cor principal da interface (botões, links, etc.)</div>
+              <!-- Secondary Color -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Cor Secundária</label>
+                <div class="flex space-x-3">
+                  <input
+                    type="color"
+                    class="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                    [value]="secondaryColor()"
+                    (input)="secondaryColor.set($any($event.target).value); applyPreviewColors()">
+                  <input
+                    type="text"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    [value]="secondaryColor()"
+                    (input)="secondaryColor.set($any($event.target).value); applyPreviewColors()"
+                    placeholder="#6B7280">
                 </div>
+                <p class="text-xs text-gray-500 mt-1">Cor para elementos secundários</p>
+              </div>
 
-                <div class="mb-3">
-                  <label class="form-label"><strong>Cor Secundária</strong></label>
-                  <div class="input-group">
-                    <input 
-                      type="color" 
-                      class="form-control form-control-color"
-                      formControlName="secondaryColor">
-                    <input 
-                      type="text" 
-                      class="form-control"
-                      formControlName="secondaryColor"
-                      placeholder="#6c757d">
-                  </div>
-                  <div class="form-text">Cor para elementos secundários</div>
-                </div>
-
-                <!-- Paleta Sugerida -->
-                <div class="mb-3">
-                  <label class="form-label"><strong>Paletas Sugeridas</strong></label>
-                  <div class="color-presets">
-                    <button 
+              <!-- Color Presets -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Paletas Sugeridas</label>
+                <div class="flex space-x-2 flex-wrap gap-2">
+                  @for (preset of colorPresets; track preset.name) {
+                    <button
                       type="button"
-                      class="color-preset"
-                      *ngFor="let preset of colorPresets"
-                      [title]="preset.name"
+                      class="w-8 h-8 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-transform"
                       [style.background-color]="preset.primary"
+                      [title]="preset.name"
                       (click)="applyColorPreset(preset)">
                     </button>
-                  </div>
+                  }
                 </div>
               </div>
-            </div>
 
-            <div class="d-flex gap-2 flex-wrap">
-              <button 
-                type="submit" 
-                class="btn btn-primary"
-                [disabled]="isLoading()">
-                <i class="fas fa-save"></i>
-                {{ isLoading() ? 'Salvando...' : 'Salvar Cores' }}
-              </button>
-              
-              <button 
-                type="button" 
-                class="btn btn-outline-secondary"
-                (click)="resetColors()">
-                <i class="fas fa-undo"></i>
-                Restaurar Padrão
-              </button>
-              
-              <button 
-                type="button" 
-                class="btn btn-outline-info"
-                (click)="generatePalette()"
-                [disabled]="!colorForm.get('primaryColor')?.value">
-                <i class="fas fa-magic"></i>
-                Gerar Palette
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- CSS Personalizado -->
-      <div class="card mt-3">
-        <div class="card-header">
-          <h6><i class="fas fa-code"></i> CSS Personalizado</h6>
-        </div>
-        <div class="card-body">
-          <div class="mb-3">
-            <label class="form-label">CSS Personalizado (Avançado)</label>
-            <textarea 
-              class="form-control font-monospace"
-              rows="6"
-              [(ngModel)]="customCss"
-              placeholder="/* Adicione seu CSS personalizado aqui */
-.custom-class {
-  color: #333;
-  font-weight: bold;
-}">
-            </textarea>
-            <div class="form-text">Cuidado: CSS inválido pode quebrar a interface</div>
-          </div>
-          
-          <div class="d-flex gap-2">
-            <button 
-              class="btn btn-outline-primary"
-              (click)="previewCustomCss()"
-              [disabled]="!customCss">
-              <i class="fas fa-eye"></i>
-              Prévia
-            </button>
-            
-            <button 
-              class="btn btn-primary"
-              (click)="saveCustomCss()"
-              [disabled]="!customCss">
-              <i class="fas fa-save"></i>
-              Salvar CSS
-            </button>
-            
-            <button 
-              class="btn btn-outline-danger"
-              (click)="clearCustomCss()">
-              <i class="fas fa-trash"></i>
-              Limpar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- URLs de Branding -->
-      <div class="card mt-3">
-        <div class="card-header">
-          <h6><i class="fas fa-link"></i> URLs de Recursos</h6>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label class="form-label">URL do Logo</label>
-                <div class="input-group">
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    [value]="currentCompany()?.logoUrl || 'Nenhum logo configurado'"
-                    readonly>
-                  <button 
-                    class="btn btn-outline-secondary" 
-                    type="button"
-                    (click)="copyToClipboard(currentCompany()?.logoUrl || '')"
-                    [disabled]="!currentCompany()?.logoUrl">
-                    <i class="fas fa-copy"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label class="form-label">Subdomínio</label>
-                <div class="input-group">
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    [value]="getCompanyUrl()"
-                    readonly>
-                  <button 
-                    class="btn btn-outline-secondary" 
-                    type="button"
-                    (click)="copyToClipboard(getCompanyUrl())">
-                    <i class="fas fa-copy"></i>
-                  </button>
-                </div>
+              <!-- Reset Colors -->
+              <div class="pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  class="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  (click)="resetColors()">
+                  <i class="fas fa-undo mr-1"></i>
+                  Restaurar Cores Padrão
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Mensagens -->
-      <div class="alert alert-success mt-3" *ngIf="successMessage()">
-        <i class="fas fa-check-circle"></i>
-        {{ successMessage() }}
-      </div>
-      
-      <div class="alert alert-danger mt-3" *ngIf="errorMessage()">
-        <i class="fas fa-exclamation-circle"></i>
-        {{ errorMessage() }}
-      </div>
-
-      <!-- Palette Gerada -->
-      <div class="card mt-3" *ngIf="generatedPalette()">
-        <div class="card-header">
-          <h6><i class="fas fa-palette"></i> Palette de Cores Gerada</h6>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-2" *ngFor="let color of generatedPalette() | keyvalue">
-              <div class="text-center mb-2">
-                <div 
-                  class="color-swatch"
-                  [style.background-color]="color.value"
-                  [title]="color.key">
-                </div>
-                <small class="d-block">{{ color.key }}</small>
-                <small class="text-muted">{{ color.value }}</small>
-              </div>
+        <!-- Company Name -->
+        <div class="mt-8 bg-white rounded-lg shadow-sm border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+              <i class="fas fa-building text-blue-500 mr-2"></i>
+              Informações da Empresa
+            </h3>
+          </div>
+          <div class="p-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa</label>
+              <input
+                type="text"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                [(ngModel)]="companyName"
+                (input)="companyName.set($any($event.target).value)"
+                placeholder="Nome da sua empresa">
+              <p class="text-xs text-gray-500 mt-1">Este nome aparecerá no cabeçalho do sistema</p>
             </div>
           </div>
         </div>
@@ -310,304 +255,157 @@ import { Company } from '../../models/company.model';
     </div>
   `,
   styles: [`
-    .branding-config-container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    
-    .branding-preview {
-      border: 2px dashed #dee2e6;
-      border-radius: 8px;
-      overflow: hidden;
-      background: white;
-    }
-    
-    .preview-header {
-      background: linear-gradient(135deg, var(--bs-primary, #007bff) 0%, var(--bs-primary, #0056b3) 100%);
-    }
-    
-    .preview-logo {
-      width: 50px;
-      height: 50px;
-      object-fit: contain;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      padding: 4px;
-    }
-    
-    .preview-logo-placeholder {
-      width: 50px;
-      height: 50px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 1.5rem;
-    }
-    
-    .logo-upload-area {
-      border: 2px dashed #dee2e6;
-      border-radius: 8px;
-      padding: 30px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      min-height: 150px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-    
-    .logo-upload-area:hover {
-      border-color: #007bff;
-      background-color: #f8f9fa;
-    }
-    
-    .upload-placeholder {
-      color: #6c757d;
-    }
-    
-    .current-logo {
-      position: relative;
-    }
-    
-    .uploaded-logo {
-      max-width: 100%;
-      max-height: 120px;
-      object-fit: contain;
-    }
-    
-    .logo-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    
-    .current-logo:hover .logo-overlay {
-      opacity: 1;
-    }
-    
-    .form-control-color {
-      width: 60px;
-      padding: 4px;
-    }
-    
-    .color-presets {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    
-    .color-preset {
-      width: 30px;
-      height: 30px;
-      border: 2px solid #fff;
-      border-radius: 50%;
-      cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      transition: transform 0.2s ease;
-    }
-    
-    .color-preset:hover {
-      transform: scale(1.1);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    
-    .color-swatch {
-      width: 60px;
-      height: 60px;
-      border-radius: 8px;
-      margin: 0 auto 8px;
-      border: 2px solid #fff;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .font-monospace {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 0.875rem;
+    :host {
+      display: block;
     }
   `]
 })
 export class BrandingConfigComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private brandingService = inject(BrandingService);
+  private companyService = inject(CompanyService);
   private subdomainService = inject(SubdomainService);
+  private brandingService = inject(BrandingService);
 
-  colorForm: FormGroup;
+  // Reactive signals
   currentCompany = signal<Company | null>(null);
-  isLoading = signal(false);
+  primaryColor = signal('#3B82F6');
+  secondaryColor = signal('#6B7280');
+  logoUrl = signal<string>('');
+  companyName = signal<string>('');
+  isSaving = signal(false);
   successMessage = signal<string | null>(null);
   errorMessage = signal<string | null>(null);
-  customCss = signal<string>('');
-  generatedPalette = signal<{ [key: string]: string } | null>(null);
 
   colorPresets = [
-    { name: 'Azul', primary: '#007bff', secondary: '#6c757d' },
-    { name: 'Verde', primary: '#28a745', secondary: '#17a2b8' },
-    { name: 'Vermelho', primary: '#dc3545', secondary: '#fd7e14' },
-    { name: 'Roxo', primary: '#6f42c1', secondary: '#e83e8c' },
-    { name: 'Laranja', primary: '#fd7e14', secondary: '#20c997' },
-    { name: 'Índigo', primary: '#6610f2', secondary: '#6f42c1' }
+    { name: 'Azul', primary: '#3B82F6', secondary: '#6B7280' },
+    { name: 'Verde', primary: '#10B981', secondary: '#6B7280' },
+    { name: 'Vermelho', primary: '#EF4444', secondary: '#6B7280' },
+    { name: 'Roxo', primary: '#8B5CF6', secondary: '#6B7280' },
+    { name: 'Laranja', primary: '#F59E0B', secondary: '#6B7280' },
+    { name: 'Rosa', primary: '#EC4899', secondary: '#6B7280' }
   ];
 
-  constructor() {
-    this.colorForm = this.fb.group({
-      primaryColor: ['#007bff'],
-      secondaryColor: ['#6c757d']
-    });
-  }
-
   ngOnInit() {
-    this.currentCompany.set(this.subdomainService.getCurrentCompany());
     this.loadCurrentBranding();
   }
 
   loadCurrentBranding() {
-    const company = this.currentCompany();
+    const company = this.subdomainService.getCurrentCompany();
     if (company) {
-      this.colorForm.patchValue({
-        primaryColor: company.primaryColor || '#007bff',
-        secondaryColor: company.secondaryColor || '#6c757d'
+      this.currentCompany.set(company);
+      this.primaryColor.set(company.brandingConfig?.primaryColor || '#3B82F6');
+      this.secondaryColor.set(company.brandingConfig?.secondaryColor || '#6B7280');
+      this.logoUrl.set(company.brandingConfig?.logo || '');
+      this.companyName.set(company.name || '');
+    }
+  }
+
+  async saveConfiguration() {
+    const company = this.currentCompany();
+    if (!company) {
+      this.showError('Empresa não encontrada');
+      return;
+    }
+
+    this.isSaving.set(true);
+    this.clearMessages();
+
+    try {
+      // Update company branding
+      const updatedCompany: Partial<Company> = {
+        name: this.companyName(),
+        brandingConfig: {
+          primaryColor: this.primaryColor(),
+          secondaryColor: this.secondaryColor(),
+          logo: this.logoUrl(),
+          favicon: company.brandingConfig?.favicon || '',
+          customCSS: company.brandingConfig?.customCSS || '',
+          companyName: this.companyName()
+        }
+      };
+
+      await this.companyService.updateCompany(company.id!, updatedCompany);
+      
+      // Update current company in subdomain service
+      const refreshedCompany = { ...company, ...updatedCompany };
+      this.subdomainService.setCurrentCompany(refreshedCompany);
+      this.currentCompany.set(refreshedCompany);
+
+      // Apply branding immediately using the branding service
+      await this.brandingService.updateColors({
+        primaryColor: this.primaryColor(),
+        secondaryColor: this.secondaryColor()
       });
+      
+      this.showSuccess('Configurações de branding salvas com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar configurações de branding:', error);
+      this.showError('Erro ao salvar configurações. Tente novamente.');
+    } finally {
+      this.isSaving.set(false);
     }
   }
 
   onLogoSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
-      this.uploadLogo(file);
+      // For now, we'll just create a URL for preview
+      // In a real app, you would upload this to a storage service
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.logoUrl.set(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
-  }
-
-  uploadLogo(file: File) {
-    this.isLoading.set(true);
-    this.clearMessages();
-
-    this.brandingService.uploadLogo(file).subscribe({
-      next: (response) => {
-        if (response.success) {
-          const company = this.currentCompany();
-          if (company && response.logoUrl) {
-            company.logoUrl = response.logoUrl;
-            this.currentCompany.set(company);
-          }
-          this.showSuccess('Logo enviado com sucesso!');
-        } else {
-          this.showError('Falha ao enviar logo: ' + (response.error || 'Erro desconhecido'));
-        }
-        this.isLoading.set(false);
-      },
-      error: (error) => {
-        console.error('Erro ao fazer upload do logo:', error);
-        this.showError('Erro ao fazer upload do logo: ' + (error.message || 'Erro desconhecido'));
-        this.isLoading.set(false);
-      }
-    });
   }
 
   removeLogo() {
     if (confirm('Tem certeza que deseja remover o logo?')) {
-      const company = this.currentCompany();
-      if (company) {
-        company.logoUrl = undefined;
-        this.currentCompany.set(company);
-        this.showSuccess('Logo removido com sucesso!');
-      }
+      this.logoUrl.set('');
     }
   }
 
-  async saveColors() {
-    if (this.colorForm.invalid) return;
-
-    this.isLoading.set(true);
-    this.clearMessages();
-
-    try {
-      const formValue = this.colorForm.value;
-      await this.brandingService.updateColors({
-        primaryColor: formValue.primaryColor,
-        secondaryColor: formValue.secondaryColor
-      });
-
-      this.showSuccess('Cores atualizadas com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar cores:', error);
-      this.showError('Erro ao salvar cores. Tente novamente.');
-    } finally {
-      this.isLoading.set(false);
-    }
-  }
-
-  applyColorPreset(preset: any) {
-    this.colorForm.patchValue({
-      primaryColor: preset.primary,
-      secondaryColor: preset.secondary
-    });
+  applyColorPreset(preset: { name: string, primary: string, secondary: string }) {
+    this.primaryColor.set(preset.primary);
+    this.secondaryColor.set(preset.secondary);
+    
+    // Apply preview immediately
+    this.applyPreviewColors();
   }
 
   resetColors() {
-    this.colorForm.patchValue({
-      primaryColor: '#007bff',
-      secondaryColor: '#6c757d'
-    });
-    this.brandingService.resetToDefault();
-    this.showSuccess('Cores restauradas para o padrão!');
+    this.primaryColor.set('#3B82F6');
+    this.secondaryColor.set('#6B7280');
   }
 
-  generatePalette() {
-    const primaryColor = this.colorForm.get('primaryColor')?.value;
-    if (primaryColor) {
-      const palette = this.brandingService.generateColorPalette(primaryColor);
-      this.generatedPalette.set(palette);
-    }
+  getContrastColor(hexColor: string): string {
+    // Simple contrast color calculation
+    if (!hexColor) return '#000000';
+    
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
   }
 
-  previewCustomCss() {
-    const css = this.customCss();
-    if (css) {
-      this.brandingService.applyCustomCss(css);
-      this.showSuccess('Prévia do CSS aplicada! Recarregue para remover.');
-    }
+  private applyBrandingToPage() {
+    // Apply branding to current page (for immediate feedback)
+    document.documentElement.style.setProperty('--primary-color', this.primaryColor());
+    document.documentElement.style.setProperty('--secondary-color', this.secondaryColor());
   }
 
-  saveCustomCss() {
-    const css = this.customCss();
-    if (css) {
-      this.brandingService.applyCustomCss(css);
-      this.showSuccess('CSS personalizado salvo!');
-    }
-  }
-
-  clearCustomCss() {
-    this.customCss.set('');
-    this.brandingService.removeCustomCss();
-    this.showSuccess('CSS personalizado removido!');
-  }
-
-  getCompanyUrl(): string {
-    const company = this.currentCompany();
-    return company ? this.subdomainService.getCompanyUrl(company.subdomain) : '';
-  }
-
-  copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      this.showSuccess('Copiado para área de transferência!');
-    }).catch(() => {
-      this.showError('Erro ao copiar para área de transferência.');
+  applyPreviewColors() {
+    // Apply colors immediately for preview using the branding service
+    this.brandingService.updateColors({
+      primaryColor: this.primaryColor(),
+      secondaryColor: this.secondaryColor()
+    }).catch(error => {
+      // Silent error for preview - just apply styles directly
+      this.applyBrandingToPage();
     });
   }
 

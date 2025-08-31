@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
          signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, updateProfile } from '@angular/fire/auth';
-import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
 
 @Injectable({
@@ -78,25 +78,37 @@ export class AuthService {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(this.auth, provider);
       
+      // Criar ou atualizar usuário no Firestore
+      await this.createOrUpdateUser(result.user);
+      
+      return result;
+    } catch (error) {
+      console.error('Erro no login com Google:', error);
+      throw error;
+    }
+  }
+
+  private async createOrUpdateUser(user: any) {
+    try {
       // Verificar se o usuário já existe no Firestore
-      const userDoc = await getDoc(doc(this.firestore, 'users', result.user.uid));
+      const userDocRef = doc(this.firestore, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
       if (!userDoc.exists()) {
-        await setDoc(doc(this.firestore, 'users', result.user.uid), {
-          email: result.user.email,
-          displayName: result.user.displayName,
+        await setDoc(userDocRef, {
+          email: user.email,
+          displayName: user.displayName,
           createdAt: new Date(),
           lastLogin: new Date()
         });
       } else {
-        // Atualizar último login
-        await setDoc(doc(this.firestore, 'users', result.user.uid), {
+        // Atualizar lastLogin
+        await updateDoc(userDocRef, {
           lastLogin: new Date()
-        }, { merge: true });
+        });
       }
-      
-      return { success: true, user: result.user };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error) {
+      console.error('Erro ao criar/atualizar usuário:', error);
     }
   }
 

@@ -6,11 +6,13 @@ import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Board } from '../../services/firestore.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { CreateBoardModalComponent } from '../create-board-modal/create-board-modal.component';
+import { MainLayoutComponent } from '../main-layout/main-layout.component';
+import { CompanyBreadcrumbComponent } from '../company-breadcrumb/company-breadcrumb.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, CreateBoardModalComponent],
+  imports: [CommonModule, CreateBoardModalComponent, MainLayoutComponent, CompanyBreadcrumbComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })

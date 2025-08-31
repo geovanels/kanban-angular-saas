@@ -37,14 +37,14 @@ export class CompanyGuard implements CanActivate {
         } else {
           // Inicializar contexto da empresa
           this.subdomainService.initializeFromSubdomain().then(async (company) => {
-            console.log('CompanyGuard: empresa inicializada:', company);
+            // Empresa inicializada com sucesso
             
             if (company) {
               observer.next(true);
             } else {
               // Verificar se é rota de login sem empresa (apps.taskboard.com.br)
               const currentUrl = this.router.url;
-              console.log('CompanyGuard: URL atual:', currentUrl);
+              // Verificando URL atual
               
               if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/login?')) {
                 // Se é login e há parâmetro subdomain=gobuyer, tentar criar empresa
@@ -52,7 +52,7 @@ export class CompanyGuard implements CanActivate {
                 const subdomain = urlParams.get('subdomain');
                 
                 if (subdomain === 'gobuyer') {
-                  console.log('CompanyGuard: detectado subdomain=gobuyer, permitindo acesso');
+                  // Subdomain Gobuyer detectado
                   // Permitir acesso - a empresa será criada no login
                 }
                 
@@ -81,13 +81,13 @@ export class CompanyGuard implements CanActivate {
   }
 
   private handleNoCompany() {
-    console.error('Nenhuma empresa encontrada, redirecionando...');
+    // Nenhuma empresa encontrada
     // Redirecionar para página de erro ou página principal
     // this.router.navigate(['/empresa-nao-encontrada']);
   }
 
   private handleError(error: any) {
-    console.error('Erro no guard da empresa:', error);
+    // Erro no guard da empresa
     // Redirecionar para página de erro
     // this.router.navigate(['/erro']);
   }

@@ -279,16 +279,140 @@ export class BrandingService {
 
       // Bootstrap override
       root.style.setProperty('--bs-primary', colors.primaryColor);
+      
+      // Tailwind overrides
+      root.style.setProperty('--primary-color', colors.primaryColor);
     }
 
     if (colors.secondaryColor) {
       root.style.setProperty('--color-secondary', colors.secondaryColor);
       root.style.setProperty('--bs-secondary', colors.secondaryColor);
+      root.style.setProperty('--secondary-color', colors.secondaryColor);
     }
 
     if (colors.accentColor) {
       root.style.setProperty('--color-accent', colors.accentColor);
     }
+
+    // Apply dynamic styles for all button variations
+    this.applyDynamicStyles(colors);
+  }
+
+  // Apply dynamic styles that override hardcoded colors
+  private applyDynamicStyles(colors: { primaryColor?: string; secondaryColor?: string; accentColor?: string }): void {
+    if (!colors.primaryColor) return;
+
+    // Remove existing dynamic styles
+    const existingStyle = document.getElementById('dynamic-branding-styles');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+
+    // Create new dynamic styles
+    const style = document.createElement('style');
+    style.id = 'dynamic-branding-styles';
+    style.textContent = `
+      /* Primary buttons - Override all blue variations */
+      .bg-blue-500, .bg-green-500 {
+        background-color: ${colors.primaryColor} !important;
+      }
+      
+      .hover\\:bg-blue-600:hover, .hover\\:bg-green-600:hover {
+        background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
+      }
+      
+      /* Focus states */
+      .focus\\:ring-blue-500:focus {
+        --tw-ring-color: ${colors.primaryColor}66 !important;
+      }
+      
+      .focus\\:border-blue-500:focus {
+        border-color: ${colors.primaryColor} !important;
+      }
+      
+      /* Text colors */
+      .text-blue-500 {
+        color: ${colors.primaryColor} !important;
+      }
+      
+      .hover\\:text-blue-600:hover, .hover\\:text-blue-800:hover {
+        color: ${this.darkenColor(colors.primaryColor, 15)} !important;
+      }
+      
+      .text-blue-600 {
+        color: ${this.darkenColor(colors.primaryColor, 5)} !important;
+      }
+      
+      .text-blue-800 {
+        color: ${this.darkenColor(colors.primaryColor, 20)} !important;
+      }
+      
+      /* Borders */
+      .border-blue-500 {
+        border-color: ${colors.primaryColor} !important;
+      }
+      
+      .border-blue-200 {
+        border-color: ${colors.primaryColor}33 !important;
+      }
+      
+      /* Backgrounds with opacity */
+      .bg-blue-100 {
+        background-color: ${colors.primaryColor}1A !important;
+      }
+      
+      .bg-blue-50 {
+        background-color: ${colors.primaryColor}0D !important;
+      }
+      
+      /* Toggle switches */
+      .peer-checked\\:bg-blue-600 {
+        background-color: ${colors.primaryColor} !important;
+      }
+      
+      /* Company header logo background */
+      .config-header-logo-bg, .h-8.w-8.bg-blue-500 {
+        background-color: ${colors.primaryColor} !important;
+      }
+      
+      /* Specific button classes */
+      .btn-primary {
+        background-color: ${colors.primaryColor} !important;
+        border-color: ${colors.primaryColor} !important;
+      }
+      
+      .btn-primary:hover {
+        background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
+        border-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
+      }
+    `;
+
+    if (colors.secondaryColor) {
+      style.textContent += `
+        /* Secondary color applications */
+        .text-gray-500 {
+          color: ${colors.secondaryColor} !important;
+        }
+        
+        .bg-gray-500 {
+          background-color: ${colors.secondaryColor} !important;
+        }
+        
+        .hover\\:bg-gray-600:hover {
+          background-color: ${this.darkenColor(colors.secondaryColor, 10)} !important;
+        }
+        
+        .text-gray-600 {
+          color: ${this.darkenColor(colors.secondaryColor, 5)} !important;
+        }
+        
+        .text-gray-700 {
+          color: ${this.darkenColor(colors.secondaryColor, 10)} !important;
+        }
+      `;
+    }
+    
+    document.head.appendChild(style);
   }
 
   // Aplicar favicon

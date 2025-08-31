@@ -124,7 +124,7 @@ export class SubdomainService {
         
         // Se for a empresa 'gobuyer', tentar criar automaticamente
         if (subdomain === 'gobuyer') {
-          console.log('Tentando criar empresa Gobuyer automaticamente...');
+          // Tentando criar empresa Gobuyer automaticamente
           this.companyService.seedGobuyerCompany().then(async () => {
             // Tentar buscar novamente após criar
             const company = await this.companyService.getCompanyBySubdomain('gobuyer');
@@ -236,7 +236,7 @@ export class SubdomainService {
   // Criar empresa automaticamente em desenvolvimento
   private async createDevelopmentCompany(subdomain: string) {
     try {
-      console.log(`Criando empresa de desenvolvimento: ${subdomain}`);
+      // Criando empresa de desenvolvimento
       
       const companyData = {
         subdomain: subdomain,
@@ -284,7 +284,7 @@ export class SubdomainService {
       
       if (company) {
         this.currentCompanySubject.next(company);
-        console.log(`Empresa ${subdomain} criada com sucesso:`, companyId);
+        // Empresa criada com sucesso
       }
       
     } catch (error) {

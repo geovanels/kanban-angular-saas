@@ -39,13 +39,8 @@ export const routes: Routes = [
     canActivate: [CompanyGuard, authGuard]
   },
   {
-    path: 'empresa/api',
-    loadComponent: () => import('./components/api-config/api-config.component').then(m => m.ApiConfigComponent),
-    canActivate: [CompanyGuard, authGuard]
-  },
-  {
-    path: 'empresa/links',
-    loadComponent: () => import('./components/company-links/company-links.component').then(m => m.CompanyLinksComponent),
+    path: 'empresa/integracoes',
+    loadComponent: () => import('./components/api-links-config/api-links-config.component').then(m => m.ApiLinksConfigComponent),
     canActivate: [CompanyGuard, authGuard]
   },
   {

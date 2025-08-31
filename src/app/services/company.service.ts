@@ -60,12 +60,16 @@ export class CompanyService {
       
       return companyRef.id;
     } catch (error) {
-      console.error('Erro ao criar empresa:', error);
+      // Erro ao criar empresa
       throw error;
     }
   }
 
   async getCompanyBySubdomain(subdomain: string): Promise<Company | null> {
+    return this.queryCompanyBySubdomain(subdomain);
+  }
+
+  private async queryCompanyBySubdomain(subdomain: string): Promise<Company | null> {
     try {
       const companiesRef = collection(this.firestore, 'companies');
       const q = query(companiesRef, where('subdomain', '==', subdomain));
@@ -75,11 +79,11 @@ export class CompanyService {
         return null;
       }
       
-      const doc = querySnapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as Company;
+      const docData = querySnapshot.docs[0];
+      return { id: docData.id, ...docData.data() } as Company;
     } catch (error) {
-      console.error('Erro ao buscar empresa por subdomínio:', error);
-      throw error;
+      // Erro silencioso para segurança
+      return null;
     }
   }
 
@@ -94,7 +98,7 @@ export class CompanyService {
       
       return null;
     } catch (error) {
-      console.error('Erro ao buscar empresa:', error);
+      // Erro ao buscar empresa
       throw error;
     }
   }
@@ -296,11 +300,11 @@ export class CompanyService {
       // Verificar se a empresa Gobuyer já existe
       const existingCompany = await this.getCompanyBySubdomain('gobuyer');
       if (existingCompany) {
-        console.log('Empresa Gobuyer já existe:', existingCompany.id);
+        // Empresa Gobuyer já existe
         return;
       }
 
-      console.log('Criando empresa Gobuyer...');
+      // Criando empresa Gobuyer
       
       // Criar empresa Gobuyer
       const gobuyerData: Omit<Company, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -343,7 +347,7 @@ export class CompanyService {
       };
 
       const companyId = await this.createCompany(gobuyerData);
-      console.log('Empresa Gobuyer criada com ID:', companyId);
+      // Empresa Gobuyer criada com sucesso
 
       // Migrar dados existentes se houver
       await this.migrateBoardsFromUsers(companyId);
@@ -414,7 +418,7 @@ export class CompanyService {
 
   private async migrateExistingData(companyId: string): Promise<void> {
     try {
-      console.log('Migrando dados existentes para a empresa Gobuyer...');
+      // Migrando dados existentes para a empresa Gobuyer
       
       // 1. Adicionar usuários conhecidos do Firebase Auth (emails da Gobuyer)
       const gobuyerUsers = [
@@ -431,7 +435,7 @@ export class CompanyService {
       // 2. Migrar quadros existentes da estrutura antiga para nova
       await this.migrateLegacyBoards(companyId);
       
-      console.log('Migração de dados concluída');
+      // Migração de dados concluída
       
     } catch (error) {
       console.error('Erro na migração de dados:', error);
@@ -440,7 +444,7 @@ export class CompanyService {
 
   private async migrateLegacyBoards(companyId: string): Promise<void> {
     try {
-      console.log('Migrando quadros existentes para a empresa Gobuyer...');
+      // Migrando quadros existentes para a empresa Gobuyer
       
       // Verificar se há quadros na nova estrutura
       const newBoardsRef = collection(this.firestore, 'companies', companyId, 'boards');
@@ -451,11 +455,11 @@ export class CompanyService {
         const migrated = await this.migrateBoardsFromUsers(companyId);
         
         if (!migrated) {
-          console.log('Nenhum quadro encontrado, criando quadro padrão da Gobuyer...');
+          // Nenhum quadro encontrado, criando quadro padrão da Gobuyer
           await this.createDefaultBoard(companyId);
         }
       } else {
-        console.log('Quadros já existem na nova estrutura');
+        // Quadros já existem na nova estrutura
         // Garantir que todos os quadros tenham companyId
         await this.updateBoardsWithCompanyId(companyId);
       }
@@ -480,7 +484,7 @@ export class CompanyService {
         const oldBoardsSnapshot = await getDocs(oldBoardsRef);
         
         if (!oldBoardsSnapshot.empty) {
-          console.log(`Encontrados ${oldBoardsSnapshot.docs.length} quadros do usuário ${userId}`);
+          // Encontrados quadros do usuário para migração
           
           for (const boardDoc of oldBoardsSnapshot.docs) {
             const boardData = boardDoc.data();
@@ -494,7 +498,7 @@ export class CompanyService {
               migratedAt: new Date()
             });
             
-            console.log(`Quadro migrado: ${boardData['name']} -> ${newBoardRef.id}`);
+            // Quadro migrado com sucesso
             
             // Migrar colunas
             await this.migrateBoardColumns(userId, boardDoc.id, companyId, newBoardRef.id);
@@ -530,7 +534,7 @@ export class CompanyService {
         });
       }
       
-      console.log(`Colunas migradas para o quadro ${newBoardId}`);
+      // Colunas migradas para o quadro
     } catch (error) {
       console.error('Erro ao migrar colunas:', error);
     }
@@ -552,7 +556,7 @@ export class CompanyService {
         });
       }
       
-      console.log(`Leads migrados para o quadro ${newBoardId}`);
+      // Leads migrados para o quadro
     } catch (error) {
       console.error('Erro ao migrar leads:', error);
     }
@@ -583,7 +587,7 @@ export class CompanyService {
       await setDoc(colRef, { ...columnData, companyId });
     }
     
-    console.log('Quadro padrão criado:', boardRef.id);
+    // Quadro padrão criado com sucesso
   }
 
   private async updateBoardsWithCompanyId(companyId: string): Promise<void> {
@@ -596,7 +600,7 @@ export class CompanyService {
         
         if (!boardData['companyId']) {
           await updateDoc(boardDoc.ref, { companyId });
-          console.log(`CompanyId adicionado ao quadro: ${boardData['name']}`);
+          // CompanyId adicionado ao quadro
         }
       }
     } catch (error) {

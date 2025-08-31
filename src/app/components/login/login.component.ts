@@ -155,12 +155,11 @@ export class LoginComponent implements OnInit {
     this.isLoading.set(true);
     this.clearMessages();
 
-    const result = await this.authService.signInWithGoogle();
-    
-    if (result.success) {
+    try {
+      const result = await this.authService.signInWithGoogle();
       await this.handleSuccessfulLogin();
-    } else {
-      this.errorMessage.set(this.getErrorMessage(result.error));
+    } catch (error) {
+      this.errorMessage.set(this.getErrorMessage(error as any));
     }
     
     this.isLoading.set(false);
@@ -293,11 +292,8 @@ export class LoginComponent implements OnInit {
         return;
       }
 
-      console.log('Login processado para usuário:', currentUser.email);
-
       // Se o usuário é da Gobuyer, configurar contexto e ir para dashboard
       if (currentUser.email.includes('gobuyer.com.br')) {
-        console.log('Usuário da Gobuyer detectado:', currentUser.email);
         // Set up Gobuyer context for development
         if (this.subdomainService.isDevelopment()) {
           localStorage.setItem('dev-subdomain', 'gobuyer');

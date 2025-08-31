@@ -5,11 +5,13 @@ import { CompanyService } from '../../services/company.service';
 import { AuthService } from '../../services/auth.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { CompanyUser, Company } from '../../models/company.model';
+import { ConfigHeaderComponent } from '../config-header/config-header.component';
+import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 @Component({
   selector: 'app-user-management',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ConfigHeaderComponent, MainLayoutComponent],
   templateUrl: './user-management.component.html',
   styleUrls: ['./user-management.component.scss']
 })
@@ -43,10 +45,11 @@ export class UserManagementComponent implements OnInit {
     // Garantir que a empresa Gobuyer existe
     await this.ensureGobuyerCompany();
     
-    await this.loadCompanyUsers();
+    // Primeiro, tentar sincronizar o usuário atual com a empresa
+    await this.forceAddCurrentUser();
     
-    // Auto-sincronizar usuário atual se não estiver na lista da empresa
-    await this.syncCurrentUserToCompany();
+    // Depois carregar todos os usuários
+    await this.loadCompanyUsers();
   }
 
   private async ensureGobuyerCompany() {
@@ -61,6 +64,23 @@ export class UserManagementComponent implements OnInit {
     }
   }
 
+  private async forceAddCurrentUser() {
+    const currentUser = this.authService.getCurrentUser();
+    const company = this.currentCompany();
+    
+    if (!currentUser || !company || !currentUser.email) return;
+
+    try {
+      // Determinar role baseado no email do proprietário
+      const role = currentUser.email === company.ownerEmail ? 'admin' : 'user';
+      
+      // Forçar adição do usuário à empresa (será ignorado se já existir)
+      await this.companyService.addUserToCompany(company.id!, currentUser.email, role);
+    } catch (error) {
+      // Erro silencioso pois pode ser normal se o usuário já existir
+    }
+  }
+
   private async syncCurrentUserToCompany() {
     const currentUser = this.authService.getCurrentUser();
     const company = this.currentCompany();
@@ -72,8 +92,6 @@ export class UserManagementComponent implements OnInit {
       const existingUser = this.users().find(u => u.email === currentUser.email);
       
       if (!existingUser) {
-        console.log('Auto-adicionando usuário atual à empresa:', currentUser.email);
-        
         // Determinar role baseado no email do proprietário
         const role = currentUser.email === company.ownerEmail ? 'admin' : 'user';
         
@@ -99,21 +117,21 @@ export class UserManagementComponent implements OnInit {
   private async loadCompanyUsers() {
     const company = this.currentCompany();
     if (!company) {
-      console.log('Nenhuma empresa encontrada para carregar usuários');
+      // Nenhuma empresa encontrada para carregar usuários
       return;
     }
 
-    console.log('Carregando usuários da empresa:', company.id, company.name);
+    // Carregando usuários da empresa
     this.isLoading.set(true);
     try {
       let users = await this.companyService.getCompanyUsers(company.id!);
-      console.log('Usuários encontrados na empresa:', users);
+      // Usuários encontrados na empresa
       
       // Se não há usuários, adicionar o usuário atual automaticamente
       if (users.length === 0) {
         const currentUser = this.authService.getCurrentUser();
         if (currentUser && currentUser.email) {
-          console.log('Adicionando usuário atual à empresa:', currentUser.email);
+          // Adicionando usuário atual à empresa
           await this.companyService.addUserToCompany(
             company.id!, 
             currentUser.email, 
@@ -152,7 +170,7 @@ export class UserManagementComponent implements OnInit {
         }
       }));
       
-      console.log('Usuários enriquecidos:', enrichedUsers);
+      // Usuários enriquecidos processados
       this.users.set(enrichedUsers);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -262,6 +280,23 @@ export class UserManagementComponent implements OnInit {
       alert('Erro ao alterar função do usuário. Tente novamente.');
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  async resendInvite(userEmail: string) {
+    const company = this.currentCompany();
+    if (!company) return;
+
+    try {
+      // Re-adicionar o usuário à empresa (que funciona como reenviar convite)
+      const user = this.users().find(u => u.email === userEmail);
+      if (user) {
+        await this.companyService.addUserToCompany(company.id!, userEmail, user.role);
+        alert(`Convite reenviado para ${userEmail}`);
+      }
+    } catch (error) {
+      console.error('Erro ao reenviar convite:', error);
+      alert('Erro ao reenviar convite. Tente novamente.');
     }
   }
 

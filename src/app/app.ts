@@ -17,14 +17,13 @@ export class App implements OnInit {
 
   async ngOnInit() {
     try {
-      console.log('🚀 Inicializando aplicação multi-empresa...');
-      console.log('🌍 URL atual:', window.location.href);
+      // Inicializando aplicação multi-empresa
       
       // Inicializar contexto da empresa baseado no subdomínio
       const company = await this.subdomainService.initializeFromSubdomain();
       
       if (company) {
-        console.log('✅ Empresa carregada:', company);
+        // Empresa carregada com sucesso
         
         // Definir contexto da empresa no FirestoreService
         this.firestoreService.setCompanyContext(company);
@@ -36,7 +35,7 @@ export class App implements OnInit {
         this.updatePageTitle(company.name);
         
       } else {
-        console.log('ℹ️ Nenhuma empresa encontrada - modo login/registro');
+        // Nenhuma empresa encontrada - modo login/registro
         this.title.set('Sistema Kanban - Login');
       }
       
