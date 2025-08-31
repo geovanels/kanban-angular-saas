@@ -1,8 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/kanban-angular/browser",
-  "installCommand": "npm install",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist/kanban-angular/browser"
+      }
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
