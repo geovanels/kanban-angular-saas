@@ -293,8 +293,11 @@ export class LoginComponent implements OnInit {
         return;
       }
 
+      console.log('Login processado para usuário:', currentUser.email);
+
       // Se o usuário é da Gobuyer, configurar contexto e ir para dashboard
       if (currentUser.email.includes('gobuyer.com.br')) {
+        console.log('Usuário da Gobuyer detectado:', currentUser.email);
         // Set up Gobuyer context for development
         if (this.subdomainService.isDevelopment()) {
           localStorage.setItem('dev-subdomain', 'gobuyer');
@@ -303,7 +306,13 @@ export class LoginComponent implements OnInit {
         // Try to get real company data or create it
         await this.subdomainService.initializeFromSubdomain();
         
-        // Redirecionar para o subdomínio correto da Gobuyer
+        // Em desenvolvimento, apenas navegar localmente
+        if (this.subdomainService.isDevelopment()) {
+          this.router.navigate(['/dashboard']);
+          return;
+        }
+        
+        // Em produção, redirecionar para o subdomínio correto da Gobuyer
         const gobuyerUrl = this.subdomainService.getCompanyUrl('gobuyer');
         window.location.href = gobuyerUrl + '/dashboard';
         return;
@@ -317,9 +326,16 @@ export class LoginComponent implements OnInit {
           // Definir contexto da empresa
           this.subdomainService.setCurrentCompany(userCompany);
           
-          // Redirecionar para o subdomínio correto da empresa
-          const companyUrl = this.subdomainService.getCompanyUrl(userCompany.subdomain);
-          window.location.href = companyUrl + '/dashboard';
+          // Em desenvolvimento, apenas navegar localmente
+          if (this.subdomainService.isDevelopment()) {
+            // Definir subdomínio no localStorage
+            localStorage.setItem('dev-subdomain', userCompany.subdomain);
+            this.router.navigate(['/dashboard']);
+          } else {
+            // Em produção, redirecionar para o subdomínio correto da empresa
+            const companyUrl = this.subdomainService.getCompanyUrl(userCompany.subdomain);
+            window.location.href = companyUrl + '/dashboard';
+          }
         } else {
           // Usuário não tem empresa
           this.errorMessage.set('Usuário não pertence a nenhuma empresa. Entre em contato com o suporte.');

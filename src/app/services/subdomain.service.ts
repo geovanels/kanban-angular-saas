@@ -184,11 +184,21 @@ export class SubdomainService {
     return hostname === 'localhost' || hostname === '127.0.0.1';
   }
 
+  // Obter URL base atual (com porta dinâmica)
+  private getBaseUrl(): string {
+    if (typeof window === 'undefined') {
+      return 'http://localhost:4200';
+    }
+    
+    const { protocol, hostname, port } = window.location;
+    const portSuffix = port ? `:${port}` : '';
+    return `${protocol}//${hostname}${portSuffix}`;
+  }
+
   // Gerar URL para uma empresa específica
   getCompanyUrl(subdomain: string): string {
     if (this.isDevelopment()) {
-      const port = typeof window !== 'undefined' ? window.location.port : '4200';
-      return `http://localhost:${port}?subdomain=${subdomain}`;
+      return `${this.getBaseUrl()}?subdomain=${subdomain}`;
     }
     
     // Usar subdomínios reais com HTTPS
@@ -217,7 +227,7 @@ export class SubdomainService {
     }
 
     if (this.isDevelopment()) {
-      return `http://localhost:4200/form/${company.subdomain}`;
+      return `${this.getBaseUrl()}/form/${company.subdomain}`;
     }
     
     return `https://${company.subdomain}.taskboard.com.br/form`;
@@ -235,12 +245,38 @@ export class SubdomainService {
         contactPhone: '+55 11 99999-9999',
         address: 'Desenvolvimento Local',
         cnpj: '00.000.000/0001-00',
-        plan: 'professional',
-        status: 'active',
+        plan: 'professional' as const,
+        status: 'active' as const,
         ownerId: 'dev-user',
         ownerEmail: `admin@${subdomain}.dev`,
         maxUsers: 50,
-        maxBoards: 100
+        maxBoards: 100,
+        smtpConfig: {
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false,
+          user: '',
+          password: '',
+          fromName: `Empresa ${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}`,
+          fromEmail: `contato@${subdomain}.dev`
+        },
+        apiConfig: {
+          enabled: true,
+          token: '',
+          endpoint: `${this.getBaseUrl()}/api/v1/lead-intake`,
+          webhookUrl: ''
+        },
+        features: {
+          maxBoards: 10,
+          maxUsers: 20,
+          maxLeadsPerMonth: 5000,
+          maxEmailsPerMonth: 2500,
+          customBranding: true,
+          apiAccess: true,
+          webhooks: true,
+          advancedReports: true,
+          whiteLabel: false
+        }
       };
 
       const companyId = await this.companyService.createCompany(companyData);
