@@ -1,0 +1,295 @@
+<div *ngIf="isVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" (click)="onBackdropClick($event)">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden">
+    <!-- Header -->
+    <div class="flex justify-between items-center p-6 border-b border-gray-200">
+      <h2 class="text-2xl font-bold text-gray-900">
+        {{ getCurrentColumn()?.order === 0 ? (currentLead?.fields?.['companyName'] || 'Lead') : (currentLead?.fields?.['title'] || 'Editar Lead') }}
+      </h2>
+      <button 
+        (click)="hide()" 
+        class="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+        [disabled]="isLoading">
+        &times;
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="grid grid-cols-12 gap-6 p-6 max-h-[calc(95vh-120px)] overflow-y-auto">
+      
+      <!-- Left Column: Lead Data -->
+      <div class="col-span-12 md:col-span-3 border-r border-gray-200 pr-6">
+        <!-- Dados do Lead -->
+        <div class="mb-8">
+          <h3 class="font-bold text-lg mb-3 text-gray-800">Dados do Lead</h3>
+          <div class="space-y-2">
+            <!-- Responsável -->
+            <div class="grid grid-cols-3 gap-2">
+              <strong class="col-span-1 text-sm text-gray-600">Responsável:</strong>
+              <span class="col-span-2 text-sm break-all">
+                {{ currentLead?.responsibleUserName || 'Ninguém' }}
+              </span>
+            </div>
+            <!-- Campos iniciais -->
+            <div *ngFor="let field of getInitialFields()" class="grid grid-cols-3 gap-2">
+              <strong class="col-span-1 text-sm text-gray-600">{{ field.label }}:</strong>
+              <span class="col-span-2 text-sm break-all">{{ field.value }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Histórico de Fases -->
+        <div class="mb-8">
+          <h3 class="font-bold text-lg mb-3 text-gray-800">Histórico de Fases</h3>
+          <div class="space-y-3">
+            <div *ngFor="let phase of getPhaseHistoryItems()" class="text-xs p-2 rounded border-l-4" [style.border-left-color]="phase.phaseColor">
+              <div class="font-medium text-gray-800">{{ phase.phaseName }}</div>
+              <div class="text-gray-600">Entrada: {{ phase.enteredAt }}</div>
+              <div class="text-gray-600" *ngIf="phase.exitedAt !== 'Atual'">Saída: {{ phase.exitedAt }}</div>
+              <div class="text-gray-600">Duração: {{ phase.duration }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Atividades Recentes -->
+        <div>
+          <h3 class="font-bold text-lg mb-3 text-gray-800">Atividades Recentes</h3>
+          <div class="space-y-3 max-h-64 overflow-y-auto">
+            <div *ngFor="let activity of getActivityLog()" class="text-xs p-2 bg-gray-50 rounded">
+              <div class="flex items-center mb-1">
+                <i [class]="getActivityIcon(activity.type)" class="mr-2 text-blue-500"></i>
+                <span class="font-medium">{{ activity.user }}</span>
+                <span class="ml-auto text-gray-500">{{ formatDateTime(activity.timestamp) }}</span>
+              </div>
+              <div [innerHTML]="activity.text" class="text-gray-700"></div>
+              <div *ngIf="activity.attachment" class="mt-2">
+                <a [href]="activity.attachment.url" target="_blank" class="text-blue-600 hover:underline flex items-center">
+                  <i class="fas fa-paperclip mr-1"></i>
+                  {{ activity.attachment.name }}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Column: Form and Comments -->
+      <div class="col-span-12 md:col-span-6">
+        <!-- Formulário da Fase Atual -->
+        <div class="mb-8">
+          <h3 class="font-bold text-lg mb-3 text-gray-800">Formulário da Fase Atual</h3>
+          <form [formGroup]="leadForm" class="space-y-4">
+            
+            <!-- Campo Responsável -->
+            <div class="form-group">
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Responsável
+              </label>
+              <select formControlName="responsibleUserId" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Ninguém</option>
+                <option *ngFor="let user of users" [value]="user.uid">
+                  {{ user.displayName || user.email }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Campo Temperatura -->
+            <div class="form-group">
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Temperatura <span class="text-xs text-gray-500">(Qualificação do lead)</span>
+              </label>
+              <select formControlName="temperature" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Selecione...</option>
+                <option value="frio">❄️ Frio - Pouco interesse</option>
+                <option value="morno">🌡️ Morno - Interesse moderado</option>
+                <option value="quente">🔥 Quente - Muito interessado</option>
+                <option value="cliente">⭐ Cliente - Já convertido</option>
+              </select>
+            </div>
+
+            <!-- Campos dinâmicos da fase -->
+            <ng-container *ngFor="let field of currentFormFields">
+              <div class="form-group">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  {{ field.label }}
+                  <span *ngIf="field.required" class="text-red-500">*</span>
+                </label>
+                
+                <!-- Campo de texto -->
+                <input 
+                  *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel' || field.type === 'url'" 
+                  [type]="field.type"
+                  [formControlName]="field.name"
+                  [placeholder]="field.placeholder || ''"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                
+                <!-- Campo de textarea -->
+                <textarea 
+                  *ngIf="field.type === 'textarea'" 
+                  [formControlName]="field.name"
+                  [placeholder]="field.placeholder || ''"
+                  rows="3"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </textarea>
+                
+                <!-- Campo de número -->
+                <input 
+                  *ngIf="field.type === 'number'" 
+                  type="number"
+                  [formControlName]="field.name"
+                  [placeholder]="field.placeholder || ''"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                
+                <!-- Campo de data -->
+                <input 
+                  *ngIf="field.type === 'date'" 
+                  type="date"
+                  [formControlName]="field.name"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                
+                <!-- Campo select -->
+                <select 
+                  *ngIf="field.type === 'select'" 
+                  [formControlName]="field.name"
+                  class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">Selecione...</option>
+                  <option *ngFor="let option of field.options" [value]="option">{{ option }}</option>
+                </select>
+              </div>
+            </ng-container>
+          </form>
+        </div>
+
+        <!-- Comentários -->
+        <div>
+          <h3 class="font-bold text-lg mb-3 text-gray-800">Comentários</h3>
+          <div class="space-y-4">
+            <div>
+              <textarea 
+                [(ngModel)]="commentText"
+                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Escreva um comentário..."
+                rows="3">
+              </textarea>
+              
+              <!-- Preview do anexo -->
+              <div *ngIf="attachmentPreview" class="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-600 flex items-center justify-between">
+                <span>{{ attachmentPreview }}</span>
+                <button (click)="clearAttachment()" class="text-red-500 hover:text-red-700">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+              
+              <div class="flex justify-between items-center mt-3">
+                <div>
+                  <button 
+                    type="button" 
+                    (click)="fileInput.click()"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg text-sm mr-2">
+                    <i class="fas fa-paperclip mr-2"></i>Anexar Arquivo
+                  </button>
+                  <input #fileInput type="file" class="hidden" (change)="onFileSelected($event)" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt,.zip,.rar">
+                </div>
+                
+                <button 
+                  (click)="addComment()"
+                  [disabled]="isUploadingComment || (!commentText.trim() && !selectedFile)"
+                  class="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white font-semibold py-2 px-4 rounded-lg flex items-center">
+                  <div *ngIf="isUploadingComment" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <i class="fas fa-paper-plane mr-2"></i>
+                  {{ isUploadingComment ? 'Enviando...' : 'Enviar' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Actions -->
+      <div class="col-span-12 md:col-span-3 border-l border-gray-200 pl-6 flex flex-col justify-between">
+        <div>
+          <!-- Ações -->
+          <div class="mb-8">
+            <h3 class="font-bold text-lg mb-3 text-gray-800">Mover Lead</h3>
+            
+            <!-- Fases de Avanço -->
+            <div *ngIf="getAdvancePhases().length > 0" class="mb-4">
+              <h4 class="text-sm font-semibold text-green-700 mb-2">🚀 Avançar para:</h4>
+              <div class="grid grid-cols-1 gap-2">
+                <button 
+                  *ngFor="let phase of getAdvancePhases()" 
+                  (click)="moveLead(phase.id!)"
+                  [disabled]="isLoading"
+                  class="text-left p-2 border border-green-200 rounded-md hover:bg-green-50 transition-colors flex items-center text-sm bg-white">
+                  <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="phase.color"></div>
+                  <span class="font-medium">{{ phase.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Fases de Retrocesso -->
+            <div *ngIf="getRetreatPhases().length > 0" class="mb-4">
+              <h4 class="text-sm font-medium text-orange-600 mb-2">🔄 Retornar para:</h4>
+              <div class="grid grid-cols-1 gap-1">
+                <button 
+                  *ngFor="let phase of getRetreatPhases()" 
+                  (click)="moveLead(phase.id!)"
+                  [disabled]="isLoading"
+                  class="text-left p-2 border border-orange-100 rounded-md hover:bg-orange-50 transition-colors flex items-center text-xs bg-orange-25 opacity-75">
+                  <div class="w-2 h-2 rounded-full mr-2" [style.background-color]="phase.color"></div>
+                  <span>{{ phase.name }}</span>
+                </button>
+              </div>
+            </div>
+            
+            <div *ngIf="getAdvancePhases().length === 0 && getRetreatPhases().length === 0" class="text-gray-500 text-sm italic p-3 bg-gray-50 rounded-lg">
+              Lead em fase final. Não é possível movimentar.
+            </div>
+          </div>
+
+          <!-- Gerador de Link Público -->
+          <div class="mb-8">
+            <h3 class="font-bold text-lg mb-3 text-gray-800">Link Público</h3>
+            <div *ngIf="publicLink" class="space-y-2">
+              <p class="text-xs text-gray-600">Compartilhe este link para permitir edição externa:</p>
+              <div class="flex">
+                <input 
+                  type="text" 
+                  [value]="publicLink" 
+                  readonly 
+                  class="flex-1 p-2 border border-gray-300 rounded-l-lg bg-gray-50 text-xs">
+                <button 
+                  (click)="copyPublicLink()"
+                  class="bg-blue-500 hover:bg-blue-600 text-white px-3 rounded-r-lg">
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="space-y-3">
+          <!-- Mensagem de erro -->
+          <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+            {{ errorMessage }}
+          </div>
+          
+          <button 
+            (click)="saveChanges()"
+            [disabled]="isSaving || isLoading"
+            class="w-full bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center">
+            <div *ngIf="isSaving" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            {{ isSaving ? 'Salvando...' : 'Salvar Alterações' }}
+          </button>
+          
+          <button 
+            (click)="deleteLead()"
+            [disabled]="isLoading || isSaving"
+            class="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-bold py-3 px-4 rounded-lg">
+            Apagar Lead
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

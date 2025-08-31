@@ -1,0 +1,373 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, throwError, BehaviorSubject } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { SubdomainService } from './subdomain.service';
+import { CompanyService } from './company.service';
+import { Company } from '../models/company.model';
+
+export interface BrandingConfig {
+  logoUrl?: string;
+  faviconUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  fontFamily?: string;
+  customCss?: string;
+}
+
+export interface LogoUploadResponse {
+  success: boolean;
+  logoUrl?: string;
+  error?: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class BrandingService {
+  private http = inject(HttpClient);
+  private subdomainService = inject(SubdomainService);
+  private companyService = inject(CompanyService);
+
+  // Observable para mudanças de branding
+  private brandingSubject = new BehaviorSubject<BrandingConfig>({});
+  public branding$ = this.brandingSubject.asObservable();
+
+  constructor() {
+    // Inicializar com branding da empresa atual
+    this.initializeBranding();
+  }
+
+  // Inicializar branding da empresa
+  private initializeBranding() {
+    const company = this.subdomainService.getCurrentCompany();
+    if (company) {
+      this.updateBranding({
+        logoUrl: company.logoUrl,
+        primaryColor: company.primaryColor,
+        secondaryColor: company.secondaryColor
+      });
+    }
+  }
+
+  // Upload de logo
+  uploadLogo(file: File): Observable<LogoUploadResponse> {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    if (!company) {
+      return throwError(() => new Error('Empresa não encontrada'));
+    }
+
+    // Validar arquivo
+    const validationError = this.validateImageFile(file);
+    if (validationError) {
+      return throwError(() => new Error(validationError));
+    }
+
+    const formData = new FormData();
+    formData.append('logo', file);
+    formData.append('companyId', company.id!);
+
+    const uploadUrl = `${this.subdomainService.getApiUrl()}/upload/logo`;
+
+    return this.http.post<LogoUploadResponse>(uploadUrl, formData).pipe(
+      map(response => {
+        if (response.success && response.logoUrl) {
+          // Atualizar empresa com nova URL do logo
+          this.updateCompanyLogo(response.logoUrl);
+        }
+        return response;
+      }),
+      catchError(error => {
+        console.error('Erro ao fazer upload do logo:', error);
+        return throwError(() => ({
+          success: false,
+          error: error.error?.message || 'Erro ao fazer upload do logo'
+        }));
+      })
+    );
+  }
+
+  // Upload de favicon
+  uploadFavicon(file: File): Observable<LogoUploadResponse> {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    if (!company) {
+      return throwError(() => new Error('Empresa não encontrada'));
+    }
+
+    // Validar favicon (deve ser ICO ou PNG pequeno)
+    const validationError = this.validateFaviconFile(file);
+    if (validationError) {
+      return throwError(() => new Error(validationError));
+    }
+
+    const formData = new FormData();
+    formData.append('favicon', file);
+    formData.append('companyId', company.id!);
+
+    const uploadUrl = `${this.subdomainService.getApiUrl()}/upload/favicon`;
+
+    return this.http.post<LogoUploadResponse>(uploadUrl, formData).pipe(
+      map(response => {
+        if (response.success && response.logoUrl) {
+          // Aplicar favicon dinamicamente
+          this.applyFavicon(response.logoUrl);
+        }
+        return response;
+      }),
+      catchError(error => {
+        console.error('Erro ao fazer upload do favicon:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  // Atualizar cores da empresa
+  async updateColors(colors: { primaryColor?: string; secondaryColor?: string; accentColor?: string }): Promise<void> {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    if (!company) {
+      throw new Error('Empresa não encontrada');
+    }
+
+    try {
+      // Atualizar no banco de dados
+      await this.companyService.updateCompany(company.id!, colors);
+
+      // Atualizar localmente
+      Object.assign(company, colors);
+      this.subdomainService.setCurrentCompany(company);
+
+      // Aplicar cores na interface
+      this.applyColors(colors);
+
+      // Notificar observadores
+      this.updateBranding(colors);
+    } catch (error) {
+      console.error('Erro ao atualizar cores:', error);
+      throw error;
+    }
+  }
+
+  // Aplicar CSS customizado
+  applyCustomCss(css: string): void {
+    this.removeCustomCss();
+    
+    if (css.trim()) {
+      const style = document.createElement('style');
+      style.id = 'company-custom-css';
+      style.textContent = css;
+      document.head.appendChild(style);
+    }
+  }
+
+  // Remover CSS customizado
+  removeCustomCss(): void {
+    const existingStyle = document.getElementById('company-custom-css');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+  }
+
+  // Aplicar branding completo da empresa
+  applyCompanyBranding(company: Company): void {
+    const branding: BrandingConfig = {
+      logoUrl: company.logoUrl,
+      primaryColor: company.primaryColor,
+      secondaryColor: company.secondaryColor
+    };
+
+    this.updateBranding(branding);
+
+    // Aplicar cores
+    if (company.primaryColor || company.secondaryColor) {
+      this.applyColors({
+        primaryColor: company.primaryColor,
+        secondaryColor: company.secondaryColor
+      });
+    }
+
+    // Atualizar título da página
+    this.updatePageTitle(company.name);
+  }
+
+  // Gerar palette de cores baseada na cor primária
+  generateColorPalette(primaryColor: string): { [key: string]: string } {
+    // Converter hex para RGB
+    const hex = primaryColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+
+    // Gerar variações
+    return {
+      primary: primaryColor,
+      primaryLight: this.lightenColor(primaryColor, 20),
+      primaryDark: this.darkenColor(primaryColor, 20),
+      secondary: this.adjustHue(primaryColor, 30),
+      accent: this.adjustHue(primaryColor, -30),
+      success: '#28a745',
+      warning: '#ffc107',
+      danger: '#dc3545',
+      info: '#17a2b8'
+    };
+  }
+
+  // Validar arquivo de imagem
+  private validateImageFile(file: File): string | null {
+    // Tamanho máximo: 5MB
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return 'Arquivo muito grande. Tamanho máximo: 5MB';
+    }
+
+    // Tipos aceitos
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      return 'Tipo de arquivo não suportado. Use JPEG, PNG ou SVG';
+    }
+
+    return null;
+  }
+
+  // Validar arquivo de favicon
+  private validateFaviconFile(file: File): string | null {
+    // Tamanho máximo: 1MB
+    const maxSize = 1 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return 'Arquivo muito grande. Tamanho máximo: 1MB';
+    }
+
+    // Tipos aceitos para favicon
+    const allowedTypes = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      return 'Tipo de arquivo não suportado. Use ICO ou PNG';
+    }
+
+    return null;
+  }
+
+  // Atualizar logo da empresa
+  private async updateCompanyLogo(logoUrl: string): Promise<void> {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    if (company) {
+      company.logoUrl = logoUrl;
+      this.subdomainService.setCurrentCompany(company);
+      
+      // Salvar no banco de dados
+      await this.companyService.updateCompany(company.id!, { logoUrl });
+      
+      // Notificar observadores
+      this.updateBranding({ logoUrl });
+    }
+  }
+
+  // Aplicar cores na interface
+  private applyColors(colors: { primaryColor?: string; secondaryColor?: string; accentColor?: string }): void {
+    const root = document.documentElement;
+
+    if (colors.primaryColor) {
+      const palette = this.generateColorPalette(colors.primaryColor);
+      
+      // Aplicar variáveis CSS
+      Object.entries(palette).forEach(([key, value]) => {
+        root.style.setProperty(`--color-${key}`, value);
+      });
+
+      // Bootstrap override
+      root.style.setProperty('--bs-primary', colors.primaryColor);
+    }
+
+    if (colors.secondaryColor) {
+      root.style.setProperty('--color-secondary', colors.secondaryColor);
+      root.style.setProperty('--bs-secondary', colors.secondaryColor);
+    }
+
+    if (colors.accentColor) {
+      root.style.setProperty('--color-accent', colors.accentColor);
+    }
+  }
+
+  // Aplicar favicon
+  private applyFavicon(faviconUrl: string): void {
+    // Remover favicon existente
+    const existingFavicon = document.querySelector('link[rel*="icon"]');
+    if (existingFavicon) {
+      existingFavicon.remove();
+    }
+
+    // Adicionar novo favicon
+    const favicon = document.createElement('link');
+    favicon.rel = 'icon';
+    favicon.href = faviconUrl;
+    document.head.appendChild(favicon);
+  }
+
+  // Atualizar título da página
+  private updatePageTitle(companyName: string): void {
+    document.title = `${companyName} - Sistema Kanban`;
+  }
+
+  // Notificar observadores sobre mudanças de branding
+  private updateBranding(branding: Partial<BrandingConfig>): void {
+    const currentBranding = this.brandingSubject.value;
+    const newBranding = { ...currentBranding, ...branding };
+    this.brandingSubject.next(newBranding);
+  }
+
+  // Utilitários de cores
+  private lightenColor(color: string, percent: number): string {
+    const num = parseInt(color.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) + amt;
+    const G = (num >> 8 & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+      (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+  }
+
+  private darkenColor(color: string, percent: number): string {
+    const num = parseInt(color.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) - amt;
+    const G = (num >> 8 & 0x00FF) - amt;
+    const B = (num & 0x0000FF) - amt;
+    return '#' + (0x1000000 + (R > 255 ? 255 : R < 0 ? 0 : R) * 0x10000 +
+      (G > 255 ? 255 : G < 0 ? 0 : G) * 0x100 +
+      (B > 255 ? 255 : B < 0 ? 0 : B)).toString(16).slice(1);
+  }
+
+  private adjustHue(color: string, degrees: number): string {
+    // Implementação simplificada de ajuste de matiz
+    return color; // Por simplicidade, retornando a mesma cor
+  }
+
+  // Obter branding atual
+  getCurrentBranding(): BrandingConfig {
+    return this.brandingSubject.value;
+  }
+
+  // Reset para branding padrão
+  resetToDefault(): void {
+    this.removeCustomCss();
+    
+    const root = document.documentElement;
+    
+    // Remover variáveis CSS customizadas
+    root.style.removeProperty('--color-primary');
+    root.style.removeProperty('--color-secondary');
+    root.style.removeProperty('--bs-primary');
+    root.style.removeProperty('--bs-secondary');
+    
+    this.updateBranding({
+      logoUrl: undefined,
+      primaryColor: undefined,
+      secondaryColor: undefined,
+      customCss: undefined
+    });
+  }
+}

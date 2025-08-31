@@ -1,0 +1,69 @@
+<div class="modal-overlay" *ngIf="isVisible" (click)="closeModal()">
+  <div class="modal-content modal-content-lg p-6" (click)="$event.stopPropagation()">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-bold">Histórico: {{ automationName }}</h2>
+      <button class="text-gray-500 hover:text-gray-800 text-2xl" (click)="closeModal()">&times;</button>
+    </div>
+    
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-gray-600">Data</th>
+            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-gray-600">Lead Afetado</th>
+            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-gray-600">Status</th>
+            <th class="text-left py-3 px-4 uppercase font-semibold text-sm text-gray-600">Ação Executada</th>
+          </tr>
+        </thead>
+        <tbody class="text-gray-700 divide-y divide-gray-200">
+          <tr *ngIf="isLoading">
+            <td colspan="4" class="text-center p-6 text-gray-500">
+              <i class="fas fa-spinner fa-spin mr-2"></i>Carregando histórico...
+            </td>
+          </tr>
+          <tr *ngIf="!isLoading && historyItems.length === 0">
+            <td colspan="4" class="text-center p-6 text-gray-500">Nenhuma execução registrada.</td>
+          </tr>
+          <tr *ngFor="let item of paginatedItems" class="hover:bg-gray-50">
+            <td class="py-3 px-4">{{ formatDate(item.timestamp) }}</td>
+            <td class="py-3 px-4">{{ getLeadName(item.leadId) }}</td>
+            <td class="py-3 px-4">
+              <span 
+                class="px-2 py-1 text-xs font-medium rounded-full"
+                [class.bg-green-100]="item.status === 'success'"
+                [class.text-green-800]="item.status === 'success'"
+                [class.bg-red-100]="item.status === 'error'"
+                [class.text-red-800]="item.status === 'error'"
+                [class.bg-yellow-100]="item.status === 'pending'"
+                [class.text-yellow-800]="item.status === 'pending'">
+                {{ getStatusText(item.status) }}
+              </span>
+            </td>
+            <td class="py-3 px-4">{{ item.text || item.action || 'Ação executada' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Paginação -->
+    <div *ngIf="totalPages > 1" class="p-4 flex justify-between items-center">
+      <button 
+        (click)="previousPage()" 
+        [disabled]="currentPage === 1"
+        class="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-medium py-2 px-4 rounded-lg">
+        <i class="fas fa-chevron-left mr-1"></i>Anterior
+      </button>
+      
+      <span class="text-sm text-gray-600">
+        Página {{ currentPage }} de {{ totalPages }} ({{ historyItems.length }} registros)
+      </span>
+      
+      <button 
+        (click)="nextPage()" 
+        [disabled]="currentPage === totalPages"
+        class="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-medium py-2 px-4 rounded-lg">
+        Próxima<i class="fas fa-chevron-right ml-1"></i>
+      </button>
+    </div>
+  </div>
+</div>

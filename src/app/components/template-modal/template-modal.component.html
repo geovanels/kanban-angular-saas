@@ -1,0 +1,183 @@
+<div *ngIf="isVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" (click)="onBackdropClick($event)">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden">
+    <!-- Header -->
+    <div class="flex justify-between items-center p-6 border-b border-gray-200">
+      <h2 class="text-2xl font-bold text-gray-900">
+        {{ isEditing ? 'Editar Template' : 'Criar Novo Template' }}
+      </h2>
+      <button 
+        (click)="hide()" 
+        class="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+        [disabled]="isLoading">
+        &times;
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <form [formGroup]="templateForm" (ngSubmit)="saveTemplate()" class="p-6 max-h-[calc(95vh-120px)] overflow-y-auto">
+      
+      <!-- Campos básicos -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="form-group">
+          <label for="templateName" class="block text-sm font-medium text-gray-700 mb-1">
+            Nome do Template
+            <span class="text-red-500">*</span>
+          </label>
+          <input 
+            type="text"
+            id="templateName"
+            formControlName="name"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            [disabled]="isLoading"
+            placeholder="Ex: Template de boas-vindas, email promocional, etc.">
+        </div>
+        
+        <div class="form-group">
+          <label for="templateRecipients" class="block text-sm font-medium text-gray-700 mb-1">
+            Destinatários
+          </label>
+          <input 
+            type="text"
+            id="templateRecipients"
+            formControlName="recipients"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            [disabled]="isLoading"
+            placeholder="Ex: {{'{{'}}contactEmail{{'}}'}}">
+        </div>
+      </div>
+
+      <!-- Assunto -->
+      <div class="form-group mb-4">
+        <label for="templateSubject" class="block text-sm font-medium text-gray-700 mb-1">
+          Assunto
+          <span class="text-red-500">*</span>
+        </label>
+        <input 
+          type="text"
+          id="templateSubject"
+          formControlName="subject"
+          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          [disabled]="isLoading"
+          placeholder="Ex: Obrigado por entrar em contato">
+      </div>
+
+      <!-- Editor de corpo -->
+      <div class="mb-4">
+        <div class="flex justify-between items-center mb-2">
+          <label class="block text-sm font-medium text-gray-700">
+            Corpo do Email
+            <span class="text-red-500">*</span>
+          </label>
+        </div>
+
+        <!-- Variáveis disponíveis -->
+        <div class="bg-gray-50 p-3 rounded-md mb-3">
+          <p class="text-xs text-gray-600 mb-2">Clique para inserir variáveis:</p>
+          <div class="flex flex-wrap gap-1">
+            <button
+              *ngFor="let variable of variables"
+              type="button"
+              (click)="insertVariable(variable.value)"
+              class="variable-tag px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200 transition-colors"
+              [disabled]="isLoading">
+              {{ variable.value }}
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">
+            As variáveis serão substituídas automaticamente pelos dados reais do lead quando o email for enviado.
+          </p>
+        </div>
+
+        <!-- Editor HTML -->
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-sm font-medium text-gray-700">
+              Corpo do E-mail
+              <span class="text-red-500">*</span>
+            </label>
+            <button 
+              type="button"
+              (click)="toggleHtmlMode()"
+              class="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors">
+              {{ showHtmlMode ? 'Editor Visual' : 'Ver HTML' }}
+            </button>
+          </div>
+          
+          <div class="border border-gray-300 rounded-lg overflow-hidden">
+            <!-- Editor Toolbar -->
+            <div *ngIf="!showHtmlMode" class="border-b border-gray-300 p-2 bg-gray-50">
+              <div class="flex gap-1 flex-wrap">
+                <button type="button" (click)="execCommand('bold')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Negrito">
+                  <strong>B</strong>
+                </button>
+                <button type="button" (click)="execCommand('italic')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Itálico">
+                  <em>I</em>
+                </button>
+                <button type="button" (click)="execCommand('underline')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Sublinhado">
+                  <u>U</u>
+                </button>
+                <div class="border-l border-gray-300 mx-1"></div>
+                <button type="button" (click)="execCommand('insertUnorderedList')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Lista">
+                  •
+                </button>
+                <button type="button" (click)="execCommand('insertOrderedList')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Lista Numerada">
+                  1.
+                </button>
+                <div class="border-l border-gray-300 mx-1"></div>
+                <button type="button" (click)="createLink()" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Link">
+                  🔗
+                </button>
+              </div>
+            </div>
+            
+            <!-- Editor Visual -->
+            <div 
+              *ngIf="!showHtmlMode"
+              #visualEditor
+              contenteditable="true"
+              (input)="onVisualEditorInput($event)"
+              class="min-h-[300px] p-4 focus:outline-none"
+              [innerHTML]="editorContent"
+              style="max-height: 400px; overflow-y: auto;">
+            </div>
+            
+            <!-- Editor HTML -->
+            <textarea 
+              *ngIf="showHtmlMode"
+              #htmlEditor
+              (input)="onHtmlEditorInput($event)"
+              [value]="editorContent"
+              class="w-full min-h-[300px] max-h-[400px] p-4 font-mono text-sm focus:outline-none resize-none"
+              placeholder="Digite o HTML aqui...">
+            </textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mensagem de erro -->
+      <div *ngIf="errorMessage" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        {{ errorMessage }}
+      </div>
+
+
+      <!-- Botões de ação -->
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <button 
+          type="button" 
+          (click)="hide()"
+          class="px-6 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+          [disabled]="isLoading">
+          Cancelar
+        </button>
+        
+        <button 
+          type="submit" 
+          [disabled]="isLoading || !templateForm.valid"
+          class="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center">
+          <div *ngIf="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          {{ isLoading ? 'Salvando...' : (isEditing ? 'Atualizar Template' : 'Criar Template') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

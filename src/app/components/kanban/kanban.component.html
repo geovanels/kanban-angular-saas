@@ -1,0 +1,788 @@
+<div class="min-h-screen bg-gray-100">
+  <!-- Header -->
+  <header class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-4">
+          <button 
+            (click)="goToDashboard()"
+            class="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <i class="fas fa-arrow-left"></i>
+          </button>
+          
+          <img src="https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png" 
+               alt="Logo GoBuyer" 
+               class="h-8">
+          
+          <h1 class="text-xl font-semibold text-gray-900">
+            {{ board?.name || 'Quadro Kanban' }}
+          </h1>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+          <button 
+            (click)="showCreateLeadModal()"
+            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-plus mr-1"></i>
+            Novo Lead
+          </button>
+
+          <button 
+            *ngIf="activeTab === 'kanban'"
+            (click)="showCreateColumnModal()"
+            class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fas fa-plus mr-1"></i>
+            Nova Fase
+          </button>
+          
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+              {{ currentUser?.displayName?.charAt(0) || currentUser?.email?.charAt(0) || 'U' }}
+            </div>
+            <span class="text-sm text-gray-700 hidden sm:block">
+              {{ currentUser?.displayName || currentUser?.email }}
+            </span>
+          </div>
+          
+          <button 
+            (click)="logout()"
+            class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+            <i class="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="flex justify-center items-center py-20">
+    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <nav *ngIf="!isLoading" class="bg-white px-8 border-b border-gray-200">
+    <div class="flex space-x-8">
+      <button
+        *ngFor="let tab of tabs"
+        (click)="switchTab(tab.id)"
+        class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+        [class.border-blue-500]="activeTab === tab.id"
+        [class.text-blue-600]="activeTab === tab.id"
+        [class.border-transparent]="activeTab !== tab.id"
+        [class.text-gray-500]="activeTab !== tab.id"
+        [class.hover:text-gray-700]="activeTab !== tab.id">
+        <i class="fas {{ tab.icon }} mr-2"></i>
+        {{ tab.name }}
+      </button>
+    </div>
+  </nav>
+
+  <!-- Kanban Board Tab -->
+  <div *ngIf="!isLoading && activeTab === 'kanban'" class="kanban-board">
+    <div 
+      *ngFor="let column of columns" 
+      class="kanban-column"
+      [style.background-color]="'#e2e8f0'">
+      
+      <!-- Column Header -->
+      <div 
+        class="kanban-column-header relative"
+        [style.border-top-color]="getColumnBorderColor(column)">
+        <div class="flex items-center">
+          <h3 class="font-semibold text-gray-800">{{ column.name }}</h3>
+          <span class="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
+            {{ getLeadsForColumn(column.id!).length }}
+          </span>
+        </div>
+        <div class="relative">
+          <button 
+            (click)="toggleColumnMenu(column.id!)"
+            class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-ellipsis-v text-sm"></i>
+          </button>
+          
+          <!-- Dropdown Menu -->
+          <div 
+            *ngIf="showColumnMenu === column.id"
+            class="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-48">
+            <button 
+              (click)="editColumn(column)"
+              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg">
+              <i class="fas fa-edit mr-2"></i>
+              Editar Fase
+            </button>
+            <button 
+              (click)="showColumnForm(column)"
+              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              <i class="fas fa-wpforms mr-2"></i>
+              Formulário da Fase
+            </button>
+            <hr class="my-1">
+            <button 
+              (click)="deleteColumn(column)"
+              class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg">
+              <i class="fas fa-trash mr-2"></i>
+              Excluir Fase
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards Container -->
+      <div 
+        class="kanban-cards"
+        cdkDropList
+        [id]="'column-' + column.id"
+        [cdkDropListData]="getLeadsForColumn(column.id!)"
+        [cdkDropListConnectedTo]="getColumnConnectedTo()"
+        (cdkDropListDropped)="onLeadDrop($event)">
+        
+        <div 
+          *ngFor="let lead of getLeadsForColumn(column.id!)" 
+          class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer mb-3 p-4 border-l-4"
+          [class]="getSlaStatus(lead).borderClass || getLeadPriorityClass(lead)"
+          cdkDrag
+          [cdkDragData]="lead.id"
+          (click)="showLeadDetailModal(lead)">
+          
+          <!-- Card Header -->
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-gray-900 text-sm truncate mb-1">
+                {{ lead.fields['companyName'] || 'Empresa não informada' }}
+              </h4>
+              <div *ngIf="lead.fields?.['cnpj']" class="text-xs text-gray-500">
+                CNPJ: {{ lead.fields['cnpj'] }}
+              </div>
+            </div>
+            
+            <!-- Temperature Badge -->
+            <div *ngIf="lead.fields?.['temperature']" 
+                 class="px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ml-2"
+                 [class]="getLeadStatusColor(lead)">
+              {{ lead.fields['temperature'] | titlecase }}
+            </div>
+          </div>
+
+          <!-- Contact Info -->
+          <div class="space-y-1 mb-3">
+            <div *ngIf="lead.fields?.['contactName']" class="flex items-center text-sm text-gray-700">
+              <i class="fas fa-user w-3 h-3 mr-2 text-gray-400"></i>
+              <span class="truncate">{{ lead.fields['contactName'] }}</span>
+            </div>
+            
+            <div *ngIf="lead.fields?.['contactEmail']" class="flex items-center text-xs text-gray-600">
+              <i class="fas fa-envelope w-3 h-3 mr-2 text-gray-400"></i>
+              <span class="truncate">{{ lead.fields['contactEmail'] }}</span>
+            </div>
+            
+            <div *ngIf="lead.fields?.['contactPhone']" class="flex items-center text-xs text-gray-600">
+              <i class="fas fa-phone w-3 h-3 mr-2 text-gray-400"></i>
+              <span class="truncate">{{ lead.fields['contactPhone'] }}</span>
+            </div>
+          </div>
+
+          <!-- SLA Status -->
+          <div *ngIf="getSlaStatus(lead).text" class="mb-3">
+            <div class="flex items-center text-xs font-medium"
+                 [class]="getSlaStatus(lead).colorClass">
+              <i class="fas fa-clock w-3 h-3 mr-1"></i>
+              <span>{{ getSlaStatus(lead).text }}</span>
+            </div>
+          </div>
+
+          <!-- Card Footer -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center text-xs text-gray-500">
+              <i class="far fa-calendar-alt w-3 h-3 mr-1"></i>
+              <span>{{ formatDate(lead.createdAt) }}</span>
+            </div>
+            
+            <!-- Responsible User Avatar -->
+            <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-sm">
+              {{ getLeadInitials(lead) }}
+            </div>
+          </div>
+
+          <!-- Description/Notes Preview -->
+          <div *ngIf="lead.fields?.['description']" class="mt-2 pt-2 border-t border-gray-100">
+            <p class="text-xs text-gray-600 line-clamp-2">
+              {{ lead.fields['description'] }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="getLeadsForColumn(column.id!).length === 0" 
+             class="text-center py-8 text-gray-400">
+          <i class="fas fa-inbox text-2xl mb-2"></i>
+          <p class="text-sm">Nenhum lead nesta fase</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State - No Columns -->
+  <div *ngIf="!isLoading && activeTab === 'kanban' && columns.length === 0" class="text-center py-20">
+    <div class="max-w-md mx-auto">
+      <i class="fas fa-columns text-6xl text-gray-300 mb-4"></i>
+      <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhuma coluna encontrada</h3>
+      <p class="text-gray-600">
+        Este quadro ainda não possui colunas configuradas.
+      </p>
+    </div>
+  </div>
+
+  <!-- Templates Tab -->
+  <div *ngIf="!isLoading && activeTab === 'templates'" class="p-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Templates de Email</h2>
+        <button (click)="createTemplate()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+          <i class="fas fa-plus mr-2"></i>
+          Novo Template
+        </button>
+      </div>
+      
+      <!-- Lista de Templates -->
+      <div *ngIf="emailTemplates.length > 0" class="grid gap-4">
+        <div 
+          *ngFor="let template of emailTemplates" 
+          class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                {{ template.name || 'Template sem nome' }}
+              </h3>
+              <p class="text-sm text-gray-600 mb-3">
+                <strong>Assunto:</strong> {{ template.subject || 'Sem assunto' }}
+              </p>
+              <p class="text-xs text-gray-500 mb-4">
+                <strong>Para:</strong> {{ template.recipients || 'Não especificado' }}
+              </p>
+              <div class="flex items-center text-xs text-gray-500 space-x-4">
+                <span>
+                  <i class="far fa-calendar-alt mr-1"></i>
+                  Criado em {{ formatDate(template.createdAt) }}
+                </span>
+                <span *ngIf="template.updatedAt">
+                  <i class="fas fa-edit mr-1"></i>
+                  Atualizado em {{ formatDate(template.updatedAt) }}
+                </span>
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 ml-4">
+              <button 
+                (click)="editTemplate(template)"
+                class="text-blue-600 hover:text-blue-800 px-3 py-1 text-sm font-medium">
+                <i class="fas fa-edit mr-1"></i>
+                Editar
+              </button>
+              <button 
+                (click)="deleteTemplate(template)"
+                class="text-red-600 hover:text-red-800 px-3 py-1 text-sm font-medium">
+                <i class="fas fa-trash mr-1"></i>
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Empty State -->
+      <div *ngIf="emailTemplates.length === 0" class="bg-white rounded-lg shadow p-6">
+        <div class="text-center py-12 text-gray-500">
+          <i class="fas fa-envelope text-6xl mb-4"></i>
+          <h3 class="text-xl font-semibold mb-2">Nenhum template encontrado</h3>
+          <p>Crie templates personalizados para automações de email</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Automations Tab -->
+  <div *ngIf="!isLoading && activeTab === 'automations'" class="p-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Automações</h2>
+        <button (click)="createAutomation($event)" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+          <i class="fas fa-plus mr-2"></i>
+          Nova Automação
+        </button>
+      </div>
+      
+      <!-- Lista de Automações -->
+      <div *ngIf="getValidAutomations().length > 0" class="grid gap-4">
+        <div 
+          *ngFor="let automation of getValidAutomations()" 
+          class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center mb-2">
+                <h3 class="text-lg font-semibold text-gray-900 mr-3">
+                  {{ automation.name }}
+                </h3>
+                <span 
+                  class="px-2 py-1 text-xs font-medium rounded-full"
+                  [class.bg-green-100]="automation.active"
+                  [class.text-green-800]="automation.active"
+                  [class.bg-red-100]="!automation.active"
+                  [class.text-red-800]="!automation.active">
+                  {{ automation.active ? 'Ativa' : 'Inativa' }}
+                </span>
+              </div>
+              
+              <div class="space-y-2 mb-4">
+                <p class="text-sm text-gray-600">
+                  <i class="fas fa-bolt mr-2"></i>
+                  <strong>Gatilho:</strong> {{ getTriggerDescription(automation.trigger) }}
+                </p>
+                <p class="text-sm text-gray-600">
+                  <i class="fas fa-play mr-2"></i>
+                  <strong>Ações:</strong> {{ getActionsCount(automation.actions) }} ação(ões) configurada(s)
+                </p>
+              </div>
+              
+              <div class="flex items-center text-xs text-gray-500 space-x-4">
+                <span>
+                  <i class="far fa-calendar-alt mr-1"></i>
+                  Criada em {{ formatDate(automation.createdAt) }}
+                </span>
+                <span *ngIf="automation.lastExecuted">
+                  <i class="fas fa-play mr-1"></i>
+                  Última execução: {{ formatDate(automation.lastExecuted) }}
+                </span>
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 ml-4">
+              <button 
+                (click)="showAutomationHistory(automation, $event)"
+                class="text-gray-500 hover:text-blue-600 px-3 py-1 text-sm font-medium"
+                title="Ver Histórico">
+                <i class="fas fa-history mr-1"></i>
+                Histórico
+              </button>
+              <button 
+                (click)="editAutomation(automation, $event)"
+                class="text-blue-600 hover:text-blue-800 px-3 py-1 text-sm font-medium">
+                <i class="fas fa-edit mr-1"></i>
+                Editar
+              </button>
+              <button 
+                (click)="toggleAutomation(automation)"
+                class="px-3 py-1 text-sm font-medium"
+                [class.text-red-600]="automation.active"
+                [class.hover:text-red-800]="automation.active"
+                [class.text-green-600]="!automation.active"
+                [class.hover:text-green-800]="!automation.active">
+                <i class="fas mr-1" [class.fa-pause]="automation.active" [class.fa-play]="!automation.active"></i>
+                {{ automation.active ? 'Pausar' : 'Ativar' }}
+              </button>
+              <button 
+                (click)="deleteAutomation(automation)"
+                class="text-red-600 hover:text-red-800 px-3 py-1 text-sm font-medium">
+                <i class="fas fa-trash mr-1"></i>
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Empty State -->
+      <div *ngIf="getValidAutomations().length === 0" class="bg-white rounded-lg shadow p-6">
+        <div class="text-center py-12 text-gray-500">
+          <i class="fas fa-cogs text-6xl mb-4"></i>
+          <h3 class="text-xl font-semibold mb-2">Nenhuma automação encontrada</h3>
+          <p>Configure automações para disparar ações quando leads mudarem de fase</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reports Tab -->
+  <div *ngIf="!isLoading && activeTab === 'reports'" class="p-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Relatórios</h2>
+        <button class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+          <i class="fas fa-download mr-2"></i>
+          Exportar Relatório
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Total de Leads</p>
+              <p class="text-2xl font-bold text-gray-900">{{ leads.length }}</p>
+            </div>
+            <div class="bg-blue-100 p-3 rounded-full">
+              <i class="fas fa-users text-blue-500"></i>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Leads Ativos</p>
+              <p class="text-2xl font-bold text-gray-900">{{ getActiveLeads().length }}</p>
+            </div>
+            <div class="bg-green-100 p-3 rounded-full">
+              <i class="fas fa-chart-line text-green-500"></i>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Total de Colunas</p>
+              <p class="text-2xl font-bold text-gray-900">{{ columns.length }}</p>
+            </div>
+            <div class="bg-purple-100 p-3 rounded-full">
+              <i class="fas fa-columns text-purple-500"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Leads por Fase</h3>
+        <div class="space-y-4">
+          <div *ngFor="let column of columns" class="flex items-center justify-between">
+            <div class="flex items-center">
+              <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="column.color || '#4A90E2'"></div>
+              <span class="font-medium">{{ column.name }}</span>
+            </div>
+            <span class="text-gray-600">{{ getLeadsForColumn(column.id!).length }} leads</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outbox/Caixa de Saída Tab -->
+  <div *ngIf="!isLoading && activeTab === 'outbox'" class="p-8">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Caixa de Saída</h2>
+        <div class="flex space-x-2">
+          <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+            <i class="fas fa-sync mr-2"></i>
+            Atualizar
+          </button>
+          <button class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+            <i class="fas fa-envelope mr-2"></i>
+            Novo Email
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow">
+        <!-- Tabs de status de email -->
+        <div class="border-b border-gray-200">
+          <nav class="flex space-x-8 px-6">
+            <button 
+              *ngFor="let status of emailStatuses"
+              (click)="activeEmailStatus = status.id"
+              class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+              [class.border-blue-500]="activeEmailStatus === status.id"
+              [class.text-blue-600]="activeEmailStatus === status.id"
+              [class.border-transparent]="activeEmailStatus !== status.id"
+              [class.text-gray-500]="activeEmailStatus !== status.id">
+              {{ status.name }}
+              <span class="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
+                {{ status.count }}
+              </span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Lista de emails -->
+        <div class="p-6">
+          <div *ngIf="getFilteredEmails().length === 0" class="text-center py-12 text-gray-500">
+            <i class="fas fa-paper-plane text-6xl mb-4"></i>
+            <h3 class="text-xl font-semibold mb-2">Nenhum email encontrado</h3>
+            <p>Emails enviados aparecerão aqui</p>
+          </div>
+
+          <div *ngIf="getFilteredEmails().length > 0" class="space-y-4">
+            <div 
+              *ngFor="let email of getFilteredEmails()" 
+              class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3">
+                    <div 
+                      class="w-3 h-3 rounded-full"
+                      [class.bg-yellow-400]="!email.delivery || email.delivery.state === 'PENDING'"
+                      [class.bg-green-400]="email.delivery?.state === 'SUCCESS'"
+                      [class.bg-red-400]="email.delivery?.state === 'ERROR'">
+                    </div>
+                    <h4 class="font-medium text-gray-900">{{ email.subject || 'Sem assunto' }}</h4>
+                    <span 
+                      class="px-2 py-1 text-xs rounded-full"
+                      [class.bg-yellow-100]="!email.delivery || email.delivery.state === 'PENDING'"
+                      [class.text-yellow-800]="!email.delivery || email.delivery.state === 'PENDING'"
+                      [class.bg-green-100]="email.delivery?.state === 'SUCCESS'"
+                      [class.text-green-800]="email.delivery?.state === 'SUCCESS'"
+                      [class.bg-red-100]="email.delivery?.state === 'ERROR'"
+                      [class.text-red-800]="email.delivery?.state === 'ERROR'">
+                      {{ getEmailStatusLabel(email) }}
+                    </span>
+                  </div>
+                  <div class="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                    <span><i class="fas fa-envelope mr-1"></i>Para: {{ email.to }}</span>
+                    <span><i class="fas fa-clock mr-1"></i>{{ formatDate(email.createdAt) }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button 
+                    (click)="viewEmail(email)"
+                    class="text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button 
+                    *ngIf="email.delivery?.state === 'ERROR' || !email.delivery"
+                    (click)="retryEmail(email)"
+                    class="text-green-600 hover:text-green-800">
+                    <i class="fas fa-redo"></i>
+                  </button>
+                  <button 
+                    (click)="deleteEmail(email)"
+                    class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Tab -->
+  <div *ngIf="!isLoading && activeTab === 'api'" class="p-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Configuração da API</h2>
+        <div class="flex items-center space-x-2">
+          <span class="text-sm text-gray-600">Status:</span>
+          <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
+            <i class="fas fa-check-circle mr-1"></i>Ativa
+          </span>
+        </div>
+      </div>
+      
+      <!-- Endpoint -->
+      <div class="bg-white rounded-lg shadow mb-6">
+        <div class="p-6 border-b border-gray-200">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-link mr-2 text-blue-500"></i>Endpoint para Novos Leads
+          </h3>
+          <p class="text-sm text-gray-600 mb-4">
+            Use este endpoint para enviar novos leads diretamente para o seu kanban via API REST.
+          </p>
+          
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">URL do Endpoint:</span>
+              <button 
+                (click)="copyToClipboard(apiEndpoint)"
+                class="text-blue-600 hover:text-blue-800 text-sm">
+                <i class="fas fa-copy mr-1"></i>Copiar
+              </button>
+            </div>
+            <code class="bg-blue-50 text-blue-800 text-sm p-2 rounded border block">
+              {{ apiEndpoint }}
+            </code>
+          </div>
+        </div>
+        
+        <!-- Token de Autenticação -->
+        <div class="p-6 border-b border-gray-200">
+          <h4 class="text-md font-semibold text-gray-900 mb-2">
+            <i class="fas fa-key mr-2 text-yellow-500"></i>Token de Autenticação
+          </h4>
+          <p class="text-sm text-gray-600 mb-3">
+            Inclua este token no header <code class="bg-gray-100 px-1 rounded">Authorization</code> de suas requisições.
+          </p>
+          
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">Bearer Token:</span>
+              <button 
+                (click)="copyToClipboard(apiToken)"
+                class="text-blue-600 hover:text-blue-800 text-sm">
+                <i class="fas fa-copy mr-1"></i>Copiar
+              </button>
+            </div>
+            <code class="bg-yellow-50 text-yellow-800 text-sm p-2 rounded border block font-mono">
+              {{ apiToken }}
+            </code>
+          </div>
+        </div>
+        
+        <!-- Exemplo de Requisição -->
+        <div class="p-6">
+          <h4 class="text-md font-semibold text-gray-900 mb-2">
+            <i class="fas fa-code mr-2 text-green-500"></i>Exemplo de Requisição
+          </h4>
+          <p class="text-sm text-gray-600 mb-3">
+            Exemplo de como enviar um novo lead via POST request:
+          </p>
+          
+          <div class="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto">
+            <pre class="text-sm"><code>POST {{ apiEndpoint }}
+Content-Type: application/json
+Authorization: Bearer {{ apiToken }}
+
+&#123;
+  "companyName": "Nome da Empresa Exemplo",
+  "cnpj": "00.000.000/0001-00",
+  "contactName": "Nome do Contato",
+  "contactEmail": "email@exemplo.com",
+  "contactPhone": "(11) 99999-9999",
+  "phaseId": "(Opcional) ID da fase para onde o lead deve ir"
+&#125;</code></pre>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Webhooks -->
+      <div class="bg-white rounded-lg shadow mb-6">
+        <div class="p-6 border-b border-gray-200">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-broadcast-tower mr-2 text-purple-500"></i>Webhooks (Em breve)
+          </h3>
+          <p class="text-sm text-gray-600">
+            Receba notificações quando leads mudarem de fase, forem criados ou atualizados.
+          </p>
+        </div>
+        
+        <div class="p-6">
+          <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-construction text-4xl mb-3"></i>
+            <h4 class="font-semibold mb-2">Funcionalidade em Desenvolvimento</h4>
+            <p class="text-sm">Webhooks estarão disponíveis em breve para integração avançada.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Documentação -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">
+          <i class="fas fa-book mr-2"></i>Documentação da API
+        </h3>
+        <div class="space-y-3 text-sm text-blue-800">
+          <div class="flex items-start space-x-3">
+            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
+            <div>
+              <strong>Método:</strong> POST para criar novos leads
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
+            <div>
+              <strong>Content-Type:</strong> application/json obrigatório
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
+            <div>
+              <strong>Autenticação:</strong> Bearer token no header Authorization
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
+            <div>
+              <strong>Campos obrigatórios:</strong> companyName, contactName, contactEmail
+            </div>
+          </div>
+          <div class="flex items-start space-x-3">
+            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
+            <div>
+              <strong>Resposta de sucesso:</strong> Status 201 com dados do lead criado
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Lead -->
+  <app-lead-modal 
+    [ownerId]="ownerId"
+    [boardId]="boardId"
+    [columns]="columns"
+    (leadCreated)="onLeadCreated()"
+    (leadUpdated)="onLeadUpdated()"
+    (closeModal)="onLeadUpdated()">
+  </app-lead-modal>
+
+  <!-- Modal de Coluna -->
+  <app-column-modal 
+    [ownerId]="ownerId"
+    [boardId]="boardId"
+    [columns]="columns"
+    (columnCreated)="onColumnCreated()"
+    (columnUpdated)="onColumnUpdated()"
+    (closeModal)="onColumnUpdated()">
+  </app-column-modal>
+
+  <!-- Modal de Formulário da Fase -->
+  <app-phase-form-modal 
+    [ownerId]="ownerId"
+    [boardId]="boardId"
+    (formConfigSaved)="onPhaseFormConfigSaved()"
+    (closeModal)="onPhaseFormConfigSaved()">
+  </app-phase-form-modal>
+
+  <!-- Modal de Detalhes do Lead -->
+  <app-lead-detail-modal 
+    [ownerId]="ownerId"
+    [boardId]="boardId"
+    [columns]="columns"
+    [users]="users"
+    (leadUpdated)="onLeadUpdated()"
+    (leadDeleted)="onLeadDeleted()"
+    (closeModal)="onLeadUpdated()">
+  </app-lead-detail-modal>
+
+  <!-- Modal de Template -->
+  <app-template-modal 
+    [ownerId]="ownerId"
+    [boardId]="boardId"
+    (templateSaved)="onTemplateSaved()"
+    (closeModal)="onTemplateSaved()">
+  </app-template-modal>
+
+  <!-- Modal de Automação -->
+  <app-automation-modal
+    *ngIf="showAutomationModal"
+    [isVisible]="showAutomationModal"
+    [automation]="selectedAutomation"
+    [phases]="columns"
+    [emailTemplates]="emailTemplates"
+    [users]="users"
+    (closeModalEvent)="onCloseAutomationModal()"
+    (saveAutomation)="onSaveAutomation($event)">
+  </app-automation-modal>
+
+  <!-- Modal de Histórico de Automação -->
+  <app-automation-history-modal
+    [isVisible]="showHistoryModal"
+    [automationId]="selectedAutomationForHistory?.id || ''"
+    [automationName]="selectedAutomationForHistory?.name || ''"
+    [ownerId]="ownerId"
+    [boardId]="boardId"
+    [leads]="leads"
+    (closeModalEvent)="onCloseHistoryModal()">
+  </app-automation-history-modal>
+</div>

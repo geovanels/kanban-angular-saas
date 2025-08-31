@@ -1,0 +1,123 @@
+<div *ngIf="isVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" (click)="onBackdropClick($event)">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center p-6 border-b border-gray-200">
+      <h2 class="text-2xl font-bold text-gray-900">
+        {{ isEditing ? 'Editar Lead' : 'Novo Lead' }}
+      </h2>
+      <button 
+        (click)="hide()" 
+        class="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+        [disabled]="isLoading">
+        &times;
+      </button>
+    </div>
+
+    <!-- Form -->
+    <form [formGroup]="leadForm" (ngSubmit)="saveLead()" class="p-6">
+      <div class="space-y-4">
+        <!-- Dynamic Fields -->
+        <div *ngFor="let field of formFields" class="form-group">
+          <label [for]="field.name" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ field.label }}
+            <span *ngIf="field.required" class="text-red-500">*</span>
+          </label>
+
+          <!-- Text Input -->
+          <input 
+            *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel'"
+            [type]="field.type"
+            [id]="field.name"
+            [formControlName]="field.name"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading">
+
+          <!-- Select -->
+          <select 
+            *ngIf="field.type === 'select'"
+            [id]="field.name"
+            [formControlName]="field.name"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading">
+            <option value="">Selecione...</option>
+            <option *ngFor="let option of field.options" [value]="option">
+              {{ option | titlecase }}
+            </option>
+          </select>
+
+          <!-- Textarea -->
+          <textarea 
+            *ngIf="field.type === 'textarea'"
+            [id]="field.name"
+            [formControlName]="field.name"
+            rows="3"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading"></textarea>
+
+          <!-- Error Message -->
+          <div *ngIf="getFieldError(field.name)" class="text-red-500 text-sm mt-1">
+            {{ getFieldError(field.name) }}
+          </div>
+        </div>
+
+        <!-- File Upload (apenas para novos leads) -->
+        <div *ngIf="!isEditing" class="form-group">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Anexos (opcional)
+          </label>
+          <input 
+            type="file"
+            multiple
+            (change)="onFileSelected($event)"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [disabled]="isLoading">
+          <p class="text-xs text-gray-500 mt-1">
+            Você pode anexar arquivos como documentos, imagens, etc.
+          </p>
+        </div>
+
+        <!-- Error Message -->
+        <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {{ errorMessage }}
+        </div>
+
+        <!-- Temperature Info -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div class="flex items-start">
+            <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2"></i>
+            <div class="text-sm text-blue-700">
+              <strong>Temperatura do Lead:</strong>
+              <ul class="mt-1 ml-2 list-disc">
+                <li><strong>Frio:</strong> Lead inicial, pouco interesse</li>
+                <li><strong>Morno:</strong> Lead com interesse moderado</li>
+                <li><strong>Quente:</strong> Lead qualificado, alta probabilidade de conversão</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+        <button 
+          type="button" 
+          (click)="hide()"
+          class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+          [disabled]="isLoading">
+          Cancelar
+        </button>
+        
+        <button 
+          type="submit" 
+          [disabled]="isLoading || !leadForm.valid"
+          class="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center">
+          <div *ngIf="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          {{ isLoading ? 'Salvando...' : (isEditing ? 'Atualizar Lead' : 'Criar Lead') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

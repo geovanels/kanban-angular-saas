@@ -1,0 +1,275 @@
+<div class="form-builder-container">
+  <div class="form-builder-header">
+    <h2 class="text-xl font-bold text-gray-900 mb-2">Construtor de Formulário</h2>
+    <p class="text-sm text-gray-600 mb-4">Arraste os tipos de campo da esquerda para o centro para montar seu formulário.</p>
+  </div>
+
+  <div class="form-builder-layout">
+    <!-- Left Sidebar - Field Types -->
+    <div class="field-types-sidebar">
+      <h3 class="font-semibold text-gray-900 mb-3">Tipos de Campo</h3>
+      
+      <!-- Basic Fields -->
+      <div class="field-category mb-4">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Campos Básicos</h4>
+        <div 
+          cdkDropList 
+          [cdkDropListData]="fieldTypes"
+          cdkDropListSortingDisabled="true"
+          [cdkDropListConnectedTo]="['form-canvas']"
+          class="field-type-list">
+          
+          <div 
+            *ngFor="let fieldType of fieldTypes; let i = index"
+            [class.hidden]="fieldType.category !== 'basic'"
+            cdkDrag 
+            [cdkDragData]="fieldType"
+            class="field-type-item">
+            <i class="fas" [class]="fieldType.icon"></i>
+            <span>{{ fieldType.label }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Center - Form Canvas -->
+    <div class="form-canvas-container">
+      <div class="form-canvas-header">
+        <h3 class="font-semibold text-gray-900">Formulário</h3>
+        <div class="canvas-actions">
+          <button 
+            type="button"
+            (click)="clearForm()"
+            class="text-red-600 hover:text-red-800 text-sm">
+            <i class="fas fa-trash mr-1"></i>Limpar
+          </button>
+        </div>
+      </div>
+
+      <div 
+        id="form-canvas"
+        cdkDropList 
+        [cdkDropListData]="formFields"
+        (cdkDropListDropped)="onFieldTypeDrop($event)"
+        [cdkDropListConnectedTo]="[]"
+        class="form-canvas">
+        
+        <!-- Drop Zone Message -->
+        <div *ngIf="formFields.length === 0" class="drop-zone-empty">
+          <i class="fas fa-plus-circle text-4xl text-gray-300 mb-3"></i>
+          <p class="text-gray-500">Arraste campos aqui para montar seu formulário</p>
+        </div>
+
+        <!-- Form Fields -->
+        <div 
+          *ngFor="let field of formFields; let i = index"
+          cdkDrag
+          [cdkDragData]="field"
+          (click)="selectField(field)"
+          class="form-field-item"
+          [class.selected]="selectedField?.id === field.id">
+          
+          <div class="form-field-header">
+            <div class="field-type-indicator">
+              <i class="fas" [class]="getFieldTypeIcon(field.type)"></i>
+            </div>
+            <div class="field-info">
+              <div class="field-label">{{ field.label }}</div>
+              <div class="field-name">{{ field.name }}</div>
+            </div>
+            <div class="field-actions">
+              <button 
+                type="button"
+                (click)="selectField(field); $event.stopPropagation()"
+                class="field-action-btn">
+                <i class="fas fa-cog"></i>
+              </button>
+              <button 
+                type="button"
+                (click)="deleteField(field); $event.stopPropagation()"
+                class="field-action-btn text-red-500 hover:text-red-700">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Field Preview -->
+          <div class="field-preview">
+            <label class="field-preview-label">
+              {{ field.label }}
+              <span *ngIf="field.required" class="text-red-500">*</span>
+            </label>
+            
+            <!-- Text Input -->
+            <input 
+              *ngIf="['text', 'email', 'tel', 'number', 'date'].includes(field.type)"
+              [type]="field.type"
+              [placeholder]="field.placeholder || 'Digite aqui...'"
+              class="field-preview-input"
+              disabled>
+            
+            <!-- File Input -->
+            <div *ngIf="field.type === 'file'" class="field-preview-file">
+              <input type="file" disabled class="field-preview-input">
+              <div class="file-info">
+                <i class="fas fa-paperclip mr-2"></i>
+                <span>Anexar documentos (PDF, DOC, JPG, PNG)</span>
+              </div>
+            </div>
+            
+            <!-- Textarea -->
+            <textarea 
+              *ngIf="field.type === 'textarea'"
+              [placeholder]="field.placeholder || 'Digite seu texto...'"
+              rows="3"
+              class="field-preview-textarea"
+              disabled></textarea>
+            
+            <!-- Select -->
+            <select 
+              *ngIf="field.type === 'select'"
+              class="field-preview-select"
+              disabled>
+              <option value="">Selecione uma opção</option>
+              <option *ngFor="let option of field.options" [value]="option">{{ option }}</option>
+            </select>
+            
+            <!-- Radio -->
+            <div *ngIf="field.type === 'radio'" class="field-preview-radio">
+              <div *ngFor="let option of field.options" class="radio-option">
+                <input type="radio" [name]="field.name" [value]="option" disabled>
+                <label>{{ option }}</label>
+              </div>
+            </div>
+            
+            <!-- Checkbox -->
+            <div *ngIf="field.type === 'checkbox'" class="field-preview-checkbox">
+              <input type="checkbox" disabled>
+              <label>{{ field.placeholder || 'Marque esta opção' }}</label>
+            </div>
+
+            <div *ngIf="field.description" class="field-description">{{ field.description }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar - Field Configuration -->
+    <div class="field-config-sidebar" [class.show]="showFieldConfig">
+      <div *ngIf="showFieldConfig && selectedField" class="field-config-panel">
+        <div class="config-header">
+          <h3 class="font-semibold text-gray-900">Configurar Campo</h3>
+          <button 
+            type="button"
+            (click)="closeFieldConfig()"
+            class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <form [formGroup]="configForm" (ngSubmit)="saveFieldConfig()" class="config-form">
+          <!-- Field Name -->
+          <div class="form-group">
+            <label class="form-label">Nome do Campo <span class="text-red-500">*</span></label>
+            <input 
+              type="text" 
+              formControlName="name"
+              class="form-input"
+              placeholder="Ex: nomeEmpresa">
+            <div class="form-hint">Nome técnico (sem espaços)</div>
+          </div>
+
+          <!-- Field Label -->
+          <div class="form-group">
+            <label class="form-label">Rótulo <span class="text-red-500">*</span></label>
+            <input 
+              type="text" 
+              formControlName="label"
+              class="form-input"
+              placeholder="Ex: Nome da Empresa">
+          </div>
+
+          <!-- Placeholder -->
+          <div class="form-group">
+            <label class="form-label">Placeholder</label>
+            <input 
+              type="text" 
+              formControlName="placeholder"
+              class="form-input"
+              placeholder="Texto de exemplo">
+          </div>
+
+          <!-- Description -->
+          <div class="form-group">
+            <label class="form-label">Descrição</label>
+            <textarea 
+              formControlName="description"
+              class="form-textarea"
+              rows="2"
+              placeholder="Texto de ajuda (opcional)"></textarea>
+          </div>
+
+          <!-- Required -->
+          <div class="form-group">
+            <label class="form-checkbox-label">
+              <input type="checkbox" formControlName="required" class="form-checkbox">
+              Campo obrigatório
+            </label>
+          </div>
+
+          <!-- Options (for select, radio, etc.) -->
+          <div *ngIf="selectedField && isFieldTypeWithOptions(selectedField.type)" class="form-group">
+            <label class="form-label">Opções <span class="text-red-500">*</span></label>
+            <textarea 
+              formControlName="options"
+              class="form-textarea"
+              rows="3"
+              placeholder="Opção 1, Opção 2, Opção 3"></textarea>
+            <div class="form-hint">Separe as opções com vírgulas</div>
+          </div>
+
+          <!-- Actions -->
+          <div class="config-actions">
+            <button 
+              type="button" 
+              (click)="closeFieldConfig()"
+              class="btn btn-secondary">
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              [disabled]="!configForm.valid"
+              class="btn btn-primary">
+              Salvar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Actions -->
+  <div class="form-builder-actions">
+    <div class="flex justify-between items-center">
+      <div class="text-sm text-gray-600">
+        {{ formFields.length }} campo(s) adicionado(s)
+      </div>
+      <div class="flex gap-3">
+        <button 
+          type="button" 
+          (click)="onCancel()"
+          class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button 
+          type="button"
+          (click)="onSave()"
+          [disabled]="formFields.length === 0"
+          class="btn btn-success">
+          <i class="fas fa-save mr-2"></i>Salvar Formulário
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

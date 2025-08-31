@@ -1,0 +1,288 @@
+<div class="user-management-container">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        <h3><i class="fas fa-users"></i> Gerenciar Usuários</h3>
+        <p class="text-muted mb-0">Gerencie os usuários da empresa {{ currentCompany()?.name }}</p>
+      </div>
+      
+      @if (canManageUsers()) {
+        <button 
+          class="btn btn-primary" 
+          (click)="showInviteFormToggle()"
+          [disabled]="inviteLoading()">
+          <i class="fas fa-plus"></i> Convidar Usuário
+        </button>
+      }
+    </div>
+
+    <div class="card-body">
+      <!-- Invite Form -->
+      @if (showInviteForm()) {
+        <div class="invite-form mb-4">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Convidar Usuário:</strong> O usuário receberá um email de convite para se juntar à empresa.
+          </div>
+
+          @if (inviteSuccess()) {
+            <div class="alert alert-success">
+              <i class="fas fa-check-circle"></i>
+              {{ inviteSuccess() }}
+            </div>
+          }
+
+          @if (inviteError()) {
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-circle"></i>
+              {{ inviteError() }}
+            </div>
+          }
+
+          <form (submit)="inviteUser(); $event.preventDefault()">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="inviteEmail">Email do Usuário *</label>
+                  <input
+                    type="email"
+                    id="inviteEmail"
+                    class="form-control"
+                    [(ngModel)]="inviteEmail"
+                    [value]="inviteEmail()"
+                    (input)="inviteEmail.set($any($event.target).value)"
+                    placeholder="usuario@exemplo.com"
+                    required>
+                </div>
+              </div>
+              
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label for="inviteRole">Função</label>
+                  <select
+                    id="inviteRole"
+                    class="form-control"
+                    [(ngModel)]="inviteRole"
+                    [value]="inviteRole()"
+                    (change)="inviteRole.set($any($event.target).value)">
+                    <option value="user">Usuário</option>
+                    <option value="manager">Gerente</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="col-md-2">
+                <div class="form-group">
+                  <label>&nbsp;</label>
+                  <div class="d-flex gap-2">
+                    <button
+                      type="submit"
+                      class="btn btn-success"
+                      [disabled]="inviteLoading() || !inviteEmail().trim()">
+                      @if (inviteLoading()) {
+                        <i class="fas fa-spinner fa-spin"></i>
+                      } @else {
+                        <i class="fas fa-paper-plane"></i>
+                      }
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      (click)="showInviteForm.set(false)">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      }
+
+      <!-- Users List -->
+      @if (isLoading()) {
+        <div class="text-center py-4">
+          <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+          <p class="mt-2 text-muted">Carregando usuários...</p>
+        </div>
+      } @else if (users().length === 0) {
+        <div class="text-center py-4">
+          <i class="fas fa-users fa-3x text-muted mb-3"></i>
+          <h5>Nenhum usuário encontrado</h5>
+          <p class="text-muted">Convide usuários para colaborar na sua empresa.</p>
+        </div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Usuário</th>
+                <th>Email</th>
+                <th>Função</th>
+                <th>Membro desde</th>
+                <th width="120">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of users(); track user.email) {
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <div class="user-avatar">
+                        @if (user.displayName) {
+                          <span class="avatar-initials">
+                            {{ user.displayName.charAt(0).toUpperCase() }}
+                          </span>
+                        } @else {
+                          <i class="fas fa-user"></i>
+                        }
+                      </div>
+                      <div class="ms-2">
+                        <div class="fw-bold">
+                          {{ user.displayName || 'Usuário sem nome' }}
+                        </div>
+                        @if (user.email === currentUser()?.email) {
+                          <small class="text-primary">(Você)</small>
+                        }
+                        @if (user.email === currentCompany()?.ownerEmail) {
+                          <small class="text-success">(Proprietário)</small>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                  <td>{{ user.email }}</td>
+                  <td>
+                    @if (canManageUsers() && user.email !== currentCompany()?.ownerEmail) {
+                      <select
+                        class="form-select form-select-sm"
+                        [value]="user.role"
+                        (change)="changeUserRole(user.email, $any($event.target).value)"
+                        [disabled]="isLoading()">
+                        <option value="user">Usuário</option>
+                        <option value="manager">Gerente</option>
+                        <option value="admin">Administrador</option>
+                      </select>
+                    } @else {
+                      <span class="badge" [class]="getRoleBadgeClass(user.role)">
+                        {{ getRoleLabel(user.role) }}
+                      </span>
+                    }
+                  </td>
+                  <td>
+                    {{ user.joinedAt?.toLocaleDateString('pt-BR') || 'Data não disponível' }}
+                  </td>
+                  <td>
+                    @if (canManageUsers() && user.email !== currentUser()?.email && user.email !== currentCompany()?.ownerEmail) {
+                      <button
+                        class="btn btn-danger btn-sm"
+                        (click)="removeUser(user.email)"
+                        [disabled]="isLoading()"
+                        title="Remover usuário">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <!-- Company Deletion Section -->
+    @if (canDeleteCompany()) {
+      <div class="card-footer bg-light border-top">
+        <div class="danger-zone">
+          <h6 class="text-danger mb-3">
+            <i class="fas fa-exclamation-triangle"></i>
+            Zona Perigosa
+          </h6>
+          <p class="text-muted small mb-3">
+            A exclusão da empresa é permanente e não pode ser desfeita. 
+            Todos os dados, quadros, leads e usuários serão perdidos.
+          </p>
+          <button
+            class="btn btn-outline-danger"
+            (click)="showDeleteModal()">
+            <i class="fas fa-trash-alt"></i>
+            Excluir Empresa Permanentemente
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Delete Company Modal -->
+@if (showDeleteConfirmation()) {
+  <div class="modal-backdrop"></div>
+  <div class="modal d-block">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">
+            <i class="fas fa-exclamation-triangle"></i>
+            Confirmar Exclusão
+          </h5>
+          <button type="button" class="btn-close btn-close-white" (click)="hideDeleteModal()"></button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="alert alert-danger">
+            <strong>ATENÇÃO:</strong> Esta ação não pode ser desfeita!
+          </div>
+          
+          <p>Você está prestes a excluir permanentemente:</p>
+          <ul>
+            <li>Empresa: <strong>{{ currentCompany()?.name }}</strong></li>
+            <li>Todos os quadros e leads</li>
+            <li>Todos os usuários associados</li>
+            <li>Todas as configurações e dados</li>
+          </ul>
+          
+          <p>Para confirmar, digite <strong>{{ currentCompany()?.name }}</strong> abaixo:</p>
+          
+          <div class="form-group">
+            <input
+              type="text"
+              class="form-control"
+              [(ngModel)]="deleteConfirmation"
+              [value]="deleteConfirmation()"
+              (input)="deleteConfirmation.set($any($event.target).value)"
+              placeholder="Digite o nome da empresa">
+          </div>
+          
+          @if (deleteError()) {
+            <div class="alert alert-danger mt-2">
+              <i class="fas fa-exclamation-circle"></i>
+              {{ deleteError() }}
+            </div>
+          }
+        </div>
+        
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="hideDeleteModal()"
+            [disabled]="deleteLoading()">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger"
+            (click)="deleteCompany()"
+            [disabled]="deleteLoading() || deleteConfirmation() !== currentCompany()?.name">
+            @if (deleteLoading()) {
+              <i class="fas fa-spinner fa-spin"></i> Excluindo...
+            } @else {
+              <i class="fas fa-trash-alt"></i> Excluir Permanentemente
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
