@@ -132,6 +132,7 @@ export class CompanyService {
       
       await setDoc(userRef, companyUser);
     } catch (error) {
+      // Silenciar erro - tentativa em background
       throw error;
     }
   }
@@ -149,6 +150,7 @@ export class CompanyService {
       return users;
       
     } catch (error) {
+      // Silenciar erro de permissões - é esperado
       return [];
     }
   }
@@ -696,6 +698,46 @@ export class CompanyService {
         ];
       default:
         return ['leads.read'];
+    }
+  }
+
+  // Método para associar usuários gobuyer.com.br existentes à empresa Gobuyer
+  async associateGobuyerUsers(): Promise<void> {
+    try {
+      const gobuyerCompany = await this.getCompanyBySubdomain('gobuyer');
+      if (!gobuyerCompany) {
+        console.log('Empresa Gobuyer não encontrada');
+        return;
+      }
+
+      // Lista expandida de emails conhecidos do domínio gobuyer.com.br
+      const gobuyerEmails = [
+        'geovane.lopes@gobuyer.com.br',
+        'admin@gobuyer.com.br',
+        'suporte@gobuyer.com.br',
+        'contato@gobuyer.com.br',
+        'vendas@gobuyer.com.br',
+        'financeiro@gobuyer.com.br',
+        'marketing@gobuyer.com.br',
+        'dev@gobuyer.com.br',
+        'ti@gobuyer.com.br'
+        // Adicione mais emails conforme necessário
+      ];
+
+      console.log('Associando usuários Gobuyer à empresa:', gobuyerEmails);
+
+      for (const email of gobuyerEmails) {
+        try {
+          const role = email === gobuyerCompany.ownerEmail ? 'admin' : 'user';
+          await this.addUserToCompany(gobuyerCompany.id!, email, role);
+          console.log(`Usuário ${email} associado como ${role}`);
+        } catch (error) {
+          // Silencioso - usuário pode já existir
+        }
+      }
+
+    } catch (error) {
+      console.error('Erro ao associar usuários Gobuyer:', error);
     }
   }
 

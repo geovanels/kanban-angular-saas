@@ -1,5 +1,6 @@
 import { Component, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { SubdomainService } from '../../services/subdomain.service';
 
 @Component({
@@ -12,7 +13,14 @@ import { SubdomainService } from '../../services/subdomain.service';
         <div class="flex items-center space-x-4">
           <!-- Company Logo -->
           <div class="flex items-center space-x-3">
-            @if (companyLogo && companyLogo !== defaultLogo) {
+            <!-- Back Button -->
+            <button 
+              (click)="goBack()"
+              class="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
+              <i class="fas fa-arrow-left"></i>
+            </button>
+            
+            @if (hasCustomLogo()) {
               <img [src]="companyLogo" 
                    [alt]="'Logo ' + companyName" 
                    class="h-10 w-auto rounded">
@@ -52,6 +60,7 @@ export class CompanyBreadcrumbComponent {
   @Input() subtitle?: string;
   
   private subdomainService = inject(SubdomainService);
+  private router = inject(Router);
   
   get companyName(): string {
     return this.subdomainService.getCurrentCompany()?.name || 'Task Board';
@@ -59,11 +68,34 @@ export class CompanyBreadcrumbComponent {
 
   get companyLogo(): string {
     const company = this.subdomainService.getCurrentCompany();
-    return company?.brandingConfig?.logo || this.defaultLogo;
+    
+    // Se tem logo customizado, usar ele
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return company.brandingConfig.logo;
+    }
+    
+    // Se é a Gobuyer, usar logo padrão da Gobuyer
+    if (company?.subdomain === 'gobuyer') {
+      return 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+    }
+    
+    return '';
   }
 
-  get defaultLogo(): string {
-    return 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+  hasCustomLogo(): boolean {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    // Se tem logo customizado
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return true;
+    }
+    
+    // Se é a Gobuyer, sempre tem logo
+    if (company?.subdomain === 'gobuyer') {
+      return true;
+    }
+    
+    return false;
   }
 
   get primaryColor(): string {
@@ -83,5 +115,16 @@ export class CompanyBreadcrumbComponent {
     }
     
     return 'TB';
+  }
+
+  goBack() {
+    // Para páginas de configuração, voltar para dashboard
+    const currentUrl = this.router.url;
+    if (currentUrl.includes('/empresa/') || currentUrl.includes('/usuarios')) {
+      this.router.navigate(['/dashboard']);
+    } else {
+      // Para outras páginas, usar navegação padrão do browser
+      window.history.back();
+    }
   }
 }

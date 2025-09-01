@@ -55,16 +55,12 @@ import { SubdomainService } from '../../services/subdomain.service';
                 <div class="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5">
                   <div class="py-1">
                     <a href="/empresa/branding" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <i class="fas fa-palette mr-3"></i>
-                      Identidade Visual
+                      <i class="fas fa-building mr-3"></i>
+                      Minha Empresa
                     </a>
                     <a href="/empresa/smtp" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <i class="fas fa-envelope mr-3"></i>
                       Configuração SMTP
-                    </a>
-                    <a href="/empresa/api" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <i class="fas fa-plug mr-3"></i>
-                      API & Integrações
                     </a>
                   </div>
                 </div>
@@ -123,16 +119,12 @@ import { SubdomainService } from '../../services/subdomain.service';
             Usuários
           </a>
           <a href="/empresa/branding" class="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md">
-            <i class="fas fa-palette mr-3"></i>
-            Identidade Visual
+            <i class="fas fa-building mr-3"></i>
+            Minha Empresa
           </a>
           <a href="/empresa/smtp" class="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md">
             <i class="fas fa-envelope mr-3"></i>
             SMTP
-          </a>
-          <a href="/empresa/api" class="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md">
-            <i class="fas fa-plug mr-3"></i>
-            API
           </a>
         </div>
       </div>
@@ -159,7 +151,7 @@ export class GlobalHeaderComponent {
   userMenuOpen = false;
   mobileMenuOpen = false;
 
-  currentUser = this.authService.currentUser;
+  currentUser = () => this.authService.getCurrentUser();
   
   currentCompany() {
     return this.subdomainService.getCurrentCompany();
@@ -188,7 +180,9 @@ export class GlobalHeaderComponent {
   }
 
   async logout() {
-    await this.authService.signOut();
-    this.router.navigate(['/login']);
+    const result = await this.authService.logout();
+    if (result.success) {
+      this.router.navigate(['/login']);
+    }
   }
 }

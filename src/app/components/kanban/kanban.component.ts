@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Board, Column, Lead } from '../../services/firestore.service';
+import { SubdomainService } from '../../services/subdomain.service';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
 import { LeadModalComponent } from '../lead-modal/lead-modal.component';
 import { ColumnModalComponent } from '../column-modal/column-modal.component';
@@ -12,17 +13,19 @@ import { LeadDetailModalComponent } from '../lead-detail-modal/lead-detail-modal
 import { TemplateModalComponent } from '../template-modal/template-modal.component';
 import { AutomationModal } from '../automation-modal/automation-modal';
 import { AutomationHistoryModal } from '../automation-history-modal/automation-history-modal';
+import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [CommonModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal],
+  imports: [CommonModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent],
   templateUrl: './kanban.component.html',
   styleUrls: ['./kanban.component.scss']
 })
 export class KanbanComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private firestoreService = inject(FirestoreService);
+  private subdomainService = inject(SubdomainService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -55,7 +58,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   ];
 
   // API Configuration
-  apiEndpoint = 'https://your-domain.com/functions/v1/lead-intake';
+  apiEndpoint = '';
   apiToken = 'KzB47@p!qR9$tW2m&e*J';
 
   ngOnInit() {
@@ -68,6 +71,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (this.currentUser && this.boardId && this.ownerId) {
       this.loadBoardData();
       this.subscribeToRealtimeUpdates();
+      this.initializeApiEndpoint();
     } else {
       console.error('Parâmetros faltando:', { currentUser: !!this.currentUser, boardId: this.boardId, ownerId: this.ownerId });
     }
@@ -75,6 +79,71 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
+  }
+
+  private initializeApiEndpoint() {
+    const company = this.subdomainService.getCurrentCompany();
+    if (company) {
+      if (this.subdomainService.isDevelopment()) {
+        this.apiEndpoint = `http://localhost:5000/api/v1/companies/${company.id}/leads`;
+      } else {
+        this.apiEndpoint = `https://api.taskboard.com.br/v1/companies/${company.id}/leads`;
+      }
+    }
+  }
+
+  // Company logo methods
+  hasCompanyLogo(): boolean {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    // Se tem logo customizado
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return true;
+    }
+    
+    // Se é a Gobuyer, sempre tem logo
+    if (company?.subdomain === 'gobuyer') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  getCompanyLogo(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    // Se tem logo customizado, usar ele
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return company.brandingConfig.logo;
+    }
+    
+    // Se é a Gobuyer, usar logo padrão da Gobuyer
+    if (company?.subdomain === 'gobuyer') {
+      return 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+    }
+    
+    return '';
+  }
+
+  getPrimaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.brandingConfig?.primaryColor || '#3B82F6';
+  }
+
+  getCompanyInitials(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    const name = company?.name || 'Task Board';
+    
+    if (!name || name === 'Task Board') return 'TB';
+    
+    const words = name.split(' ').filter(word => word.length > 0);
+    if (words.length === 1) {
+      return words[0].charAt(0).toUpperCase();
+    } else if (words.length >= 2) {
+      return words[0].charAt(0).toUpperCase() + words[1].charAt(0).toUpperCase();
+    }
+    
+    return 'TB';
   }
 
   private async loadBoardData() {

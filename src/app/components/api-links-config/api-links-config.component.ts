@@ -5,6 +5,7 @@ import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
+import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 interface CompanyLink {
   name: string;
@@ -18,9 +19,9 @@ interface CompanyLink {
 @Component({
   selector: 'app-api-links-config',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfigHeaderComponent],
+  imports: [CommonModule, FormsModule, ConfigHeaderComponent, MainLayoutComponent],
   template: `
-    <div class="min-h-screen bg-gray-100">
+    <app-main-layout>
       <app-config-header title="API e Integrações">
         <button 
           class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -152,82 +153,8 @@ interface CompanyLink {
           </div>
         </div>
 
-        <!-- Company Links -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div class="p-6 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-              <i class="fas fa-link text-blue-500 mr-2"></i>
-              Links da Empresa
-            </h3>
-            <p class="text-sm text-gray-600 mt-1">Links personalizados para {{ currentCompany()?.name }}</p>
-          </div>
-          
-          <div class="p-6">
-            <!-- Company Info Summary -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-              <div>
-                <p class="text-sm font-medium text-gray-500">Nome da Empresa</p>
-                <p class="text-lg font-semibold text-gray-900">{{ currentCompany()?.name }}</p>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-500">Subdomínio</p>
-                <span class="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800">
-                  {{ currentCompany()?.subdomain }}
-                </span>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-500">Status</p>
-                <span class="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">
-                  {{ getStatusText() }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Links Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              @for (link of companyLinks(); track link.name) {
-                <div class="border border-gray-200 rounded-lg p-4">
-                  <div class="flex items-start justify-between">
-                    <div class="flex items-center space-x-3">
-                      <div [class]="getLinkIconClass(link.category)">
-                        <i [class]="link.icon"></i>
-                      </div>
-                      <div>
-                        <h4 class="text-sm font-semibold text-gray-900">{{ link.name }}</h4>
-                        <p class="text-xs text-gray-500">{{ link.description }}</p>
-                      </div>
-                    </div>
-                    @if (link.copyable) {
-                      <button
-                        class="text-gray-400 hover:text-gray-600 p-1"
-                        (click)="copyToClipboard(link.url)"
-                        title="Copiar URL">
-                        <i class="fas fa-copy"></i>
-                      </button>
-                    }
-                  </div>
-                  
-                  <div class="mt-3">
-                    <div class="flex space-x-2">
-                      <input
-                        type="text"
-                        class="flex-1 px-3 py-1 text-xs border border-gray-300 rounded bg-gray-50 text-gray-600"
-                        [value]="link.url"
-                        readonly>
-                      <button
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors"
-                        (click)="openLink(link.url)">
-                        <i class="fas fa-external-link-alt"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
+    </app-main-layout>
   `,
   styles: [`
     :host {
@@ -329,45 +256,7 @@ export class ApiLinksConfigComponent implements OnInit {
   companyLinks = signal<CompanyLink[]>([]);
 
   generateCompanyLinks() {
-    const company = this.currentCompany();
-    if (!company) return;
-
-    const links: CompanyLink[] = [
-      {
-        name: 'Painel Principal',
-        url: this.subdomainService.getCompanyUrl(company.subdomain),
-        description: 'Acesso principal ao sistema da empresa',
-        icon: 'fas fa-home',
-        category: 'app',
-        copyable: true
-      },
-      {
-        name: 'Formulário Público',
-        url: this.subdomainService.getPublicFormUrl() || '',
-        description: 'Formulário para captura de leads externos',
-        icon: 'fas fa-wpforms',
-        category: 'form',
-        copyable: true
-      },
-      {
-        name: 'Endpoint de API',
-        url: this.getLeadIntakeUrl(),
-        description: 'URL para integração via API REST',
-        icon: 'fas fa-plug',
-        category: 'api',
-        copyable: true
-      },
-      {
-        name: 'Webhook',
-        url: this.webhookUrl() || 'Não configurado',
-        description: 'URL que recebe notificações de novos leads',
-        icon: 'fas fa-bell',
-        category: 'webhook',
-        copyable: !!this.webhookUrl()
-      }
-    ];
-
-    this.companyLinks.set(links.filter(link => link.url && link.url !== 'Não configurado'));
+    // Links section removed - external form link should now be in leads section
   }
 
   getLinkIconClass(category: string): string {

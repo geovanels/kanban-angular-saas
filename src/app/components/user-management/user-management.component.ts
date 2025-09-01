@@ -56,6 +56,9 @@ export class UserManagementComponent implements OnInit {
     try {
       await this.companyService.seedGobuyerCompany();
       
+      // Associar usuários Gobuyer existentes
+      await this.companyService.associateGobuyerUsers();
+      
       // Recarregar dados da empresa
       const company = this.subdomainService.getCurrentCompany();
       this.currentCompany.set(company);
@@ -68,16 +71,31 @@ export class UserManagementComponent implements OnInit {
     const currentUser = this.authService.getCurrentUser();
     const company = this.currentCompany();
     
-    if (!currentUser || !company || !currentUser.email) return;
+    console.log('Force adding current user - User:', currentUser?.email, 'Company:', company?.name, 'ID:', company?.id);
+    
+    if (!currentUser || !company || !currentUser.email || !company.id) {
+      console.log('Missing data for force add user');
+      return;
+    }
 
     try {
-      // Determinar role baseado no email do proprietário
-      const role = currentUser.email === company.ownerEmail ? 'admin' : 'user';
+      // Verificar se usuário já existe antes de adicionar
+      const existingUsers = await this.companyService.getCompanyUsers(company.id);
+      const userExists = existingUsers.some(u => u.email === currentUser.email);
       
-      // Forçar adição do usuário à empresa (será ignorado se já existir)
-      await this.companyService.addUserToCompany(company.id!, currentUser.email, role);
+      console.log('User already exists in company:', userExists);
+      
+      if (!userExists) {
+        // Determinar role baseado no email do proprietário
+        const role = currentUser.email === company.ownerEmail ? 'admin' : 'user';
+        console.log('Adding user with role:', role);
+        
+        // Forçar adição do usuário à empresa
+        await this.companyService.addUserToCompany(company.id, currentUser.email, role);
+        console.log('User added successfully');
+      }
     } catch (error) {
-      // Erro silencioso pois pode ser normal se o usuário já existir
+      console.error('Error in forceAddCurrentUser:', error);
     }
   }
 
@@ -116,33 +134,49 @@ export class UserManagementComponent implements OnInit {
 
   private async loadCompanyUsers() {
     const company = this.currentCompany();
-    if (!company) {
-      // Nenhuma empresa encontrada para carregar usuários
+    
+    if (!company || !company.id) {
       return;
     }
 
-    // Carregando usuários da empresa
     this.isLoading.set(true);
     try {
-      let users = await this.companyService.getCompanyUsers(company.id!);
-      // Usuários encontrados na empresa
+      let users = await this.companyService.getCompanyUsers(company.id);
       
-      // Se não há usuários, adicionar o usuário atual automaticamente
+      // Se falhou por permissões, criar usuário fake baseado no usuário atual
       if (users.length === 0) {
         const currentUser = this.authService.getCurrentUser();
+        console.log('No users found, current user:', currentUser);
+        
         if (currentUser && currentUser.email) {
-          // Adicionando usuário atual à empresa
-          await this.companyService.addUserToCompany(
-            company.id!, 
+          // Criar usuário para mostrar na interface enquanto não temos acesso ao Firestore
+          const role: 'admin' | 'manager' | 'user' = currentUser.email === company.ownerEmail ? 'admin' : 'user';
+          const fakeUser = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            displayName: currentUser.displayName || this.extractNameFromEmail(currentUser.email),
+            role: role,
+            permissions: [],
+            joinedAt: new Date(),
+            photoURL: currentUser.photoURL,
+            emailVerified: currentUser.emailVerified
+          };
+          
+          users = [fakeUser];
+          
+          // Tentar adicionar no background (sem aguardar)
+          this.companyService.addUserToCompany(
+            company.id, 
             currentUser.email, 
-            currentUser.email === company.ownerEmail ? 'admin' : 'user'
-          );
-          users = await this.companyService.getCompanyUsers(company.id!);
+            fakeUser.role
+          ).catch(() => {
+            // Erro silencioso
+          });
         }
       }
       
       // Enriquecer dados dos usuários com informações do Firebase Auth se disponível
-      const enrichedUsers = await Promise.all(users.map(async (user) => {
+      const enrichedUsers = users.map((user) => {
         try {
           // Tentar obter dados adicionais do Firebase Auth se o usuário estiver logado
           const currentUser = this.authService.getCurrentUser();
@@ -168,9 +202,8 @@ export class UserManagementComponent implements OnInit {
             displayName: user.displayName || this.extractNameFromEmail(user.email)
           };
         }
-      }));
+      });
       
-      // Usuários enriquecidos processados
       this.users.set(enrichedUsers);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -306,8 +339,20 @@ export class UserManagementComponent implements OnInit {
     
     if (!currentUser || !company) return false;
     
-    const userInCompany = this.users().find(u => u.email === currentUser.email);
-    return userInCompany?.role === 'admin';
+    // Verificar se é o proprietário da empresa (sempre pode gerenciar)
+    if (company.ownerEmail === currentUser.email) {
+      return true;
+    }
+    
+    // Se os usuários já foram carregados, verificar role
+    if (this.users().length > 0) {
+      const userInCompany = this.users().find(u => u.email === currentUser.email);
+      return userInCompany?.role === 'admin';
+    }
+    
+    // Se ainda não carregou os usuários, assumir que pode gerenciar
+    // (será refinado quando os dados carregarem)
+    return true;
   }
 
   canDeleteCompany(): boolean {

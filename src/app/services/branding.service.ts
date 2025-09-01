@@ -37,6 +37,11 @@ export class BrandingService {
   constructor() {
     // Inicializar com branding da empresa atual
     this.initializeBranding();
+    
+    // Aplicar branding após inicialização
+    setTimeout(() => {
+      this.applyStoredBranding();
+    }, 100);
   }
 
   // Inicializar branding da empresa
@@ -45,9 +50,23 @@ export class BrandingService {
     if (company) {
       this.updateBranding({
         logoUrl: company.logoUrl,
-        primaryColor: company.primaryColor,
-        secondaryColor: company.secondaryColor
+        primaryColor: company.brandingConfig?.primaryColor || company.primaryColor,
+        secondaryColor: company.brandingConfig?.secondaryColor || company.secondaryColor
       });
+    }
+  }
+
+  // Aplicar branding armazenado
+  private applyStoredBranding() {
+    const company = this.subdomainService.getCurrentCompany();
+    if (company && company.brandingConfig) {
+      // Aplicar cores se existirem
+      if (company.brandingConfig.primaryColor) {
+        this.applyColors({
+          primaryColor: company.brandingConfig.primaryColor,
+          secondaryColor: company.brandingConfig.secondaryColor
+        });
+      }
     }
   }
 
@@ -313,11 +332,27 @@ export class BrandingService {
     style.id = 'dynamic-branding-styles';
     style.textContent = `
       /* Primary buttons - Override all blue variations */
-      .bg-blue-500, .bg-green-500 {
+      .bg-blue-500, .bg-green-500,
+      button.bg-blue-500, button.bg-green-500,
+      .bg-blue-500.hover\\:bg-blue-600, .bg-green-500.hover\\:bg-green-600 {
         background-color: ${colors.primaryColor} !important;
       }
       
-      .hover\\:bg-blue-600:hover, .hover\\:bg-green-600:hover {
+      .hover\\:bg-blue-600:hover, .hover\\:bg-green-600:hover,
+      button.bg-blue-500:hover, button.bg-green-500:hover,
+      button.hover\\:bg-blue-600:hover, button.hover\\:bg-green-600:hover {
+        background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
+      }
+      
+      /* Dashboard specific buttons - more specific selectors */
+      .bg-blue-500.hover\\:bg-blue-600.text-white,
+      button[class*="bg-blue-500"][class*="hover:bg-blue-600"],
+      .bg-blue-500.hover\\:bg-blue-600.text-white.px-4.py-2 {
+        background-color: ${colors.primaryColor} !important;
+      }
+      
+      button[class*="bg-blue-500"][class*="hover:bg-blue-600"]:hover,
+      .bg-blue-500.hover\\:bg-blue-600.text-white.px-4.py-2:hover {
         background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
       }
       
@@ -371,7 +406,13 @@ export class BrandingService {
       }
       
       /* Company header logo background */
-      .config-header-logo-bg, .h-8.w-8.bg-blue-500 {
+      .config-header-logo-bg, .h-8.w-8.bg-blue-500,
+      .h-10.w-10.bg-blue-500 {
+        background-color: ${colors.primaryColor} !important;
+      }
+      
+      /* User avatar backgrounds */
+      .h-10.w-10.rounded-full.bg-blue-500 {
         background-color: ${colors.primaryColor} !important;
       }
       

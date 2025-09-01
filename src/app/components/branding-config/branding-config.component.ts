@@ -6,14 +6,15 @@ import { SubdomainService } from '../../services/subdomain.service';
 import { BrandingService } from '../../services/branding.service';
 import { Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
+import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 @Component({
   selector: 'app-branding-config',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfigHeaderComponent],
+  imports: [CommonModule, FormsModule, ConfigHeaderComponent, MainLayoutComponent],
   template: `
-    <div class="min-h-screen bg-gray-100">
-      <app-config-header title="Identidade Visual">
+    <app-main-layout>
+      <app-config-header title="Minha Empresa">
         <button 
           class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           (click)="saveConfiguration()"
@@ -252,7 +253,7 @@ import { ConfigHeaderComponent } from '../config-header/config-header.component'
           </div>
         </div>
       </div>
-    </div>
+    </app-main-layout>
   `,
   styles: [`
     :host {

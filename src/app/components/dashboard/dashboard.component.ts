@@ -28,6 +28,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isLoading = false;
   currentUser: any = null;
   showConfigMenu = false;
+  showCreateModal = false;
+  activeBoardMenu: string | null = null;
   private subscription?: Subscription;
 
   async ngOnInit() {
@@ -114,12 +116,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   showCreateBoardModal() {
-    this.createBoardModal.show();
+    this.showCreateModal = true;
   }
 
-  onBoardCreated() {
+  onBoardCreated(event?: any) {
     // Recarregar a lista de quadros
     this.loadBoards();
+    this.showCreateModal = false;
+  }
+
+  toggleBoardMenu(boardId: string) {
+    this.activeBoardMenu = this.activeBoardMenu === boardId ? null : boardId;
+  }
+
+  editBoard(board: Board) {
+    // TODO: Implementar edição de quadro
+    console.log('Editar quadro:', board);
+    this.activeBoardMenu = null;
+  }
+
+  duplicateBoard(board: Board) {
+    // TODO: Implementar duplicação de quadro
+    console.log('Duplicar quadro:', board);
+    this.activeBoardMenu = null;
+  }
+
+  async deleteBoard(boardId: string) {
+    if (confirm('Tem certeza que deseja excluir este quadro?')) {
+      try {
+        await this.firestoreService.deleteBoard(this.currentUser.uid, boardId);
+        await this.loadBoards();
+      } catch (error) {
+        console.error('Erro ao excluir quadro:', error);
+      }
+    }
+    this.activeBoardMenu = null;
+  }
+
+  getBoardColumnCount(boardId: string): number {
+    // TODO: Implementar contagem real de colunas
+    return 3; // Valor placeholder
+  }
+
+  getBoardTaskCount(boardId: string): number {
+    // TODO: Implementar contagem real de leads
+    return 0; // Valor placeholder
   }
 
   toggleConfigMenu() {

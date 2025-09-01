@@ -18,16 +18,16 @@ import { CommonModule } from '@angular/common';
               <i class="fas fa-arrow-left"></i>
             </button>
             
-            <img [src]="companyLogo" 
-                 [alt]="'Logo ' + companyName" 
-                 class="h-8"
-                 *ngIf="companyLogo && companyLogo !== 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png'">
-            
-            <!-- Default logo if no custom logo -->
-            <div class="h-8 w-8 bg-blue-500 rounded flex items-center justify-center text-white font-bold text-sm"
-                 *ngIf="!companyLogo || companyLogo === 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png'">
-              {{ getCompanyInitials() }}
-            </div>
+            @if (hasCustomLogo()) {
+              <img [src]="companyLogo" 
+                   [alt]="'Logo ' + companyName" 
+                   class="h-8 w-auto rounded">
+            } @else {
+              <div class="h-8 w-8 rounded flex items-center justify-center text-white font-bold text-sm"
+                   [style.background-color]="primaryColor">
+                {{ getCompanyInitials() }}
+              </div>
+            }
             
             <h1 class="text-xl font-semibold text-gray-900">
               {{ title }}
@@ -36,11 +36,6 @@ import { CommonModule } from '@angular/common';
           
           <div class="flex items-center space-x-4">
             <ng-content></ng-content>
-            
-            <div class="flex items-center space-x-2 text-sm text-gray-600">
-              <i class="fas fa-building"></i>
-              <span>{{ companyName }}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -66,16 +61,48 @@ export class ConfigHeaderComponent {
 
   get companyLogo(): string {
     const company = this.subdomainService.getCurrentCompany();
-    return company?.brandingConfig?.logo || 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+    
+    // Se tem logo customizado, usar ele
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return company.brandingConfig.logo;
+    }
+    
+    // Se é a Gobuyer, usar logo padrão da Gobuyer
+    if (company?.subdomain === 'gobuyer') {
+      return 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+    }
+    
+    return '';
   }
 
   goToDashboard() {
     this.router.navigate(['/dashboard']);
   }
 
+  hasCustomLogo(): boolean {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    // Se tem logo customizado
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return true;
+    }
+    
+    // Se é a Gobuyer, sempre tem logo
+    if (company?.subdomain === 'gobuyer') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  get primaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.brandingConfig?.primaryColor || '#3B82F6';
+  }
+
   getCompanyInitials(): string {
     const name = this.companyName;
-    if (!name) return 'K';
+    if (!name || name === 'Sistema Kanban') return 'SK';
     
     const words = name.split(' ').filter(word => word.length > 0);
     if (words.length === 1) {
@@ -84,6 +111,6 @@ export class ConfigHeaderComponent {
       return words[0].charAt(0).toUpperCase() + words[1].charAt(0).toUpperCase();
     }
     
-    return 'K';
+    return 'SK';
   }
 }

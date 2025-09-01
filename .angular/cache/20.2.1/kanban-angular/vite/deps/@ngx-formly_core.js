@@ -24,15 +24,15 @@ import {
   provideFormlyConfig,
   provideFormlyCore,
   reverseDeepMerge
-} from "./chunk-2DTNOL5I.js";
-import "./chunk-FEGV7CK2.js";
+} from "./chunk-HYNFKLPY.js";
 import "./chunk-XIW7D5TW.js";
+import "./chunk-FEGV7CK2.js";
 import "./chunk-AEBWEGBE.js";
 import "./chunk-ZFDSAH52.js";
 import "./chunk-IHPBTLLR.js";
 import "./chunk-GRSK3TSD.js";
-import "./chunk-XYFQ7QOX.js";
 import "./chunk-BZLT2HVW.js";
+import "./chunk-XYFQ7QOX.js";
 import "./chunk-QJQPERGE.js";
 import "./chunk-ZX6IUAQ5.js";
 export {

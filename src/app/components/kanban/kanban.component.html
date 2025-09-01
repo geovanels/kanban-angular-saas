@@ -1,79 +1,79 @@
-<div class="min-h-screen bg-gray-100">
-  <!-- Header -->
-  <header class="bg-white shadow-sm border-b border-gray-200">
-    <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center h-16">
-        <div class="flex items-center space-x-4">
-          <button 
-            (click)="goToDashboard()"
-            class="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <i class="fas fa-arrow-left"></i>
-          </button>
-          
-          <img src="https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png" 
-               alt="Logo GoBuyer" 
-               class="h-8">
-          
-          <h1 class="text-xl font-semibold text-gray-900">
-            {{ board?.name || 'Quadro Kanban' }}
-          </h1>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <button 
-            (click)="showCreateLeadModal()"
-            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <i class="fas fa-plus mr-1"></i>
-            Novo Lead
-          </button>
-
-          <button 
-            *ngIf="activeTab === 'kanban'"
-            (click)="showCreateColumnModal()"
-            class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <i class="fas fa-plus mr-1"></i>
-            Nova Fase
-          </button>
-          
-          <div class="flex items-center space-x-2">
-            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
-              {{ currentUser?.displayName?.charAt(0) || currentUser?.email?.charAt(0) || 'U' }}
-            </div>
-            <span class="text-sm text-gray-700 hidden sm:block">
-              {{ currentUser?.displayName || currentUser?.email }}
-            </span>
-          </div>
-          
-          <button 
-            (click)="logout()"
-            class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-            <i class="fas fa-sign-out-alt"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  </header>
+<app-main-layout>
 
   <!-- Loading State -->
   <div *ngIf="isLoading" class="flex justify-center items-center py-20">
     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
   </div>
 
-  <!-- Tabs Navigation -->
+  <!-- Tabs Navigation with Company Logo and Actions -->
   <nav *ngIf="!isLoading" class="bg-white px-8 border-b border-gray-200">
-    <div class="flex space-x-8">
-      <button
-        *ngFor="let tab of tabs"
-        (click)="switchTab(tab.id)"
-        class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
-        [class.border-blue-500]="activeTab === tab.id"
-        [class.text-blue-600]="activeTab === tab.id"
-        [class.border-transparent]="activeTab !== tab.id"
-        [class.text-gray-500]="activeTab !== tab.id"
-        [class.hover:text-gray-700]="activeTab !== tab.id">
-        <i class="fas {{ tab.icon }} mr-2"></i>
-        {{ tab.name }}
-      </button>
+    <div class="flex justify-between items-center">
+      <!-- Left side: Back Button, Company Logo and Board Name -->
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-3">
+          <!-- Back Button -->
+          <button 
+            (click)="goToDashboard()"
+            class="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
+            <i class="fas fa-arrow-left"></i>
+          </button>
+          
+          <!-- Company Logo -->
+          <div>
+            @if (hasCompanyLogo()) {
+              <img [src]="getCompanyLogo()" 
+                   alt="Logo da Empresa" 
+                   class="h-8 w-auto rounded">
+            } @else {
+              <div class="h-8 w-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                   [style.background-color]="getPrimaryColor()">
+                {{ getCompanyInitials() }}
+              </div>
+            }
+          </div>
+          
+          <!-- Board Name -->
+          <div>
+            <h1 class="text-lg font-semibold text-gray-900">
+              {{ board?.name || 'Quadro Kanban' }}
+            </h1>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Tab Navigation -->
+      <div class="flex space-x-8">
+        <button
+          *ngFor="let tab of tabs"
+          (click)="switchTab(tab.id)"
+          class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+          [class.border-blue-500]="activeTab === tab.id"
+          [class.text-blue-600]="activeTab === tab.id"
+          [class.border-transparent]="activeTab !== tab.id"
+          [class.text-gray-500]="activeTab !== tab.id"
+          [class.hover:text-gray-700]="activeTab !== tab.id">
+          <i class="fas {{ tab.icon }} mr-2"></i>
+          {{ tab.name }}
+        </button>
+      </div>
+
+      <!-- Right side: Action Buttons -->
+      <div class="flex items-center space-x-2">
+        <button 
+          (click)="showCreateLeadModal()"
+          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-plus mr-1"></i>
+          Novo Lead
+        </button>
+
+        <button 
+          *ngIf="activeTab === 'kanban'"
+          (click)="showCreateColumnModal()"
+          class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          <i class="fas fa-plus mr-1"></i>
+          Nova Fase
+        </button>
+      </div>
     </div>
   </nav>
 
@@ -785,4 +785,4 @@ Authorization: Bearer {{ apiToken }}
     [leads]="leads"
     (closeModalEvent)="onCloseHistoryModal()">
   </app-automation-history-modal>
-</div>
+</app-main-layout>

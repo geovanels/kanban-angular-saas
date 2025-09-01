@@ -5,26 +5,35 @@ import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
+import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 @Component({
   selector: 'app-smtp-config',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfigHeaderComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfigHeaderComponent, MainLayoutComponent],
   template: `
-    <div class="min-h-screen bg-gray-100">
+    <app-main-layout>
       <app-config-header title="Configuração SMTP">
-        <button 
-          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          (click)="saveConfiguration()"
-          [disabled]="isSaving() || smtpForm.invalid">
-          @if (isSaving()) {
-            <i class="fas fa-spinner fa-spin mr-1"></i>
-            Salvando...
-          } @else {
-            <i class="fas fa-save mr-1"></i>
-            Salvar Configurações
+        <div class="flex items-center space-x-3">
+          @if (smtpForm.invalid) {
+            <span class="text-sm text-red-600 flex items-center">
+              <i class="fas fa-exclamation-circle mr-1"></i>
+              Preencha todos os campos
+            </span>
           }
-        </button>
+          <button 
+            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            (click)="saveConfiguration()"
+            [disabled]="isSaving()">
+            @if (isSaving()) {
+              <i class="fas fa-spinner fa-spin mr-1"></i>
+              Salvando...
+            } @else {
+              <i class="fas fa-save mr-1"></i>
+              Salvar Configurações
+            }
+          </button>
+        </div>
       </app-config-header>
 
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -64,7 +73,9 @@ import { ConfigHeaderComponent } from '../config-header/config-header.component'
                   <input
                     type="text"
                     formControlName="host"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    [class]="'w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ' + 
+                            (smtpForm.get('host')?.invalid && smtpForm.get('host')?.touched ? 
+                             'border-red-300 bg-red-50' : 'border-gray-300')"
                     placeholder="smtp.gmail.com">
                   <p class="text-xs text-gray-500 mt-1">Endereço do servidor SMTP</p>
                 </div>
@@ -91,7 +102,9 @@ import { ConfigHeaderComponent } from '../config-header/config-header.component'
                   <input
                     type="email"
                     formControlName="user"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    [class]="'w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ' + 
+                            (smtpForm.get('user')?.invalid && smtpForm.get('user')?.touched ? 
+                             'border-red-300 bg-red-50' : 'border-gray-300')"
                     placeholder="seu-email@gmail.com">
                   <p class="text-xs text-gray-500 mt-1">Email para autenticação no servidor</p>
                 </div>
@@ -103,7 +116,9 @@ import { ConfigHeaderComponent } from '../config-header/config-header.component'
                   <input
                     type="password"
                     formControlName="password"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    [class]="'w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ' + 
+                            (smtpForm.get('password')?.invalid && smtpForm.get('password')?.touched ? 
+                             'border-red-300 bg-red-50' : 'border-gray-300')"
                     placeholder="sua-senha-ou-app-password">
                   <p class="text-xs text-gray-500 mt-1">Senha ou App Password do Gmail</p>
                 </div>
@@ -244,7 +259,7 @@ import { ConfigHeaderComponent } from '../config-header/config-header.component'
           </div>
         </div>
       </div>
-    </div>
+    </app-main-layout>
   `,
   styles: [`
     :host {
@@ -267,9 +282,9 @@ export class SmtpConfigComponent implements OnInit {
 
   constructor() {
     this.smtpForm = this.fb.group({
-      host: ['', Validators.required],
+      host: ['smtp.gmail.com', Validators.required],
       port: [587, [Validators.required, Validators.min(1), Validators.max(65535)]],
-      secure: [false],
+      secure: [true],
       user: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required],
       fromName: ['', Validators.required],
@@ -296,15 +311,28 @@ export class SmtpConfigComponent implements OnInit {
           fromName: company.smtpConfig.fromName,
           fromEmail: company.smtpConfig.fromEmail
         });
+      } else {
+        // Configurar valores padrão para empresas sem configuração SMTP
+        this.smtpForm.patchValue({
+          fromName: company.name || 'Sistema Kanban',
+          secure: true,
+          port: 587
+        });
       }
     }
   }
 
   async saveConfiguration() {
-    if (this.smtpForm.invalid) return;
+    // Sempre marcar campos como touched para mostrar erros
+    this.markAllFieldsAsTouched();
+    
+    if (this.smtpForm.invalid) {
+      this.showError('Por favor, preencha todos os campos obrigatórios corretamente.');
+      return;
+    }
 
     const company = this.currentCompany();
-    if (!company) {
+    if (!company?.id) {
       this.showError('Empresa não encontrada');
       return;
     }
@@ -314,29 +342,33 @@ export class SmtpConfigComponent implements OnInit {
 
     try {
       const formValue = this.smtpForm.value;
-      const updatedCompany: Partial<Company> = {
-        smtpConfig: {
-          host: formValue.host,
-          port: formValue.port,
-          secure: formValue.secure,
-          user: formValue.user,
-          password: formValue.password,
-          fromName: formValue.fromName,
-          fromEmail: formValue.fromEmail
-        }
+      
+      // Garantir que os valores sejam do tipo correto
+      const smtpConfig = {
+        host: String(formValue.host || ''),
+        port: Number(formValue.port || 587),
+        secure: Boolean(formValue.secure),
+        user: String(formValue.user || ''),
+        password: String(formValue.password || ''),
+        fromName: String(formValue.fromName || ''),
+        fromEmail: String(formValue.fromEmail || '')
       };
-
-      await this.companyService.updateCompany(company.id!, updatedCompany);
+      
+      const updatedCompany: Partial<Company> = {
+        smtpConfig: smtpConfig
+      };
+      
+      await this.companyService.updateCompany(company.id, updatedCompany);
       
       // Update current company
-      const refreshedCompany = { ...company, ...updatedCompany };
+      const refreshedCompany = { ...company, smtpConfig: smtpConfig };
       this.subdomainService.setCurrentCompany(refreshedCompany);
       this.currentCompany.set(refreshedCompany);
       
       this.showSuccess('Configurações SMTP salvas com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar configurações SMTP:', error);
-      this.showError('Erro ao salvar configurações. Tente novamente.');
+      this.showError('Erro ao salvar configurações: ' + ((error as any)?.message || 'Tente novamente.'));
     } finally {
       this.isSaving.set(false);
     }
@@ -376,5 +408,22 @@ export class SmtpConfigComponent implements OnInit {
   private clearMessages() {
     this.successMessage.set(null);
     this.errorMessage.set(null);
+  }
+
+  private getFormErrors(): any {
+    const errors: any = {};
+    Object.keys(this.smtpForm.controls).forEach(key => {
+      const control = this.smtpForm.get(key);
+      if (control && !control.valid && control.touched) {
+        errors[key] = control.errors;
+      }
+    });
+    return errors;
+  }
+
+  private markAllFieldsAsTouched() {
+    Object.keys(this.smtpForm.controls).forEach(key => {
+      this.smtpForm.get(key)?.markAsTouched();
+    });
   }
 }
