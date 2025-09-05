@@ -50,10 +50,11 @@
         <div class="flex items-start">
           <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2"></i>
           <div class="text-sm text-blue-700">
-            <strong>O quadro será criado com:</strong>
+            <strong>Após criar o quadro:</strong>
             <ul class="mt-1 ml-2 list-disc">
-              <li>1 coluna inicial "Novo Lead"</li>
-              <li>Campos padrão para leads (Empresa, CNPJ, Contato, etc.)</li>
+              <li>Configure as fases do seu processo</li>
+              <li>Defina os campos do formulário conforme sua necessidade</li>
+              <li>Personalize para qualquer tipo de processo (vendas, compras, viagens, etc.)</li>
             </ul>
           </div>
         </div>
@@ -71,7 +72,9 @@
         <button 
           type="submit" 
           [disabled]="isLoading || !boardName.trim()"
-          class="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center">
+          class="px-6 py-2 text-white rounded-lg font-medium transition-colors flex items-center"
+          [style.background-color]="getPrimaryColor()"
+          [style.opacity]="isLoading || !boardName.trim() ? '0.6' : '1'">
           <div *ngIf="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
           {{ isLoading ? 'Criando...' : 'Criar Quadro' }}
         </button>

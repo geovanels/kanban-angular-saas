@@ -122,22 +122,6 @@ import { Company } from '../../models/company.model';
         </div>
       </div>
 
-      <!-- Body de Exemplo -->
-      <div class="card mt-3">
-        <div class="card-header">
-          <h6><i class="fas fa-file-code"></i> Corpo da Requisição (JSON)</h6>
-        </div>
-        <div class="card-body">
-          <pre class="bg-light p-3 rounded"><code>{{getExampleRequestBody()}}</code></pre>
-          <div class="mt-2">
-            <button 
-              class="btn btn-sm btn-outline-secondary"
-              (click)="copyToClipboard(getExampleRequestBody())">
-              <i class="fas fa-copy"></i> Copiar Exemplo
-            </button>
-          </div>
-        </div>
-      </div>
 
       <!-- Exemplos de Integração -->
       <div class="card mt-3" *ngIf="showIntegrationExamples">
@@ -361,15 +345,22 @@ export class ApiConfigComponent implements OnInit {
     }
   }
 
-  getExampleRequestBody(): string {
-    return JSON.stringify({
-      companyName: "Nome da Empresa Exemplo",
-      cnpj: "00.000.000/0001-00", 
-      contactName: "Nome do Contato",
-      contactEmail: "email@exemplo.com",
-      contactPhone: "(11) 99999-9999",
-      phaseId: "(Opcional) ID da fase para onde o lead deve ir"
-    }, null, 2);
+  getCurrentBoardId(): string | undefined {
+    // 1. Buscar o boardId da URL atual
+    const url = window.location.pathname;
+    const boardMatch = url.match(/\/board\/([^\/]+)/);
+    if (boardMatch) {
+      return boardMatch[1];
+    }
+    
+    // 2. Buscar no localStorage (último quadro acessado)
+    const lastBoardId = localStorage.getItem('lastBoardId');
+    if (lastBoardId) {
+      return lastBoardId;
+    }
+    
+    // 3. Se não encontrar, retornar undefined (usará configuração padrão)
+    return undefined;
   }
 
   async toggleApiStatus() {
@@ -429,10 +420,13 @@ export class ApiConfigComponent implements OnInit {
     this.isLoading.set(true);
     this.clearMessages();
 
-    this.apiService.testApiEndpoint().subscribe({
+    // Usar o boardId atual se disponível
+    const boardId = this.getCurrentBoardId();
+    
+    this.apiService.testApiEndpoint(boardId).subscribe({
       next: (response) => {
         if (response.success) {
-          this.showSuccess('API testada com sucesso! Lead de teste criado.');
+          this.showSuccess(`API testada com sucesso! Lead de teste criado${boardId ? ` no quadro ${boardId}` : ''}.`);
         } else {
           this.showError('Falha no teste da API: ' + (response.error || 'Erro desconhecido'));
         }
@@ -478,7 +472,17 @@ export class ApiConfigComponent implements OnInit {
 
   private loadIntegrationExamples() {
     try {
-      const examples = this.apiService.getIntegrationExamples();
+      // Obter o boardId atual (se disponível) e campos de formulário
+      const boardId = this.getCurrentBoardId();
+      
+      // TODO: Buscar campos do formulário se estivermos no contexto de um quadro
+      // Por enquanto, usar campos padrão como exemplo
+      const exampleFormFields = [
+        { name: 'customField', type: 'text', includeInApi: true },
+        { name: 'temperature', type: 'temperatura', includeInApi: true }
+      ];
+      
+      const examples = this.apiService.getIntegrationExamples(boardId, exampleFormFields);
       this.integrationExamples.set(examples);
     } catch (error) {
       console.error('Erro ao carregar exemplos de integração:', error);

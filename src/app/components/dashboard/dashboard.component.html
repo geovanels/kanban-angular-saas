@@ -1,12 +1,23 @@
 <app-main-layout>
   <!-- Company Breadcrumb -->
   <app-company-breadcrumb title="Meus quadros Kanban">
-    <button 
-      (click)="showCreateBoardModal()"
-      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center">
-      <i class="fas fa-plus mr-2"></i>
-      Novo Quadro
-    </button>
+    <div class="flex space-x-2">
+      <!-- BOTÃO TEMPORÁRIO DE LIMPEZA -->
+      <button 
+        (click)="clearAllData()"
+        class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
+        title="🧹 Limpar apenas quadros (preserva usuários/SMTP)">
+        <i class="fas fa-broom mr-2"></i>
+        🧹 LIMPAR QUADROS
+      </button>
+      
+      <button 
+        (click)="showCreateBoardModal()"
+        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center">
+        <i class="fas fa-plus mr-2"></i>
+        Novo Quadro
+      </button>
+    </div>
   </app-company-breadcrumb>
 
   <!-- Main Content -->
@@ -55,15 +66,17 @@
                 </div>
                 
                 <!-- Board Actions -->
-                <div class="relative ml-4">
+                <div class="relative ml-4 board-menu-container">
                   <button 
                     (click)="$event.stopPropagation(); toggleBoardMenu(board.id!)"
-                    class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-600 transition-all">
+                    class="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-all"
+                    style="display: flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px;">
                     <i class="fas fa-ellipsis-v"></i>
                   </button>
                   
                   @if (activeBoardMenu === board.id) {
-                    <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
+                    <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50" 
+                         style="box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);">
                       <div class="py-1">
                         <button 
                           (click)="$event.stopPropagation(); editBoard(board)"
@@ -120,7 +133,7 @@
     <app-create-board-modal 
       #createBoardModal
       (boardCreated)="onBoardCreated($event)"
-      (modalClosed)="showCreateModal = false">
+      (closeModal)="showCreateModal = false">
     </app-create-board-modal>
   }
 </app-main-layout>

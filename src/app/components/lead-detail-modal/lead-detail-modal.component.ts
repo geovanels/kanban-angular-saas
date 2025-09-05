@@ -4,6 +4,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup } from '@angul
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column } from '../../services/firestore.service';
 import { StorageService } from '../../services/storage.service';
+import { SubdomainService } from '../../services/subdomain.service';
 
 export interface LeadHistory {
   id?: string;
@@ -39,6 +40,7 @@ export class LeadDetailModalComponent {
   private authService = inject(AuthService);
   private firestoreService = inject(FirestoreService);
   private storageService = inject(StorageService);
+  private subdomainService = inject(SubdomainService);
   private fb = inject(FormBuilder);
 
   @Input() ownerId: string = '';
@@ -109,8 +111,6 @@ export class LeadDetailModalComponent {
       // Extrair histórico de fases
       this.phaseHistory = this.currentLead.phaseHistory || {};
 
-      // Carregar campos do formulário atual
-      await this.loadCurrentFormFields();
 
       // Construir formulário dinâmico baseado na fase atual
       await this.buildDynamicForm();
@@ -175,26 +175,6 @@ export class LeadDetailModalComponent {
 
   currentFormFields: any[] = [];
 
-  private async loadCurrentFormFields() {
-    const currentColumn = this.getCurrentColumn();
-    if (!currentColumn) {
-      this.currentFormFields = [];
-      return;
-    }
-
-    try {
-      const phaseFormConfig = await this.firestoreService.getPhaseFormConfig(
-        this.ownerId,
-        this.boardId,
-        currentColumn.id!
-      );
-
-      this.currentFormFields = (phaseFormConfig as any)?.fields || [];
-    } catch (error) {
-      console.error('Erro ao buscar campos do formulário:', error);
-      this.currentFormFields = [];
-    }
-  }
 
   getPhaseHistoryItems(): any[] {
     const items: any[] = [];
@@ -530,8 +510,20 @@ export class LeadDetailModalComponent {
     const currentColumn = this.getCurrentColumn();
     if (!currentColumn) return;
 
-    // Gerar link público baseado no padrão do sistema original
-    this.publicLink = `https://www.supplik.com.br/kanban/?page=form&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
+    // Gerar link público usando o SubdomainService
+    const company = this.subdomainService.getCurrentCompany();
+    if (company) {
+      const isDev = this.subdomainService.isDevelopment();
+      
+      if (isDev) {
+        // Em desenvolvimento: /form?subdomain=X&outros_params
+        const baseUrl = this.subdomainService.getBaseUrl();
+        this.publicLink = `${baseUrl}/form?subdomain=${company.subdomain}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
+      } else {
+        // Em produção: https://subdomain.taskboard.com.br/form?params
+        this.publicLink = `https://${company.subdomain}.taskboard.com.br/form?userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
+      }
+    }
   }
 
   copyPublicLink() {

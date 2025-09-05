@@ -17,11 +17,11 @@ export class CompanyGuard implements CanActivate {
         if (isInitialized) {
           const company = this.subdomainService.getCurrentCompany();
           
-          // Se não há empresa, verificar se é a rota de login
+          // Se não há empresa, verificar se é rota pública
           if (!company) {
             const currentUrl = this.router.url;
-            if (currentUrl === '/login' || currentUrl === '/') {
-              // Permitir acesso ao login quando não há empresa (apps.taskboard.com.br)
+            if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/form')) {
+              // Permitir acesso a rotas públicas quando não há empresa
               observer.next(true);
               observer.complete();
             } else {
@@ -42,11 +42,11 @@ export class CompanyGuard implements CanActivate {
             if (company) {
               observer.next(true);
             } else {
-              // Verificar se é rota de login sem empresa (apps.taskboard.com.br)
+              // Verificar se é rota pública sem empresa
               const currentUrl = this.router.url;
               // Verificando URL atual
               
-              if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/login?')) {
+              if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/login?') || currentUrl.startsWith('/form')) {
                 // Se é login e há parâmetro subdomain=gobuyer, tentar criar empresa
                 const urlParams = new URLSearchParams(window.location.search);
                 const subdomain = urlParams.get('subdomain');
@@ -65,9 +65,9 @@ export class CompanyGuard implements CanActivate {
             observer.complete();
           }).catch(error => {
             console.error('Erro ao inicializar guard da empresa:', error);
-            // Em caso de erro, permitir acesso se for rota de login
+            // Em caso de erro, permitir acesso se for rota pública
             const currentUrl = this.router.url;
-            if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/login?')) {
+            if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/login?') || currentUrl.startsWith('/form')) {
               observer.next(true);
             } else {
               this.handleError(error);

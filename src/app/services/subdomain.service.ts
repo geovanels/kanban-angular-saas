@@ -185,7 +185,7 @@ export class SubdomainService {
   }
 
   // Obter URL base atual (com porta dinâmica)
-  private getBaseUrl(): string {
+  getBaseUrl(): string {
     if (typeof window === 'undefined') {
       return 'http://localhost:4200';
     }

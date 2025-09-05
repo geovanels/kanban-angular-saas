@@ -2,6 +2,7 @@ import { Component, signal, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SubdomainService } from './services/subdomain.service';
 import { FirestoreService } from './services/firestore.service';
+import { BrandingService } from './services/branding.service';
 
 @Component({
   selector: 'app-root',
@@ -12,19 +13,16 @@ import { FirestoreService } from './services/firestore.service';
 export class App implements OnInit {
   private subdomainService = inject(SubdomainService);
   private firestoreService = inject(FirestoreService);
+  private brandingService = inject(BrandingService);
   
   protected readonly title = signal('Sistema Kanban');
 
   async ngOnInit() {
     try {
-      // Inicializando aplicação multi-empresa
-      
       // Inicializar contexto da empresa baseado no subdomínio
       const company = await this.subdomainService.initializeFromSubdomain();
       
       if (company) {
-        // Empresa carregada com sucesso
-        
         // Definir contexto da empresa no FirestoreService
         this.firestoreService.setCompanyContext(company);
         
@@ -33,6 +31,9 @@ export class App implements OnInit {
         
         // Atualizar favicon e título da página se necessário
         this.updatePageTitle(company.name);
+
+        // Aplicar branding da empresa
+        this.brandingService.applyCompanyBranding(company);
         
       } else {
         // Nenhuma empresa encontrada - modo login/registro
@@ -40,7 +41,7 @@ export class App implements OnInit {
       }
       
     } catch (error) {
-      console.error('❌ Erro ao inicializar aplicação:', error);
+      // Error handled silently
     }
   }
 

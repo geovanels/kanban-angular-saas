@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Injector } from '@angular/core';
 import { 
   Firestore, 
   collection, 
@@ -7,19 +7,25 @@ import {
   setDoc, 
   updateDoc, 
   deleteDoc,
+  addDoc,
   query, 
   where, 
   getDocs,
   orderBy,
-  onSnapshot
+  limit,
+  onSnapshot,
+  serverTimestamp
 } from '@angular/fire/firestore';
 import { Company, CompanyUser, CompanySettings } from '../models/company.model';
+import { FirestoreService } from './firestore.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CompanyService {
   private firestore = inject(Firestore);
+  private injector = inject(Injector);
+  private firestoreService = inject(FirestoreService);
 
   // ===== COMPANY MANAGEMENT =====
   
@@ -111,7 +117,6 @@ export class CompanyService {
         updatedAt: new Date()
       });
     } catch (error) {
-      console.error('Erro ao atualizar empresa:', error);
       throw error;
     }
   }
@@ -131,8 +136,80 @@ export class CompanyService {
       };
       
       await setDoc(userRef, companyUser);
+      
+      try {
+        await this.sendInvitationEmail(userEmail, role, companyId);
+      } catch (emailError) {
+        throw new Error('Usuário adicionado com sucesso, mas houve erro ao enviar email de convite. Verifique a configuração do SMTP.');
+      }
+      
     } catch (error) {
-      // Silenciar erro - tentativa em background
+      throw error;
+    }
+  }
+
+  private async sendInvitationEmail(userEmail: string, role: string, companyId: string): Promise<void> {
+    try {
+      // Importar SmtpService dinamicamente para evitar dependência circular
+      const { SmtpService } = await import('./smtp.service');
+      const smtpService = this.injector.get(SmtpService);
+      
+      const company = await this.getCompany(companyId);
+      if (!company) throw new Error('Empresa não encontrada');
+      
+      const roleTranslations: { [key: string]: string } = {
+        'admin': 'Administrador',
+        'manager': 'Gerente',
+        'user': 'Usuário'
+      };
+
+      const inviteLink = `${window.location.origin}/login`;
+      const subject = `Convite para participar da ${company.name}`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            ${company.brandingConfig?.logo ? `<img src="${company.brandingConfig.logo}" alt="${company.name}" style="max-height: 80px;">` : ''}
+            <h1 style="color: ${company.brandingConfig?.primaryColor || '#3B82F6'}; margin-top: 20px;">
+              Convite para ${company.name}
+            </h1>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #333; margin-top: 0;">Você foi convidado!</h2>
+            <p>Olá,</p>
+            <p>Você foi convidado para fazer parte da <strong>${company.name}</strong> com a função de <strong>${roleTranslations[role]}</strong>.</p>
+            <p>Para aceitar o convite e começar a usar a plataforma, clique no botão abaixo:</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${inviteLink}" 
+               style="background-color: ${company.brandingConfig?.primaryColor || '#3B82F6'}; 
+                      color: white; 
+                      padding: 12px 30px; 
+                      text-decoration: none; 
+                      border-radius: 6px; 
+                      font-weight: bold;
+                      display: inline-block;">
+              Aceitar Convite
+            </a>
+          </div>
+          
+          <div style="font-size: 12px; color: #666; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <p>Se você não conseguir clicar no botão, copie e cole este link no seu navegador:</p>
+            <p><a href="${inviteLink}" style="color: #3B82F6;">${inviteLink}</a></p>
+            <p>Este convite foi enviado por ${company.name}.</p>
+          </div>
+        </div>
+      `;
+
+      await smtpService.sendEmail({
+        to: userEmail,
+        subject: subject,
+        html: html
+      }).toPromise();
+      
+    } catch (error) {
       throw error;
     }
   }
@@ -160,7 +237,6 @@ export class CompanyService {
       const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
       await deleteDoc(userRef);
     } catch (error) {
-      console.error('Erro ao remover usuário da empresa:', error);
       throw error;
     }
   }
@@ -173,7 +249,6 @@ export class CompanyService {
         permissions: this.getPermissionsByRole(newRole)
       });
     } catch (error) {
-      console.error('Erro ao atualizar função do usuário:', error);
       throw error;
     }
   }
@@ -225,7 +300,6 @@ export class CompanyService {
       await deleteDoc(companyRef);
       
     } catch (error) {
-      console.error('Erro ao excluir empresa:', error);
       throw error;
     }
   }
@@ -254,7 +328,6 @@ export class CompanyService {
       
       await setDoc(settingsRef, defaultSettings);
     } catch (error) {
-      console.error('Erro ao criar configurações padrão:', error);
       throw error;
     }
   }
@@ -270,7 +343,6 @@ export class CompanyService {
       
       return null;
     } catch (error) {
-      console.error('Erro ao buscar configurações da empresa:', error);
       throw error;
     }
   }
@@ -280,7 +352,6 @@ export class CompanyService {
       const settingsRef = doc(this.firestore, 'companies', companyId, 'settings', 'general');
       await updateDoc(settingsRef, settings);
     } catch (error) {
-      console.error('Erro ao atualizar configurações da empresa:', error);
       throw error;
     }
   }
@@ -292,7 +363,6 @@ export class CompanyService {
       const company = await this.getCompanyBySubdomain(subdomain);
       return company === null;
     } catch (error) {
-      console.error('Erro ao verificar disponibilidade do subdomínio:', error);
       return false;
     }
   }
@@ -302,12 +372,9 @@ export class CompanyService {
       // Verificar se a empresa Gobuyer já existe
       const existingCompany = await this.getCompanyBySubdomain('gobuyer');
       if (existingCompany) {
-        // Empresa Gobuyer já existe
         return;
       }
 
-      // Criando empresa Gobuyer
-      
       // Criar empresa Gobuyer
       const gobuyerData: Omit<Company, 'id' | 'createdAt' | 'updatedAt'> = {
         subdomain: 'gobuyer',
@@ -349,16 +416,11 @@ export class CompanyService {
       };
 
       const companyId = await this.createCompany(gobuyerData);
-      // Empresa Gobuyer criada com sucesso
-
-      // Migrar dados existentes se houver
-      await this.migrateBoardsFromUsers(companyId);
       
     } catch (error) {
-      console.error('Erro ao criar empresa Gobuyer:', error);
+      // Error handled silently
     }
   }
-
 
   getCompanySubdomain(): string | null {
     if (typeof window !== 'undefined') {
@@ -411,202 +473,7 @@ export class CompanyService {
       
       return null;
     } catch (error) {
-      console.error('Erro ao buscar empresa do usuário:', error);
       return null;
-    }
-  }
-
-  // ===== DEVELOPMENT SEED =====
-
-  private async migrateExistingData(companyId: string): Promise<void> {
-    try {
-      // Migrando dados existentes para a empresa Gobuyer
-      
-      // 1. Adicionar usuários conhecidos do Firebase Auth (emails da Gobuyer)
-      const gobuyerUsers = [
-        { email: 'geovane.lopes@gobuyer.com.br', role: 'admin' as const },
-        { email: 'admin@gobuyer.com.br', role: 'admin' as const },
-        { email: 'contato@gobuyer.com.br', role: 'manager' as const },
-        { email: 'suporte@gobuyer.com.br', role: 'user' as const }
-      ];
-      
-      for (const user of gobuyerUsers) {
-        await this.addUserToCompany(companyId, user.email, user.role);
-      }
-      
-      // 2. Migrar quadros existentes da estrutura antiga para nova
-      await this.migrateLegacyBoards(companyId);
-      
-      // Migração de dados concluída
-      
-    } catch (error) {
-      console.error('Erro na migração de dados:', error);
-    }
-  }
-
-  private async migrateLegacyBoards(companyId: string): Promise<void> {
-    try {
-      // Migrando quadros existentes para a empresa Gobuyer
-      
-      // Verificar se há quadros na nova estrutura
-      const newBoardsRef = collection(this.firestore, 'companies', companyId, 'boards');
-      const newBoardsSnapshot = await getDocs(newBoardsRef);
-      
-      if (newBoardsSnapshot.empty) {
-        // Procurar quadros na estrutura antiga (users/{userId}/boards)
-        const migrated = await this.migrateBoardsFromUsers(companyId);
-        
-        if (!migrated) {
-          // Nenhum quadro encontrado, criando quadro padrão da Gobuyer
-          await this.createDefaultBoard(companyId);
-        }
-      } else {
-        // Quadros já existem na nova estrutura
-        // Garantir que todos os quadros tenham companyId
-        await this.updateBoardsWithCompanyId(companyId);
-      }
-      
-    } catch (error) {
-      console.error('Erro ao migrar quadros:', error);
-    }
-  }
-
-  private async migrateBoardsFromUsers(companyId: string): Promise<boolean> {
-    try {
-      // Listar todos os usuários na coleção 'users' para encontrar quadros
-      const usersRef = collection(this.firestore, 'users');
-      const usersSnapshot = await getDocs(usersRef);
-      let migratedAny = false;
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-        
-        // Verificar se há quadros para este usuário
-        const oldBoardsRef = collection(this.firestore, 'users', userId, 'boards');
-        const oldBoardsSnapshot = await getDocs(oldBoardsRef);
-        
-        if (!oldBoardsSnapshot.empty) {
-          // Encontrados quadros do usuário para migração
-          
-          for (const boardDoc of oldBoardsSnapshot.docs) {
-            const boardData = boardDoc.data();
-            
-            // Migrar quadro para a nova estrutura
-            const newBoardRef = doc(collection(this.firestore, 'companies', companyId, 'boards'));
-            await setDoc(newBoardRef, {
-              ...boardData,
-              companyId: companyId,
-              migratedFrom: `users/${userId}/boards/${boardDoc.id}`,
-              migratedAt: new Date()
-            });
-            
-            // Quadro migrado com sucesso
-            
-            // Migrar colunas
-            await this.migrateBoardColumns(userId, boardDoc.id, companyId, newBoardRef.id);
-            
-            // Migrar leads
-            await this.migrateBoardLeads(userId, boardDoc.id, companyId, newBoardRef.id);
-            
-            migratedAny = true;
-          }
-        }
-      }
-      
-      return migratedAny;
-    } catch (error) {
-      console.error('Erro ao migrar quadros de usuários:', error);
-      return false;
-    }
-  }
-
-  private async migrateBoardColumns(oldUserId: string, oldBoardId: string, companyId: string, newBoardId: string): Promise<void> {
-    try {
-      const oldColumnsRef = collection(this.firestore, 'users', oldUserId, 'boards', oldBoardId, 'columns');
-      const oldColumnsSnapshot = await getDocs(oldColumnsRef);
-      
-      for (const columnDoc of oldColumnsSnapshot.docs) {
-        const columnData = columnDoc.data();
-        
-        const newColumnRef = doc(collection(this.firestore, 'companies', companyId, 'boards', newBoardId, 'columns'));
-        await setDoc(newColumnRef, {
-          ...columnData,
-          companyId: companyId,
-          migratedFrom: `users/${oldUserId}/boards/${oldBoardId}/columns/${columnDoc.id}`
-        });
-      }
-      
-      // Colunas migradas para o quadro
-    } catch (error) {
-      console.error('Erro ao migrar colunas:', error);
-    }
-  }
-
-  private async migrateBoardLeads(oldUserId: string, oldBoardId: string, companyId: string, newBoardId: string): Promise<void> {
-    try {
-      const oldLeadsRef = collection(this.firestore, 'users', oldUserId, 'boards', oldBoardId, 'leads');
-      const oldLeadsSnapshot = await getDocs(oldLeadsRef);
-      
-      for (const leadDoc of oldLeadsSnapshot.docs) {
-        const leadData = leadDoc.data();
-        
-        const newLeadRef = doc(collection(this.firestore, 'companies', companyId, 'boards', newBoardId, 'leads'));
-        await setDoc(newLeadRef, {
-          ...leadData,
-          companyId: companyId,
-          migratedFrom: `users/${oldUserId}/boards/${oldBoardId}/leads/${leadDoc.id}`
-        });
-      }
-      
-      // Leads migrados para o quadro
-    } catch (error) {
-      console.error('Erro ao migrar leads:', error);
-    }
-  }
-
-  private async createDefaultBoard(companyId: string): Promise<void> {
-    const boardData = {
-      name: 'Leads Gobuyer',
-      description: 'Quadro principal para gerenciamento de leads da Gobuyer Digital',
-      companyId: companyId,
-      createdAt: null // será preenchido pelo serverTimestamp
-    };
-
-    const boardRef = doc(collection(this.firestore, 'companies', companyId, 'boards'));
-    await setDoc(boardRef, boardData);
-    
-    // Criar colunas padrão
-    const defaultColumns = [
-      { name: 'Novo Lead', order: 0, color: '#4A90E2', endStageType: 'none' },
-      { name: 'Em Contato', order: 1, color: '#F5A623', endStageType: 'none' },
-      { name: 'Proposta Enviada', order: 2, color: '#7ED321', endStageType: 'none' },
-      { name: 'Fechado', order: 3, color: '#50E3C2', endStageType: 'won' },
-      { name: 'Perdido', order: 4, color: '#D0021B', endStageType: 'lost' }
-    ];
-
-    for (const columnData of defaultColumns) {
-      const colRef = doc(collection(this.firestore, 'companies', companyId, 'boards', boardRef.id, 'columns'));
-      await setDoc(colRef, { ...columnData, companyId });
-    }
-    
-    // Quadro padrão criado com sucesso
-  }
-
-  private async updateBoardsWithCompanyId(companyId: string): Promise<void> {
-    try {
-      const boardsRef = collection(this.firestore, 'companies', companyId, 'boards');
-      const boardsSnapshot = await getDocs(boardsRef);
-      
-      for (const boardDoc of boardsSnapshot.docs) {
-        const boardData = boardDoc.data();
-        
-        if (!boardData['companyId']) {
-          await updateDoc(boardDoc.ref, { companyId });
-          // CompanyId adicionado ao quadro
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar quadros com companyId:', error);
     }
   }
 
@@ -701,46 +568,6 @@ export class CompanyService {
     }
   }
 
-  // Método para associar usuários gobuyer.com.br existentes à empresa Gobuyer
-  async associateGobuyerUsers(): Promise<void> {
-    try {
-      const gobuyerCompany = await this.getCompanyBySubdomain('gobuyer');
-      if (!gobuyerCompany) {
-        console.log('Empresa Gobuyer não encontrada');
-        return;
-      }
-
-      // Lista expandida de emails conhecidos do domínio gobuyer.com.br
-      const gobuyerEmails = [
-        'geovane.lopes@gobuyer.com.br',
-        'admin@gobuyer.com.br',
-        'suporte@gobuyer.com.br',
-        'contato@gobuyer.com.br',
-        'vendas@gobuyer.com.br',
-        'financeiro@gobuyer.com.br',
-        'marketing@gobuyer.com.br',
-        'dev@gobuyer.com.br',
-        'ti@gobuyer.com.br'
-        // Adicione mais emails conforme necessário
-      ];
-
-      console.log('Associando usuários Gobuyer à empresa:', gobuyerEmails);
-
-      for (const email of gobuyerEmails) {
-        try {
-          const role = email === gobuyerCompany.ownerEmail ? 'admin' : 'user';
-          await this.addUserToCompany(gobuyerCompany.id!, email, role);
-          console.log(`Usuário ${email} associado como ${role}`);
-        } catch (error) {
-          // Silencioso - usuário pode já existir
-        }
-      }
-
-    } catch (error) {
-      console.error('Erro ao associar usuários Gobuyer:', error);
-    }
-  }
-
   // ===== REAL-TIME SUBSCRIPTIONS =====
   
   subscribeToCompany(companyId: string, callback: (company: Company | null) => void) {
@@ -753,5 +580,4 @@ export class CompanyService {
       }
     });
   }
-
 }

@@ -22,6 +22,7 @@ export class ColumnModalComponent {
   
   @Output() columnCreated = new EventEmitter<void>();
   @Output() columnUpdated = new EventEmitter<void>();
+  @Output() columnDeleted = new EventEmitter<void>();
   @Output() closeModal = new EventEmitter<void>();
 
   isVisible = false;
@@ -30,25 +31,32 @@ export class ColumnModalComponent {
   errorMessage = '';
   currentColumn: Column | null = null;
 
-  columnForm: FormGroup = this.fb.group({
-    name: ['', [Validators.required]],
-    color: ['#3B82F6'],
-    endStageType: ['none'],
-    slaDays: [0, [Validators.min(0)]]
-  });
-
   predefinedColors = [
     '#3B82F6', // Blue
     '#EF4444', // Red
     '#10B981', // Green
-    '#F59E0B', // Yellow
-    '#8B5CF6', // Purple
+    '#F59E0B', // Amber
+    '#8B5CF6', // Violet
     '#EC4899', // Pink
     '#6B7280', // Gray
     '#F97316', // Orange
     '#06B6D4', // Cyan
-    '#84CC16'  // Lime
+    '#84CC16', // Lime
+    '#14B8A6', // Teal
+    '#F43F5E', // Rose
+    '#A855F7', // Purple
+    '#EAB308', // Yellow
+    '#059669', // Emerald
+    '#DC2626'  // Red-600
   ];
+
+  columnForm: FormGroup = this.fb.group({
+    name: ['', [Validators.required]],
+    color: [this.predefinedColors[0]], // Usar primeira cor da paleta como padrão
+    endStageType: ['none'],
+    slaDays: [0, [Validators.min(0)]],
+    isInitialPhase: [false]
+  });
 
   endStageTypes = [
     { value: 'none', label: 'Nenhuma (fase normal)' },
@@ -77,14 +85,34 @@ export class ColumnModalComponent {
   }
 
   private resetForm() {
+    // Selecionar cor baseada no número de colunas existentes
+    const defaultColor = this.getNextAvailableColor();
+    
     this.columnForm.reset({
       name: '',
-      color: '#3B82F6',
+      color: defaultColor,
       endStageType: 'none',
-      slaDays: 0
+      slaDays: 0,
+      isInitialPhase: false
     });
     this.errorMessage = '';
     this.isLoading = false;
+  }
+
+  private getNextAvailableColor(): string {
+    // Cores já usadas pelas colunas existentes
+    const usedColors = this.columns.map(col => col.color).filter(color => color);
+    
+    // Encontrar primeira cor disponível que não está sendo usada
+    for (const color of this.predefinedColors) {
+      if (!usedColors.includes(color)) {
+        return color;
+      }
+    }
+    
+    // Se todas as cores estão sendo usadas, retornar cor baseada no índice
+    const colorIndex = this.columns.length % this.predefinedColors.length;
+    return this.predefinedColors[colorIndex];
   }
 
   private populateForm(column: Column) {
@@ -92,7 +120,8 @@ export class ColumnModalComponent {
       name: column.name,
       color: column.color || '#3B82F6',
       endStageType: column.endStageType || 'none',
-      slaDays: column.slaDays || 0
+      slaDays: column.slaDays || 0,
+      isInitialPhase: (column as any).isInitialPhase || false
     });
   }
 
@@ -124,6 +153,7 @@ export class ColumnModalComponent {
             color: formData.color,
             endStageType: formData.endStageType,
             slaDays: formData.slaDays,
+            isInitialPhase: formData.isInitialPhase,
             updatedAt: new Date()
           }
         );
@@ -139,6 +169,7 @@ export class ColumnModalComponent {
           order: nextOrder,
           endStageType: formData.endStageType,
           slaDays: formData.slaDays,
+          isInitialPhase: formData.isInitialPhase,
           boardId: this.boardId,
           companyId: '', // Será preenchido pelo FirestoreService
           createdAt: new Date(),
@@ -182,5 +213,35 @@ export class ColumnModalComponent {
       'slaDays': 'SLA (dias)'
     };
     return labels[fieldName] || fieldName;
+  }
+
+  async deleteColumn() {
+    if (!this.currentColumn || !this.currentColumn.id) {
+      return;
+    }
+
+    const confirmed = confirm(`Deseja excluir a fase "${this.currentColumn.name}"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.isLoading = true;
+    this.errorMessage = '';
+
+    try {
+      await this.firestoreService.deleteColumn(
+        this.ownerId,
+        this.boardId,
+        this.currentColumn.id
+      );
+
+      this.columnDeleted.emit();
+      this.hide();
+    } catch (error: any) {
+      console.error('Erro ao excluir coluna:', error);
+      this.errorMessage = 'Erro ao excluir fase. Tente novamente.';
+    } finally {
+      this.isLoading = false;
+    }
   }
 }

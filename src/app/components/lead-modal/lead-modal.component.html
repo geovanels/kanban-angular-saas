@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center p-6 border-b border-gray-200">
       <h2 class="text-2xl font-bold text-gray-900">
-        {{ isEditing ? 'Editar Lead' : 'Novo Lead' }}
+        {{ isEditing ? 'Editar Registro' : 'Novo Registro' }}
       </h2>
       <button 
         (click)="hide()" 
@@ -25,13 +25,53 @@
 
           <!-- Text Input -->
           <input 
-            *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel'"
+            *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'date' || field.type === 'time' || field.type === 'number'"
             [type]="field.type"
             [id]="field.name"
             [formControlName]="field.name"
+            [placeholder]="field.placeholder || ''"
             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
             [disabled]="isLoading">
+
+          <!-- Phone Input with Brazilian Mask -->
+          <input 
+            *ngIf="field.type === 'tel'"
+            type="tel"
+            [id]="field.name"
+            [formControlName]="field.name"
+            [placeholder]="field.placeholder || '(11) 99999-9999'"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading"
+            (input)="maskHelper.maskPhone($event)"
+            (keyup)="maskHelper.maskPhone($event)">
+
+          <!-- CNPJ Input -->
+          <input 
+            *ngIf="field.type === 'cnpj'"
+            type="text"
+            [id]="field.name"
+            [formControlName]="field.name"
+            placeholder="00.000.000/0000-00"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading"
+            (input)="maskHelper.maskCNPJ($event)"
+            (keyup)="maskHelper.maskCNPJ($event)">
+
+          <!-- CPF Input -->
+          <input 
+            *ngIf="field.type === 'cpf'"
+            type="text"
+            [id]="field.name"
+            [formControlName]="field.name"
+            placeholder="000.000.000-00"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading"
+            (input)="maskHelper.maskCPF($event)"
+            (keyup)="maskHelper.maskCPF($event)">
 
           <!-- Select -->
           <select 
@@ -43,9 +83,50 @@
             [disabled]="isLoading">
             <option value="">Selecione...</option>
             <option *ngFor="let option of field.options" [value]="option">
-              {{ option | titlecase }}
+              {{ option }}
             </option>
           </select>
+
+          <!-- Temperatura Select -->
+          <select 
+            *ngIf="field.type === 'temperatura'"
+            [id]="field.name"
+            [formControlName]="field.name"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading">
+            <option value="">Selecione a temperatura</option>
+            <option *ngFor="let option of (field.options || ['Quente', 'Morno', 'Frio'])" [value]="option">
+              {{ option }}
+            </option>
+          </select>
+
+          <!-- Radio Buttons -->
+          <div *ngIf="field.type === 'radio'" class="space-y-2">
+            <div *ngFor="let option of field.options; let i = index" class="flex items-center">
+              <input
+                type="radio"
+                [id]="field.name + '_radio_' + i"
+                [formControlName]="field.name"
+                [value]="option"
+                [disabled]="isLoading"
+                class="mr-2 text-blue-600 focus:ring-blue-500 border-gray-300">
+              <label [for]="field.name + '_radio_' + i" class="text-gray-700 cursor-pointer">
+                {{ option }}
+              </label>
+            </div>
+          </div>
+
+          <!-- Checkbox -->
+          <label *ngIf="field.type === 'checkbox'" class="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              [id]="field.name"
+              [formControlName]="field.name"
+              [disabled]="isLoading"
+              class="mr-2 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="text-gray-700">{{ field.placeholder || field.label }}</span>
+          </label>
 
           <!-- Textarea -->
           <textarea 
@@ -57,47 +138,33 @@
             [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
             [disabled]="isLoading"></textarea>
 
+          <!-- File Upload -->
+          <div *ngIf="field.type === 'file'">
+            <input 
+              type="file"
+              [id]="field.name"
+              [multiple]="field.placeholder === 'multiple'"
+              (change)="onFileSelected($event, field.name)"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+              [disabled]="isLoading">
+            <p class="text-xs text-gray-500 mt-1">
+              {{ field.placeholder || 'Você pode anexar arquivos como documentos, imagens, etc.' }}
+            </p>
+          </div>
+
           <!-- Error Message -->
           <div *ngIf="getFieldError(field.name)" class="text-red-500 text-sm mt-1">
             {{ getFieldError(field.name) }}
           </div>
         </div>
 
-        <!-- File Upload (apenas para novos leads) -->
-        <div *ngIf="!isEditing" class="form-group">
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            Anexos (opcional)
-          </label>
-          <input 
-            type="file"
-            multiple
-            (change)="onFileSelected($event)"
-            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            [disabled]="isLoading">
-          <p class="text-xs text-gray-500 mt-1">
-            Você pode anexar arquivos como documentos, imagens, etc.
-          </p>
-        </div>
 
         <!-- Error Message -->
         <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {{ errorMessage }}
         </div>
 
-        <!-- Temperature Info -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div class="flex items-start">
-            <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2"></i>
-            <div class="text-sm text-blue-700">
-              <strong>Temperatura do Lead:</strong>
-              <ul class="mt-1 ml-2 list-disc">
-                <li><strong>Frio:</strong> Lead inicial, pouco interesse</li>
-                <li><strong>Morno:</strong> Lead com interesse moderado</li>
-                <li><strong>Quente:</strong> Lead qualificado, alta probabilidade de conversão</li>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Actions -->
@@ -115,7 +182,7 @@
           [disabled]="isLoading || !leadForm.valid"
           class="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center">
           <div *ngIf="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-          {{ isLoading ? 'Salvando...' : (isEditing ? 'Atualizar Lead' : 'Criar Lead') }}
+          {{ isLoading ? 'Salvando...' : (isEditing ? 'Atualizar Registro' : 'Salvar Registro') }}
         </button>
       </div>
     </form>

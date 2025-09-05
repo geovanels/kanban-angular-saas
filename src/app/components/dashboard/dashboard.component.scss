@@ -4,3 +4,19 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+// Board menu styles - garantir visibilidade
+.board-menu-container {
+  position: relative;
+  
+  button {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  
+  // Menu dropdown
+  .absolute {
+    position: absolute !important;
+    z-index: 1000 !important;
+  }
+}

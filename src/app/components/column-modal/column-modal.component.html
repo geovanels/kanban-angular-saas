@@ -38,26 +38,45 @@
 
         <!-- Cor da Fase -->
         <div class="form-group">
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
             Cor da Fase
           </label>
-          <div class="flex flex-wrap gap-2 mb-2">
-            <button
-              *ngFor="let color of predefinedColors"
-              type="button"
-              class="w-8 h-8 rounded-full border-2 transition-all hover:scale-110"
-              [style.backgroundColor]="color"
+          
+          <!-- Paleta de Cores Predefinidas -->
+          <div class="grid grid-cols-8 gap-2 mb-3 p-3 bg-gray-50 rounded-lg">
+            <div
+              *ngFor="let color of predefinedColors; let i = index"
+              class="color-swatch w-10 h-10 rounded-lg border-2 transition-all duration-200 hover:scale-105 hover:shadow-md relative cursor-pointer"
+              [style]="'background-color: ' + color + ' !important;'"
               [class.border-gray-800]="columnForm.get('color')?.value === color"
               [class.border-gray-300]="columnForm.get('color')?.value !== color"
-              (click)="columnForm.patchValue({color: color})"
-              [disabled]="isLoading">
-            </button>
+              [class.ring-2]="columnForm.get('color')?.value === color"
+              [class.ring-blue-500]="columnForm.get('color')?.value === color"
+              (click)="!isLoading && columnForm.patchValue({color: color})"
+              [title]="color"
+              [attr.data-color]="color"
+              [attr.data-index]="i">
+              
+              <!-- Checkmark para cor selecionada -->
+              <div *ngIf="columnForm.get('color')?.value === color" 
+                   class="absolute inset-0 flex items-center justify-center">
+                <i class="fas fa-check text-white text-sm drop-shadow-md"></i>
+              </div>
+              
+            </div>
           </div>
-          <input 
-            type="color"
-            formControlName="color"
-            class="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
-            [disabled]="isLoading">
+          
+          <!-- Seletor de Cor Customizada -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-gray-600">Cor personalizada:</label>
+            <input 
+              type="color"
+              formControlName="color"
+              class="w-12 h-8 border border-gray-300 rounded cursor-pointer"
+              [disabled]="isLoading"
+              title="Escolher cor personalizada">
+            <span class="text-xs text-gray-500 ml-1">{{ columnForm.get('color')?.value }}</span>
+          </div>
         </div>
 
         <!-- Tipo de Finalização -->
@@ -102,6 +121,23 @@
           </p>
         </div>
 
+        <!-- Fase Inicial -->
+        <div class="form-group">
+          <label class="flex items-center space-x-2">
+            <input 
+              type="checkbox"
+              formControlName="isInitialPhase"
+              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              [disabled]="isLoading">
+            <span class="text-sm font-medium text-gray-700">
+              Esta é a fase inicial
+            </span>
+          </label>
+          <p class="text-xs text-gray-500 mt-1">
+            A fase inicial será usada automaticamente ao criar novos registros.
+          </p>
+        </div>
+
         <!-- Error Message -->
         <div *ngIf="errorMessage" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {{ errorMessage }}
@@ -125,22 +161,37 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+      <div class="flex justify-between mt-6 pt-4 border-t border-gray-200">
+        <!-- Delete button (only when editing) -->
         <button 
+          *ngIf="isEditing"
           type="button" 
-          (click)="hide()"
-          class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+          (click)="deleteColumn()"
+          class="px-4 py-2 text-red-700 bg-red-100 hover:bg-red-200 rounded-lg font-medium transition-colors flex items-center"
           [disabled]="isLoading">
-          Cancelar
+          <i class="fas fa-trash mr-2"></i>
+          Excluir Fase
         </button>
+        <div *ngIf="!isEditing"></div>
         
-        <button 
-          type="submit" 
-          [disabled]="isLoading || !columnForm.valid"
-          class="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center">
-          <div *ngIf="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-          {{ isLoading ? 'Salvando...' : (isEditing ? 'Atualizar Fase' : 'Criar Fase') }}
-        </button>
+        <!-- Right side buttons -->
+        <div class="flex gap-3">
+          <button 
+            type="button" 
+            (click)="hide()"
+            class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+            [disabled]="isLoading">
+            Cancelar
+          </button>
+          
+          <button 
+            type="submit" 
+            [disabled]="isLoading || !columnForm.valid"
+            class="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors flex items-center">
+            <div *ngIf="isLoading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            {{ isLoading ? 'Salvando...' : (isEditing ? 'Atualizar Fase' : 'Criar Fase') }}
+          </button>
+        </div>
       </div>
     </form>
   </div>

@@ -1,275 +1,405 @@
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { SubdomainService } from '../../services/subdomain.service';
 
-export interface FormField {
-  id: string;
+interface FormField {
   name: string;
   label: string;
   type: string;
   required: boolean;
-  placeholder?: string;
+  order: number;
   options?: string[];
-  description?: string;
-}
-
-export interface FieldType {
-  id: string;
-  name: string;
-  label: string;
-  icon: string;
-  category: string;
-  defaultConfig: Partial<FormField>;
+  placeholder?: string;
+  includeInApi?: boolean; // Flag para indicar se o campo deve ser incluído na API
+  apiFieldName?: string; // Nome do campo na API (se diferente do nome)
+  showInCard?: boolean; // Flag para indicar se o campo deve ser exibido no card
 }
 
 @Component({
   selector: 'app-visual-form-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, DragDropModule],
+  imports: [CommonModule, ReactiveFormsModule, DragDropModule],
   templateUrl: './visual-form-builder.html',
-  styleUrl: './visual-form-builder.scss'
+  styleUrls: ['./visual-form-builder.scss']
 })
-export class VisualFormBuilder implements OnInit {
-  @Input() initialFields: FormField[] = [];
+export class VisualFormBuilderComponent implements OnInit {
+  @Input() fields: FormField[] = [];
   @Output() fieldsChanged = new EventEmitter<FormField[]>();
-  @Output() saveForm = new EventEmitter<FormField[]>();
-  @Output() cancelForm = new EventEmitter<void>();
 
-  // Available field types
-  fieldTypes: FieldType[] = [
-    {
-      id: 'text',
-      name: 'text',
-      label: 'Texto',
-      icon: 'fa-font',
-      category: 'basic',
-      defaultConfig: { type: 'text', required: false }
-    },
-    {
-      id: 'email',
-      name: 'email', 
-      label: 'Email',
-      icon: 'fa-envelope',
-      category: 'basic',
-      defaultConfig: { type: 'email', required: false }
-    },
-    {
-      id: 'phone',
-      name: 'tel',
-      label: 'Telefone',
-      icon: 'fa-phone',
-      category: 'basic',
-      defaultConfig: { type: 'tel', required: false }
-    },
-    {
-      id: 'number',
-      name: 'number',
-      label: 'Número',
-      icon: 'fa-hashtag',
-      category: 'basic',
-      defaultConfig: { type: 'number', required: false }
-    },
-    {
-      id: 'textarea',
-      name: 'textarea',
-      label: 'Texto Longo',
-      icon: 'fa-align-left',
-      category: 'basic',
-      defaultConfig: { type: 'textarea', required: false }
-    },
-    {
-      id: 'select',
-      name: 'select',
-      label: 'Lista de Opções',
-      icon: 'fa-list',
-      category: 'basic',
-      defaultConfig: { type: 'select', required: false, options: ['Opção 1', 'Opção 2', 'Opção 3'] }
-    },
-    {
-      id: 'radio',
-      name: 'radio',
-      label: 'Botões de Opção',
-      icon: 'fa-dot-circle',
-      category: 'basic',
-      defaultConfig: { type: 'radio', required: false, options: ['Sim', 'Não'] }
-    },
-    {
-      id: 'checkbox',
-      name: 'checkbox',
-      label: 'Caixa de Seleção',
-      icon: 'fa-check-square',
-      category: 'basic',
-      defaultConfig: { type: 'checkbox', required: false }
-    },
-    {
-      id: 'file',
-      name: 'file',
-      label: 'Anexo de Documentos',
-      icon: 'fa-paperclip',
-      category: 'basic',
-      defaultConfig: { type: 'file', required: false }
-    },
-    {
-      id: 'date',
-      name: 'date',
-      label: 'Data',
-      icon: 'fa-calendar',
-      category: 'basic',
-      defaultConfig: { type: 'date', required: false }
-    }
+  private fb = inject(FormBuilder);
+  private subdomainService = inject(SubdomainService);
+  
+  fieldsForm: FormGroup;
+  editingField: FormField | null = null;
+  editingIndex: number = -1;
+  selectedFieldType: string = '';
+  selectedField: FormField | null = null;
+  
+  fieldTypes = [
+    { value: 'text', label: 'Texto' },
+    { value: 'email', label: 'E-mail' },
+    { value: 'tel', label: 'Telefone' },
+    { value: 'number', label: 'Número' },
+    { value: 'cnpj', label: 'CNPJ' },
+    { value: 'cpf', label: 'CPF' },
+    { value: 'temperatura', label: 'Temperatura' },
+    { value: 'textarea', label: 'Área de Texto' },
+    { value: 'select', label: 'Lista Suspensa' },
+    { value: 'checkbox', label: 'Checkbox' },
+    { value: 'radio', label: 'Botão de Rádio' },
+    { value: 'date', label: 'Data' },
+    { value: 'time', label: 'Hora' },
+    { value: 'file', label: 'Upload de Arquivo' }
   ];
 
-  // Form builder state
-  formFields: FormField[] = [];
-  selectedField: FormField | null = null;
-  showFieldConfig = false;
-
-  // Configuration form
-  configForm: FormGroup;
-  private fieldIdCounter = 1;
-
-  constructor(private fb: FormBuilder) {
-    this.configForm = this.createConfigForm();
+  constructor() {
+    this.fieldsForm = this.fb.group({
+      name: ['', Validators.required],
+      label: ['', Validators.required],
+      type: ['text', Validators.required],
+      required: [false],
+      placeholder: [''],
+      options: [''],
+      includeInApi: [true], // Por padrão, incluir na API
+      apiFieldName: [''], // Nome personalizado na API
+      showInCard: [false] // Por padrão, não exibir no card
+    });
   }
 
   ngOnInit() {
-    if (this.initialFields.length > 0) {
-      this.formFields = [...this.initialFields];
-      this.fieldIdCounter = Math.max(...this.formFields.map(f => parseInt(f.id.replace('field_', '')))) + 1;
-    }
-  }
-
-  private createConfigForm(): FormGroup {
-    return this.fb.group({
-      name: ['', [Validators.required, Validators.pattern(/^[a-zA-Z][a-zA-Z0-9_]*$/)]],
-      label: ['', Validators.required],
-      placeholder: [''],
-      description: [''],
-      required: [false],
-      options: ['']
-    });
-  }
-
-  // Drag & Drop handlers
-  onFieldTypeDrop(event: CdkDragDrop<FormField[]>) {
-    if (event.previousContainer !== event.container) {
-      const fieldType = this.fieldTypes[event.previousIndex];
-      const newField = this.createFieldFromType(fieldType);
-      
-      const copyOfItems = [...this.formFields];
-      copyOfItems.splice(event.currentIndex, 0, newField);
-      this.formFields = copyOfItems;
+    // Inicializar com campos existentes se fornecidos
+    if (this.fields && this.fields.length > 0) {
       this.emitFieldsChange();
     }
   }
 
-  onFieldReorder(event: CdkDragDrop<FormField[]>) {
-    if (event.previousContainer === event.container) {
-      moveItemInArray(this.formFields, event.previousIndex, event.currentIndex);
-      this.emitFieldsChange();
-    }
-  }
-
-  private createFieldFromType(fieldType: FieldType): FormField {
-    return {
-      id: `field_${this.fieldIdCounter++}`,
-      name: `${fieldType.name}_${this.fieldIdCounter}`,
-      label: `${fieldType.label} ${this.fieldIdCounter}`,
-      type: fieldType.name,
-      required: false,
-      ...fieldType.defaultConfig
-    };
-  }
-
-  // Field management
-  selectField(field: FormField) {
-    this.selectedField = field;
-    this.showFieldConfig = true;
-    this.populateConfigForm(field);
-  }
-
-  private populateConfigForm(field: FormField) {
-    this.configForm.patchValue({
-      name: field.name,
-      label: field.label,
-      placeholder: field.placeholder || '',
-      description: field.description || '',
-      required: field.required,
-      options: field.options ? field.options.join(', ') : ''
-    });
-  }
-
-  saveFieldConfig() {
-    if (this.configForm.valid && this.selectedField) {
-      const formValue = this.configForm.value;
-      
-      // Update selected field
-      this.selectedField.name = formValue.name;
-      this.selectedField.label = formValue.label;
-      this.selectedField.placeholder = formValue.placeholder;
-      this.selectedField.description = formValue.description;
-      this.selectedField.required = formValue.required;
-      
-      // Handle options for select, radio, etc.
-      if (this.isFieldTypeWithOptions(this.selectedField.type)) {
-        this.selectedField.options = formValue.options
-          .split(',')
-          .map((opt: string) => opt.trim())
-          .filter((opt: string) => opt.length > 0);
-      }
-
-      this.showFieldConfig = false;
-      this.selectedField = null;
-      this.emitFieldsChange();
-    }
-  }
-
-  deleteField(field: FormField) {
-    const index = this.formFields.findIndex(f => f.id === field.id);
-    if (index > -1) {
-      this.formFields.splice(index, 1);
-      if (this.selectedField?.id === field.id) {
-        this.closeFieldConfig();
+  removeField(index: number) {
+    if (confirm('Tem certeza que deseja remover este campo?')) {
+      this.fields.splice(index, 1);
+      // Reset selection if removing selected field
+      if (this.selectedField === this.fields[index]) {
+        this.selectedField = null;
+        this.selectedFieldType = '';
       }
       this.emitFieldsChange();
     }
   }
 
-  closeFieldConfig() {
-    this.showFieldConfig = false;
-    this.selectedField = null;
-    this.configForm.reset();
+  moveFieldUp(index: number) {
+    if (index > 0) {
+      const temp = this.fields[index];
+      this.fields[index] = this.fields[index - 1];
+      this.fields[index - 1] = temp;
+      this.updateFieldOrders();
+      this.emitFieldsChange();
+    }
   }
 
-  // Utility methods
-  isFieldTypeWithOptions(type: string): boolean {
-    return ['select', 'radio', 'checkbox'].includes(type);
+  moveFieldDown(index: number) {
+    if (index < this.fields.length - 1) {
+      const temp = this.fields[index];
+      this.fields[index] = this.fields[index + 1];
+      this.fields[index + 1] = temp;
+      this.updateFieldOrders();
+      this.emitFieldsChange();
+    }
   }
 
-  getFieldTypeIcon(type: string): string {
-    const fieldType = this.fieldTypes.find(ft => ft.name === type);
-    return fieldType?.icon || 'fa-question';
+  onDrop(event: CdkDragDrop<FormField[]>) {
+    moveItemInArray(this.fields, event.previousIndex, event.currentIndex);
+    this.updateFieldOrders();
+    this.emitFieldsChange();
+  }
+
+  private resetForm() {
+    this.fieldsForm.reset({
+      type: 'text',
+      required: false
+    });
+  }
+
+  private updateFieldOrders() {
+    this.fields.forEach((field, index) => {
+      field.order = index;
+    });
   }
 
   private emitFieldsChange() {
-    this.fieldsChanged.emit([...this.formFields]);
+    this.fieldsChanged.emit([...this.fields]);
   }
 
-  onSave() {
-    this.saveForm.emit([...this.formFields]);
+  // Método para obter tipo de campo formatado
+  getFieldTypeLabel(type: string): string {
+    const fieldType = this.fieldTypes.find(ft => ft.value === type);
+    return fieldType ? fieldType.label : type;
   }
 
-  onCancel() {
-    this.cancelForm.emit();
-  }
-
-  // Clear all fields
-  clearForm() {
-    if (confirm('Tem certeza que deseja limpar todos os campos?')) {
-      this.formFields = [];
-      this.closeFieldConfig();
-      this.emitFieldsChange();
+  // Novos métodos para o layout Form.io
+  selectFieldType(type: string) {
+    this.selectedFieldType = type;
+    this.fieldsForm.patchValue({ type });
+    
+    // Auto-gerar nome se estiver vazio
+    if (!this.fieldsForm.get('name')?.value) {
+      const baseName = type + (this.fields.length + 1);
+      this.fieldsForm.patchValue({ name: baseName });
     }
+  }
+
+  selectField(field: FormField, index: number) {
+    this.selectedField = field;
+    this.editField(index);
+  }
+
+  getFieldTypeIcon(type: string): string {
+    const icons: { [key: string]: string } = {
+      'text': 'fas fa-font',
+      'email': 'fas fa-envelope',
+      'tel': 'fas fa-phone',
+      'number': 'fas fa-hashtag',
+      'cnpj': 'fas fa-building',
+      'cpf': 'fas fa-id-card',
+      'temperatura': 'fas fa-thermometer-half',
+      'textarea': 'fas fa-align-left',
+      'select': 'fas fa-list',
+      'checkbox': 'fas fa-check-square',
+      'radio': 'fas fa-dot-circle',
+      'date': 'fas fa-calendar',
+      'time': 'fas fa-clock',
+      'file': 'fas fa-upload'
+    };
+    return icons[type] || 'fas fa-question';
+  }
+
+  getFieldTypeDescription(type: string): string {
+    const descriptions: { [key: string]: string } = {
+      'text': 'Campo de texto simples',
+      'email': 'Campo de e-mail com validação',
+      'tel': 'Telefone com máscara DDD Brasil',
+      'number': 'Campo numérico',
+      'cnpj': 'CNPJ com máscara e validação',
+      'cpf': 'CPF com máscara e validação',
+      'temperatura': 'Lista suspensa (Quente, Morno, Frio)',
+      'textarea': 'Área de texto multilinha',
+      'select': 'Lista suspensa',
+      'checkbox': 'Caixa de seleção',
+      'radio': 'Botões de seleção única',
+      'date': 'Seletor de data',
+      'time': 'Seletor de hora',
+      'file': 'Upload de arquivos'
+    };
+    return descriptions[type] || 'Campo personalizado';
+  }
+
+  addField() {
+    const formValue = this.fieldsForm.value;
+    
+    if (!formValue.name || !formValue.label) {
+      alert('Nome e rótulo são obrigatórios');
+      return;
+    }
+
+    // Verificar se nome já existe
+    if (this.fields.some(f => f.name === formValue.name && this.editingIndex === -1)) {
+      alert('Já existe um campo com este nome');
+      return;
+    }
+
+    const newField: FormField = {
+      name: formValue.name,
+      label: formValue.label,
+      type: formValue.type || this.selectedFieldType,
+      required: formValue.required || false,
+      order: this.editingIndex >= 0 ? this.fields[this.editingIndex].order : this.fields.length,
+      includeInApi: formValue.includeInApi !== false, // Default true
+      showInCard: formValue.showInCard || false, // Default false
+      // Só incluir propriedades que não sejam undefined
+      ...(formValue.placeholder && formValue.placeholder.trim() && { placeholder: formValue.placeholder.trim() }),
+      ...(formValue.apiFieldName && formValue.apiFieldName.trim() && { apiFieldName: formValue.apiFieldName.trim() })
+    };
+
+    // Processar opções para select, radio e temperatura
+    if ((newField.type === 'select' || newField.type === 'radio') && formValue.options) {
+      newField.options = formValue.options
+        .split('\n')
+        .map((opt: string) => opt.trim())
+        .filter((opt: string) => opt);
+    }
+
+    // Auto-configurar opções para campo temperatura
+    if (newField.type === 'temperatura') {
+      newField.options = ['Quente', 'Morno', 'Frio'];
+    }
+
+    if (this.editingIndex >= 0) {
+      // Editando campo existente
+      this.fields[this.editingIndex] = newField;
+      this.editingIndex = -1;
+      this.selectedField = null;
+    } else {
+      // Adicionando novo campo
+      this.fields.push(newField);
+    }
+
+    this.resetForm();
+    this.emitFieldsChange();
+  }
+
+  editField(index: number) {
+    const field = this.fields[index];
+    this.editingIndex = index;
+    this.editingField = { ...field };
+    this.selectedFieldType = field.type;
+    this.selectedField = field;
+
+    this.fieldsForm.patchValue({
+      name: field.name,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      placeholder: field.placeholder || '',
+      options: field.options ? field.options.join('\n') : '',
+      includeInApi: field.includeInApi !== false, // Default true se não especificado
+      apiFieldName: field.apiFieldName || '',
+      showInCard: field.showInCard || false // Default false se não especificado
+    });
+  }
+
+  cancelEdit() {
+    this.editingIndex = -1;
+    this.editingField = null;
+    this.selectedField = null;
+    this.selectedFieldType = '';
+    this.resetForm();
+  }
+
+  getPrimaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.primaryColor || company?.brandingConfig?.primaryColor || '#3B82F6';
+  }
+
+  getPlaceholderExample(type: string): string {
+    const examples: { [key: string]: string } = {
+      'text': 'Ex: Digite seu nome',
+      'email': 'Ex: usuario@exemplo.com',
+      'tel': 'Ex: (11) 99999-9999',
+      'number': 'Ex: 123',
+      'cnpj': 'Ex: 00.000.000/0000-00',
+      'cpf': 'Ex: 000.000.000-00',
+      'textarea': 'Ex: Digite suas observações...',
+      'date': '',
+      'time': ''
+    };
+    return examples[type] || 'Ex: Digite aqui';
+  }
+
+  // Gerar estrutura de dados para API baseada nos campos marcados
+  generateApiSchema(): any {
+    const apiFields = this.fields.filter(field => field.includeInApi !== false);
+    
+    const schema = {
+      fields: apiFields.map(field => ({
+        name: field.apiFieldName || field.name,
+        originalName: field.name,
+        label: field.label,
+        type: this.mapFieldTypeForApi(field.type),
+        required: field.required,
+        validation: this.getValidationRules(field),
+        ...(field.options && { options: field.options })
+      })),
+      totalFields: apiFields.length,
+      generatedAt: new Date().toISOString()
+    };
+
+    return schema;
+  }
+
+  // Mapear tipos de campo para tipos da API
+  private mapFieldTypeForApi(fieldType: string): string {
+    const typeMap: { [key: string]: string } = {
+      'text': 'string',
+      'email': 'email',
+      'tel': 'phone',
+      'number': 'number',
+      'cnpj': 'cnpj',
+      'cpf': 'cpf',
+      'temperatura': 'enum',
+      'textarea': 'text',
+      'select': 'enum',
+      'checkbox': 'boolean',
+      'radio': 'enum',
+      'date': 'date',
+      'time': 'time',
+      'file': 'file'
+    };
+    return typeMap[fieldType] || 'string';
+  }
+
+  // Obter regras de validação para a API
+  private getValidationRules(field: FormField): any {
+    const rules: any = {};
+    
+    if (field.required) {
+      rules.required = true;
+    }
+
+    switch (field.type) {
+      case 'email':
+        rules.format = 'email';
+        break;
+      case 'cnpj':
+        rules.format = 'cnpj';
+        rules.mask = '00.000.000/0000-00';
+        break;
+      case 'cpf':
+        rules.format = 'cpf';
+        rules.mask = '000.000.000-00';
+        break;
+      case 'tel':
+        rules.format = 'phone';
+        rules.mask = '(00) 00000-0000';
+        break;
+      case 'temperatura':
+      case 'select':
+      case 'radio':
+        if (field.options) {
+          rules.enum = field.options;
+        }
+        break;
+      case 'file':
+        rules.type = 'file';
+        if (field.placeholder === 'multiple') {
+          rules.multiple = true;
+        }
+        break;
+    }
+
+    return rules;
+  }
+
+  // Mostrar schema da API no console e como alerta
+  showApiSchema(): void {
+    const schema = this.generateApiSchema();
+    const jsonSchema = JSON.stringify(schema, null, 2);
+    
+    console.log('📋 Schema da API gerado:', schema);
+    console.log('📋 JSON Schema:', jsonSchema);
+    
+    // Mostrar em um alert formatado (para desenvolvimento)
+    const summary = `
+📋 Schema da API - Resumo:
+
+✅ Campos na API: ${schema.totalFields}/${this.fields.length}
+📅 Gerado em: ${new Date().toLocaleString('pt-BR')}
+
+🔗 Campos incluídos na API:
+${schema.fields.map((f: any) => `• ${f.label} (${f.name}) - Tipo: ${f.type}${f.required ? ' *' : ''}`).join('\n')}
+
+📋 Schema completo salvo no console para cópia.
+    `;
+    
+    alert(summary);
   }
 }

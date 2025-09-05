@@ -44,11 +44,6 @@ export const routes: Routes = [
     canActivate: [CompanyGuard, authGuard]
   },
   {
-    path: 'form', // Formulário público da empresa
-    loadComponent: () => import('./components/public-form/public-form.component').then(m => m.PublicFormComponent),
-    canActivate: [CompanyGuard] // Apenas verificar empresa
-  },
-  {
     path: 'empresa-nao-encontrada',
     loadComponent: () => import('./components/company-not-found/company-not-found.component').then(m => m.CompanyNotFoundComponent)
   },

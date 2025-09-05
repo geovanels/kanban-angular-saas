@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ViewChild, HostListener, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -16,7 +16,7 @@ import { CompanyBreadcrumbComponent } from '../company-breadcrumb/company-breadc
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private authService = inject(AuthService);
   private firestoreService = inject(FirestoreService);
   private subdomainService = inject(SubdomainService);
@@ -31,36 +31,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
   showCreateModal = false;
   activeBoardMenu: string | null = null;
   private subscription?: Subscription;
+  
+  // Estatísticas dos boards
+  boardStats: { [boardId: string]: { columnCount: number; leadCount: number } } = {};
 
   async ngOnInit() {
     this.currentUser = this.authService.getCurrentUser();
     
     if (this.currentUser) {
-      // Se é usuário da Gobuyer e não há contexto de empresa, configurar
-      if (this.currentUser.email?.includes('gobuyer.com.br')) {
-        await this.ensureGobuyerContext();
-      }
-      
       await this.loadBoards();
-    }
-  }
-
-  private async ensureGobuyerContext() {
-    try {
-      const currentCompany = this.subdomainService.getCurrentCompany();
-      
-      if (!currentCompany) {
-        // Set up Gobuyer development context
-        if (this.subdomainService.isDevelopment()) {
-          localStorage.setItem('dev-subdomain', 'gobuyer');
-        }
-        
-        // Try to get real Gobuyer company from service
-        // This will attempt to load the real company data
-        await this.subdomainService.initializeFromSubdomain();
-      }
-    } catch (error) {
-      // Handle context setup errors silently
     }
   }
 
@@ -68,6 +47,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+  }
+
+  ngAfterViewInit() {
+    // ViewChild will be available after view initialization
   }
 
   async loadBoards() {
@@ -78,10 +61,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     try {
       this.boards = await this.firestoreService.getBoards(this.currentUser.uid);
+      
+      // Carregar estatísticas para cada board
+      await this.loadBoardStatistics();
     } catch (error) {
       // Handle error silently or show user-friendly message
     } finally {
       this.isLoading = false;
+    }
+  }
+  
+  private async loadBoardStatistics() {
+    for (const board of this.boards) {
+      if (board.id) {
+        try {
+          // Carregar colunas do board
+          const columns = await this.firestoreService.getColumns(this.currentUser.uid, board.id);
+          
+          // Carregar leads do board
+          const leads = await this.firestoreService.getLeads(this.currentUser.uid, board.id);
+          
+          // Armazenar estatísticas
+          this.boardStats[board.id] = {
+            columnCount: columns.length,
+            leadCount: leads.length
+          };
+        } catch (error) {
+          // Em caso de erro, usar valores padrão
+          this.boardStats[board.id!] = {
+            columnCount: 0,
+            leadCount: 0
+          };
+        }
+      }
     }
   }
 
@@ -117,6 +129,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   showCreateBoardModal() {
     this.showCreateModal = true;
+    // Wait for Angular to render the modal, then show it
+    setTimeout(() => {
+      if (this.createBoardModal) {
+        this.createBoardModal.show();
+      }
+    }, 0);
   }
 
   onBoardCreated(event?: any) {
@@ -131,36 +149,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   editBoard(board: Board) {
     // TODO: Implementar edição de quadro
-    console.log('Editar quadro:', board);
     this.activeBoardMenu = null;
   }
 
   duplicateBoard(board: Board) {
     // TODO: Implementar duplicação de quadro
-    console.log('Duplicar quadro:', board);
     this.activeBoardMenu = null;
   }
 
   async deleteBoard(boardId: string) {
-    if (confirm('Tem certeza que deseja excluir este quadro?')) {
+    const board = this.boards.find(b => b.id === boardId);
+    const boardName = board?.name || 'Quadro';
+    
+    const confirmMessage = `⚠️ ATENÇÃO: Esta ação não pode ser desfeita!\n\n` +
+      `Deseja excluir o quadro "${boardName}"?\n\n` +
+      `Isso irá remover PERMANENTEMENTE:\n` +
+      `• Todas as colunas/fases\n` +
+      `• Todos os leads/registros\n` +
+      `• Todos os templates de email\n` +
+      `• Todas as automações\n` +
+      `• Todo o histórico e configurações\n\n` +
+      `Digite "EXCLUIR" para confirmar:`;
+    
+    const confirmation = prompt(confirmMessage);
+    
+    if (confirmation === 'EXCLUIR') {
       try {
         await this.firestoreService.deleteBoard(this.currentUser.uid, boardId);
         await this.loadBoards();
+        
+        // Mostrar feedback visual
+        alert(`✅ Quadro "${boardName}" foi excluído com sucesso!`);
       } catch (error) {
-        console.error('Erro ao excluir quadro:', error);
+        alert('❌ Erro ao excluir o quadro. Tente novamente.');
       }
     }
+    
     this.activeBoardMenu = null;
   }
 
   getBoardColumnCount(boardId: string): number {
-    // TODO: Implementar contagem real de colunas
-    return 3; // Valor placeholder
+    return this.boardStats[boardId]?.columnCount || 0;
   }
 
   getBoardTaskCount(boardId: string): number {
-    // TODO: Implementar contagem real de leads
-    return 0; // Valor placeholder
+    return this.boardStats[boardId]?.leadCount || 0;
   }
 
   toggleConfigMenu() {
@@ -170,5 +203,53 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Método adicional para fechar menu ao clicar fora
   closeConfigMenu() {
     this.showConfigMenu = false;
+  }
+
+  // Fechar menu do board ao clicar fora
+  @HostListener('document:click', ['$event'])
+  closeBoardMenu(event: Event) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.board-menu-container')) {
+      this.activeBoardMenu = null;
+    }
+  }
+
+  // 🧹 MÉTODO TEMPORÁRIO PARA LIMPEZA DE QUADROS
+  async clearAllData() {
+    const confirmation = prompt(
+      '🧹 LIMPEZA DE QUADROS (Preserva usuários/empresas/SMTP)\n\n' +
+      '✅ SERÁ PRESERVADO:\n' +
+      '• Dados dos usuários\n' +
+      '• Configurações das empresas\n' +
+      '• Configurações de SMTP\n' +
+      '• Configurações de branding\n' +
+      '• Links da empresa\n\n' +
+      '❌ SERÁ REMOVIDO:\n' +
+      '• Todos os quadros Kanban\n' +
+      '• Todas as fases/colunas\n' +
+      '• Todos os leads/registros\n' +
+      '• Templates de email dos quadros\n' +
+      '• Automações dos quadros\n' +
+      '• Caixa de saída\n' +
+      '• Histórico de automações\n\n' +
+      'Digite "LIMPAR QUADROS" para confirmar:'
+    );
+
+    if (confirmation === 'LIMPAR QUADROS') {
+      try {
+        this.isLoading = true;
+        await this.firestoreService.clearAllData(this.currentUser.uid);
+        
+        // Recarregar a lista de quadros (deve ficar vazia)
+        await this.loadBoards();
+        
+        alert('✅ Banco de dados limpo com sucesso!');
+        
+      } catch (error) {
+        alert('❌ Erro durante a limpeza. Tente novamente.');
+      } finally {
+        this.isLoading = false;
+      }
+    }
   }
 }

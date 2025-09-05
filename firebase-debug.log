@@ -1,0 +1,137 @@
+[debug] [2025-09-05T17:15:45.298Z] ----------------------------------------------------------------------
+[debug] [2025-09-05T17:15:45.300Z] Command:       /Users/geovanelopes/.nvm/versions/node/v20.19.4/bin/node /Users/geovanelopes/.nvm/versions/node/v20.19.4/bin/firebase emulators:start --only functions
+[debug] [2025-09-05T17:15:45.300Z] CLI Version:   14.15.1
+[debug] [2025-09-05T17:15:45.300Z] Platform:      darwin
+[debug] [2025-09-05T17:15:45.300Z] Node Version:  v20.19.4
+[debug] [2025-09-05T17:15:45.300Z] Time:          Fri Sep 05 2025 14:15:45 GMT-0300 (Horário Padrão de Brasília)
+[debug] [2025-09-05T17:15:45.300Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-09-05T17:15:45.301Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-09-05T17:15:45.409Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-05T17:15:45.410Z] > authorizing via signed-in user (geovanels@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[debug] [2025-09-05T17:15:45.533Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-09-05T17:15:45.534Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-09-05T17:15:45.536Z] [hub] writing locator at /var/folders/z8/6gbtrc6d7zn1hrz1ddnyc55c0000gn/T/hub-kanban-gobuyer.json
+[debug] [2025-09-05T17:15:45.672Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-09-05T17:15:45.672Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-09-05T17:15:45.672Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-09-05T17:15:45.672Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] ⚠  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect"}}
+[debug] [2025-09-05T17:15:46.310Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-09-05T17:15:46.310Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[debug] [2025-09-05T17:15:48.387Z] Checked if tokens are valid: false, expires at: 1756825684239
+[debug] [2025-09-05T17:15:48.387Z] Checked if tokens are valid: false, expires at: 1756825684239
+[debug] [2025-09-05T17:15:48.387Z] > refreshing access token with scopes: []
+[debug] [2025-09-05T17:15:48.387Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-09-05T17:15:48.387Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-05T17:15:48.684Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-09-05T17:15:48.684Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-05T17:15:48.695Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/kanban-gobuyer/adminSdkConfig [none]
+[debug] [2025-09-05T17:15:49.348Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/kanban-gobuyer/adminSdkConfig 200
+[debug] [2025-09-05T17:15:49.349Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/kanban-gobuyer/adminSdkConfig {"projectId":"kanban-gobuyer","storageBucket":"kanban-gobuyer.firebasestorage.app"}
+[info] i  functions: Watching "/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions\" for Cloud Functions..."}}
+[debug] [2025-09-05T17:15:49.380Z] Validating nodejs source
+[debug] [2025-09-05T17:15:49.827Z] > [functions] package.json contents: {
+  "name": "functions",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-functions": "^5.1.1",
+    "firebase-admin": "^12.8.0",
+    "nodemailer": "^6.9.16",
+    "cors": "^2.8.5"
+  }
+}
+[debug] [2025-09-05T17:15:49.827Z] Building nodejs source
+[debug] [2025-09-05T17:15:49.827Z] Failed to find version of module node: reached end of search path /Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules
+[warn] ⚠  functions: Your requested "node" version "18" doesn't match your global version "20". Using node@20 from host. 
+[debug] [2025-09-05T17:15:49.829Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-09-05T17:15:49.833Z] Found firebase-functions binary at '/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8624
+
+[debug] [2025-09-05T17:15:50.217Z] Got response from /__/functions.yaml {"endpoints":{"sendEmail":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"sendEmail"},"sendEmailCallable":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"sendEmailCallable"},"testSmtpConfig":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"testSmtpConfig"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] ✔  functions: Loaded functions definitions from source: sendEmail, sendEmailCallable, testSmtpConfig. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: sendEmail, sendEmailCallable, testSmtpConfig."}}
+[info] ✔  functions[us-central1-sendEmail]: http function initialized (http://127.0.0.1:5001/kanban-gobuyer/us-central1/sendEmail). {"metadata":{"emulator":{"name":"functions"},"message":"http function initialized (http://127.0.0.1:5001/kanban-gobuyer/us-central1/sendEmail)."}}
+[info] ✔  functions[us-central1-sendEmailCallable]: http function initialized (http://127.0.0.1:5001/kanban-gobuyer/us-central1/sendEmailCallable). {"metadata":{"emulator":{"name":"functions"},"message":"http function initialized (http://127.0.0.1:5001/kanban-gobuyer/us-central1/sendEmailCallable)."}}
+[info] ✔  functions[us-central1-testSmtpConfig]: http function initialized (http://127.0.0.1:5001/kanban-gobuyer/us-central1/testSmtpConfig). {"metadata":{"emulator":{"name":"functions"},"message":"http function initialized (http://127.0.0.1:5001/kanban-gobuyer/us-central1/testSmtpConfig)."}}
+[debug] [2025-09-05T17:15:54.251Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌───────────┬────────────────┬─────────────────────────────────┐
+│ Emulator  │ Host:Port      │ View in Emulator UI             │
+├───────────┼────────────────┼─────────────────────────────────┤
+│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+└───────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
+[debug] [2025-09-05T17:19:31.062Z] [work-queue] {"queuedWork":["/kanban-gobuyer/us-central1/sendEmail-2025-09-05T17:19:31.061Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-09-05T17:19:31.065Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/kanban-gobuyer/us-central1/sendEmail-2025-09-05T17:19:31.061Z"],"workRunningCount":1}
+[debug] [2025-09-05T17:19:31.065Z] Accepted request OPTIONS /kanban-gobuyer/us-central1/sendEmail --> us-central1-sendEmail
+[debug] [2025-09-05T17:19:31.091Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-09-05T17:19:31.093Z] [functions] Got req.url=/kanban-gobuyer/us-central1/sendEmail, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/kanban-gobuyer/us-central1/sendEmail, mapping to path=/"}}
+[debug] [2025-09-05T17:19:31.106Z] [worker-pool] addWorker(us-central1-sendEmail) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] addWorker(us-central1-sendEmail)"}}
+[debug] [2025-09-05T17:19:31.108Z] [worker-pool] Adding worker with key us-central1-sendEmail, total=1 {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Adding worker with key us-central1-sendEmail, total=1"}}
+[debug] [2025-09-05T17:19:31.841Z] [runtime-status] [32656] Resolved module firebase-admin {"declared":true,"installed":true,"version":"13.5.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-admin/lib/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Resolved module firebase-admin {\"declared\":true,\"installed\":true,\"version\":\"13.5.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-admin/lib/index.js\"}"}}
+[debug] [2025-09-05T17:19:31.841Z] [runtime-status] [32656] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.4.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-09-05T17:19:31.841Z] [runtime-status] [32656] Outgoing network have been stubbed. [{"name":"http","status":"mocked"},{"name":"http","status":"mocked"},{"name":"https","status":"mocked"},{"name":"https","status":"mocked"},{"name":"net","status":"mocked"}] {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Outgoing network have been stubbed. [{\"name\":\"http\",\"status\":\"mocked\"},{\"name\":\"http\",\"status\":\"mocked\"},{\"name\":\"https\",\"status\":\"mocked\"},{\"name\":\"https\",\"status\":\"mocked\"},{\"name\":\"net\",\"status\":\"mocked\"}]"}}
+[debug] [2025-09-05T17:19:31.841Z] [runtime-status] [32656] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.4.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-09-05T17:19:32.042Z] [runtime-status] [32656] Checked functions.config() {"config":{}} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Checked functions.config() {\"config\":{}}"}}
+[debug] [2025-09-05T17:19:32.042Z] [runtime-status] [32656] firebase-functions has been stubbed. {"functionsResolution":{"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js"}} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] firebase-functions has been stubbed. {\"functionsResolution\":{\"declared\":true,\"installed\":true,\"version\":\"6.4.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js\"}}"}}
+[debug] [2025-09-05T17:19:32.042Z] [runtime-status] [32656] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.4.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-09-05T17:19:32.044Z] [runtime-status] [32656] Resolved module firebase-admin {"declared":true,"installed":true,"version":"13.5.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-admin/lib/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Resolved module firebase-admin {\"declared\":true,\"installed\":true,\"version\":\"13.5.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-admin/lib/index.js\"}"}}
+[debug] [2025-09-05T17:19:32.045Z] [runtime-status] [32656] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Resolved module firebase-functions {\"declared\":true,\"installed\":true,\"version\":\"6.4.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-functions/lib/v2/index.js\"}"}}
+[debug] [2025-09-05T17:19:32.045Z] [runtime-status] [32656] firebase-admin has been stubbed. {"adminResolution":{"declared":true,"installed":true,"version":"13.5.0","resolution":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-admin/lib/index.js"}} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] firebase-admin has been stubbed. {\"adminResolution\":{\"declared\":true,\"installed\":true,\"version\":\"13.5.0\",\"resolution\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/firebase-admin/lib/index.js\"}}"}}
+[debug] [2025-09-05T17:19:32.060Z] [runtime-status] [32656] initializeApp(DEFAULT) {"storageBucket":"kanban-gobuyer.firebasestorage.app","projectId":"kanban-gobuyer"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] initializeApp(DEFAULT) {\"storageBucket\":\"kanban-gobuyer.firebasestorage.app\",\"projectId\":\"kanban-gobuyer\"}"}}
+[debug] [2025-09-05T17:19:32.063Z] [runtime-status] [32656] Functions runtime initialized. {"cwd":"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions","node_version":"20.19.4"} {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Functions runtime initialized. {\"cwd\":\"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions\",\"node_version\":\"20.19.4\"}"}}
+[debug] [2025-09-05T17:19:32.064Z] [runtime-status] [32656] Listening to port: /var/folders/z8/6gbtrc6d7zn1hrz1ddnyc55c0000gn/T/fire_emu_9a4bcb20410857f1.sock {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[runtime-status] [32656] Listening to port: /var/folders/z8/6gbtrc6d7zn1hrz1ddnyc55c0000gn/T/fire_emu_9a4bcb20410857f1.sock"}}
+[debug] [2025-09-05T17:19:32.132Z] [worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: IDLE"}}
+[debug] [2025-09-05T17:19:32.132Z] [worker-pool] submitRequest(triggerId=us-central1-sendEmail) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-sendEmail)"}}
+[info] i  functions: Beginning execution of "us-central1-sendEmail" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Beginning execution of \"us-central1-sendEmail\""}}
+[debug] [2025-09-05T17:19:32.132Z] [worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: BUSY"}}
+[debug] [2025-09-05T17:19:32.134Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-sendEmail" in 2.036625ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finished \"us-central1-sendEmail\" in 2.036625ms"}}
+[debug] [2025-09-05T17:19:32.134Z] [worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: IDLE"}}
+[debug] [2025-09-05T17:19:32.134Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-09-05T17:19:32.134Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-09-05T17:19:32.135Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2025-09-05T17:19:32.141Z] [work-queue] {"queuedWork":["/kanban-gobuyer/us-central1/sendEmail-2025-09-05T17:19:32.141Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2025-09-05T17:19:32.141Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/kanban-gobuyer/us-central1/sendEmail-2025-09-05T17:19:32.141Z"],"workRunningCount":1}
+[debug] [2025-09-05T17:19:32.141Z] Accepted request POST /kanban-gobuyer/us-central1/sendEmail --> us-central1-sendEmail
+[debug] [2025-09-05T17:19:32.141Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2025-09-05T17:19:32.141Z] [functions] Got req.url=/kanban-gobuyer/us-central1/sendEmail, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/kanban-gobuyer/us-central1/sendEmail, mapping to path=/"}}
+[debug] [2025-09-05T17:19:32.141Z] [worker-pool] submitRequest(triggerId=us-central1-sendEmail) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-sendEmail)"}}
+[info] i  functions: Beginning execution of "us-central1-sendEmail" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Beginning execution of \"us-central1-sendEmail\""}}
+[debug] [2025-09-05T17:19:32.141Z] [worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: BUSY"}}
+[info] >  {"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"} {"user":{"verifications":{"app":"MISSING","auth":"VALID"},"logging.googleapis.com/labels":{"firebase-log-type":"callable-request-verification"},"severity":"DEBUG","message":"Callable request verification passed"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":">  {\"verifications\":{\"app\":\"MISSING\",\"auth\":\"VALID\"},\"logging.googleapis.com/labels\":{\"firebase-log-type\":\"callable-request-verification\"},\"severity\":\"DEBUG\",\"message\":\"Callable request verification passed\"}"}}
+[info] >  {"to":"geovanels@gmail.com","subject":"Teste SMTP - Gobuyer Digital","hasConfig":true,"host":"smtp.sendgrid.net","severity":"INFO","message":"📧 Recebido pedido de envio de email:"} {"user":{"to":"geovanels@gmail.com","subject":"Teste SMTP - Gobuyer Digital","hasConfig":true,"host":"smtp.sendgrid.net","severity":"INFO","message":"📧 Recebido pedido de envio de email:"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":">  {\"to\":\"geovanels@gmail.com\",\"subject\":\"Teste SMTP - Gobuyer Digital\",\"hasConfig\":true,\"host\":\"smtp.sendgrid.net\",\"severity\":\"INFO\",\"message\":\"📧 Recebido pedido de envio de email:\"}"}}
+[info] >  {"severity":"INFO","message":"✅ Email enviado com sucesso: <4a6e08d9-5787-e5bd-dd2d-a0b1fd628052@gobuyer.com.br>"} {"user":{"severity":"INFO","message":"✅ Email enviado com sucesso: <4a6e08d9-5787-e5bd-dd2d-a0b1fd628052@gobuyer.com.br>"},"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":">  {\"severity\":\"INFO\",\"message\":\"✅ Email enviado com sucesso: <4a6e08d9-5787-e5bd-dd2d-a0b1fd628052@gobuyer.com.br>\"}"}}
+[debug] [2025-09-05T17:19:34.288Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-sendEmail" in 2146.312791ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finished \"us-central1-sendEmail\" in 2146.312791ms"}}
+[debug] [2025-09-05T17:19:34.288Z] [worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"[worker-us-central1-sendEmail-1e04aa2b-984d-4fab-b165-8c7378829db6]: IDLE"}}
+[debug] [2025-09-05T17:19:34.288Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2025-09-05T17:19:34.289Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-sendEmail"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2025-09-05T17:19:34.289Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}

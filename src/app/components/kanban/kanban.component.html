@@ -63,7 +63,7 @@
           (click)="showCreateLeadModal()"
           class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <i class="fas fa-plus mr-1"></i>
-          Novo Lead
+          Novo Registro
         </button>
 
         <button 
@@ -86,43 +86,29 @@
       
       <!-- Column Header -->
       <div 
-        class="kanban-column-header relative"
+        class="kanban-column-header"
         [style.border-top-color]="getColumnBorderColor(column)">
-        <div class="flex items-center">
-          <h3 class="font-semibold text-gray-800">{{ column.name }}</h3>
-          <span class="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
-            {{ getLeadsForColumn(column.id!).length }}
-          </span>
-        </div>
-        <div class="relative">
-          <button 
-            (click)="toggleColumnMenu(column.id!)"
-            class="text-gray-400 hover:text-gray-600 p-1">
-            <i class="fas fa-ellipsis-v text-sm"></i>
-          </button>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <h3 class="font-semibold text-gray-800">{{ column.name }}</h3>
+            <span class="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">
+              {{ getLeadsForColumn(column.id!).length }}
+            </span>
+          </div>
           
-          <!-- Dropdown Menu -->
-          <div 
-            *ngIf="showColumnMenu === column.id"
-            class="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-48">
-            <button 
-              (click)="editColumn(column)"
-              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg">
-              <i class="fas fa-edit mr-2"></i>
-              Editar Fase
-            </button>
+          <!-- Action Icons -->
+          <div class="flex items-center space-x-1 ml-auto">
             <button 
               (click)="showColumnForm(column)"
-              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-              <i class="fas fa-wpforms mr-2"></i>
-              Formulário da Fase
+              class="p-1 text-blue-600 hover:bg-blue-50 rounded"
+              title="Configurar Campos do Formulário">
+              <i class="fas fa-list-check text-sm"></i>
             </button>
-            <hr class="my-1">
             <button 
-              (click)="deleteColumn(column)"
-              class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg">
-              <i class="fas fa-trash mr-2"></i>
-              Excluir Fase
+              (click)="editColumn(column)"
+              class="p-1 text-gray-600 hover:bg-gray-50 rounded"
+              title="Editar Fase">
+              <i class="fas fa-edit text-sm"></i>
             </button>
           </div>
         </div>
@@ -480,6 +466,12 @@
             <i class="fas fa-envelope mr-2"></i>
             Novo Email
           </button>
+          <button 
+            (click)="clearOutbox()"
+            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+            <i class="fas fa-trash mr-2"></i>
+            Limpar
+          </button>
         </div>
       </div>
       
@@ -733,6 +725,7 @@ Authorization: Bearer {{ apiToken }}
     [columns]="columns"
     (columnCreated)="onColumnCreated()"
     (columnUpdated)="onColumnUpdated()"
+    (columnDeleted)="onColumnDeleted()"
     (closeModal)="onColumnUpdated()">
   </app-column-modal>
 

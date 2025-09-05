@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService } from '../../services/firestore.service';
+import { SubdomainService } from '../../services/subdomain.service';
 
 @Component({
   selector: 'app-create-board-modal',
@@ -14,6 +15,7 @@ import { FirestoreService } from '../../services/firestore.service';
 export class CreateBoardModalComponent {
   private authService = inject(AuthService);
   private firestoreService = inject(FirestoreService);
+  private subdomainService = inject(SubdomainService);
 
   @Output() boardCreated = new EventEmitter<void>();
   @Output() closeModal = new EventEmitter<void>();
@@ -72,24 +74,6 @@ export class CreateBoardModalComponent {
         ownerEmail: currentUser.email || ''
       });
 
-      // Definir campos fixos para leads (igual ao sistema original)
-      const fixedLeadFields = [
-        { name: "companyName", label: "Nome da Empresa", type: "text", required: true },
-        { name: "cnpj", label: "CNPJ", type: "cnpj", required: true },
-        { name: "contactName", label: "Nome Contato", type: "text", required: true },
-        { name: "contactEmail", label: "Email Contato", type: "email", required: true },
-        { name: "contactPhone", label: "Telefone Contato", type: "tel", required: true }
-      ];
-
-      // Criar coluna inicial "Novo Lead"
-      await this.firestoreService.createColumn(currentUser.uid, boardRef.id, {
-        name: "Novo Lead",
-        order: 0,
-        color: "#4A90E2",
-        endStageType: 'none',
-        companyId: '' // Será preenchido pelo FirestoreService
-      });
-
       // Emitir evento de sucesso
       this.boardCreated.emit();
       this.hide();
@@ -106,5 +90,10 @@ export class CreateBoardModalComponent {
     if (event.target === event.currentTarget) {
       this.hide();
     }
+  }
+
+  getPrimaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.primaryColor || company?.brandingConfig?.primaryColor || '#3B82F6';
   }
 }

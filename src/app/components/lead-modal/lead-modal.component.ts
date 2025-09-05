@@ -4,13 +4,19 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column } from '../../services/firestore.service';
 import { StorageService } from '../../services/storage.service';
+import { MaskService } from '../../services/mask.service';
 
-export interface LeadFormField {
+interface LeadFormField {
   name: string;
   label: string;
   type: string;
   required: boolean;
+  order: number;
   options?: string[];
+  placeholder?: string;
+  includeInApi?: boolean;
+  apiFieldName?: string;
+  showInCard?: boolean;
 }
 
 @Component({
@@ -25,6 +31,7 @@ export class LeadModalComponent {
   private firestoreService = inject(FirestoreService);
   private storageService = inject(StorageService);
   private fb = inject(FormBuilder);
+  private maskService = inject(MaskService);
 
   @Input() ownerId: string = '';
   @Input() boardId: string = '';
@@ -48,19 +55,85 @@ export class LeadModalComponent {
     this.initializeForm();
   }
 
-  private initializeForm() {
-    // Campos padrão do sistema original
-    this.formFields = [
-      { name: 'companyName', label: 'Nome da Empresa', type: 'text', required: true },
-      { name: 'cnpj', label: 'CNPJ', type: 'text', required: true },
-      { name: 'contactName', label: 'Nome do Contato', type: 'text', required: true },
-      { name: 'contactEmail', label: 'Email do Contato', type: 'email', required: true },
-      { name: 'contactPhone', label: 'Telefone do Contato', type: 'tel', required: true },
-      { name: 'temperature', label: 'Temperatura', type: 'select', required: false, options: ['frio', 'morno', 'quente'] },
-      { name: 'description', label: 'Observações', type: 'textarea', required: false }
-    ];
+  private async initializeForm() {
+    // Tentar carregar campos da primeira fase configurada
+    await this.loadFormFieldsFromInitialPhase();
+    
+    // Se não encontrou campos da fase, usar campos padrão (fallback)
+    if (this.formFields.length === 0) {
+      this.formFields = [
+        { name: 'companyName', label: 'Nome da Empresa', type: 'text', required: true, order: 0, includeInApi: true, showInCard: false },
+        { name: 'cnpj', label: 'CNPJ', type: 'cnpj', required: true, order: 1, includeInApi: true, showInCard: false },
+        { name: 'contactName', label: 'Nome do Contato', type: 'text', required: true, order: 2, includeInApi: true, showInCard: false },
+        { name: 'contactEmail', label: 'Email do Contato', type: 'email', required: true, order: 3, includeInApi: true, showInCard: false },
+        { name: 'contactPhone', label: 'Telefone do Contato', type: 'tel', required: true, order: 4, includeInApi: true, showInCard: false },
+        { name: 'temperature', label: 'Temperatura', type: 'temperatura', required: false, order: 5, options: ['Quente', 'Morno', 'Frio'], includeInApi: true, showInCard: false },
+        { name: 'description', label: 'Observações', type: 'textarea', required: false, order: 6, includeInApi: true, showInCard: false }
+      ];
+    }
 
     this.buildForm();
+  }
+
+  private async loadFormFieldsFromInitialPhase() {
+    try {
+      if (this.boardId && this.ownerId) {
+        console.log('🔍 Carregando campos do formulário da fase inicial...', { 
+          boardId: this.boardId, 
+          ownerId: this.ownerId 
+        });
+        
+        // Buscar fase inicial (marcada como isInitialPhase)
+        const columns = await this.firestoreService.getColumns(this.ownerId, this.boardId);
+        console.log('📋 Colunas encontradas:', columns);
+        
+        // Encontrar fase inicial ou usar a primeira fase como fallback
+        const initialColumn = columns.find((col: any) => col.isInitialPhase) || 
+                             columns.sort((a, b) => (a.order || 0) - (b.order || 0))[0];
+        
+        if (initialColumn) {
+          console.log('🎯 Fase inicial encontrada:', initialColumn);
+          
+          // Buscar configuração do formulário da fase inicial
+          const phaseFormConfig = await this.firestoreService.getPhaseFormConfig(
+            this.ownerId, 
+            this.boardId, 
+            initialColumn.id!
+          );
+          console.log('⚙️ Configuração da fase encontrada:', phaseFormConfig);
+          
+          if (phaseFormConfig && (phaseFormConfig as any).fields) {
+            this.formFields = (phaseFormConfig as any).fields
+              .map((field: any) => {
+                // Reconstruct temperatura fields properly
+                if (field.type === 'temperatura') {
+                  if (!field.options || field.options.length === 0) {
+                    field.options = ['Quente', 'Morno', 'Frio'];
+                  }
+                  console.log('🌡️ Campo temperatura reconstruído:', field);
+                }
+                // Ensure all required properties exist
+                return {
+                  ...field,
+                  includeInApi: field.includeInApi !== false,
+                  order: field.order || 0
+                };
+              })
+              .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+            console.log('✅ Formulário carregado da fase inicial:', this.formFields);
+          } else {
+            console.log('⚠️ Nenhuma configuração de formulário encontrada para a fase');
+          }
+        } else {
+          console.log('⚠️ Nenhuma coluna encontrada no quadro');
+        }
+      } else {
+        console.log('⚠️ BoardId ou OwnerId não definidos:', { boardId: this.boardId, ownerId: this.ownerId });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar campos do formulário da fase:', error);
+      // Continua com campos padrão
+    }
   }
 
   private buildForm() {
@@ -68,9 +141,28 @@ export class LeadModalComponent {
     
     this.formFields.forEach(field => {
       const validators = field.required ? [Validators.required] : [];
-      if (field.type === 'email') {
-        validators.push(Validators.email);
+      
+      // Add field type-specific validators
+      switch (field.type) {
+        case 'email':
+          validators.push(Validators.email);
+          break;
+        case 'cnpj':
+          validators.push((control: any) => {
+            const value = control.value;
+            if (!value) return null;
+            return this.maskService.validateCNPJ(value) ? null : { cnpj: true };
+          });
+          break;
+        case 'cpf':
+          validators.push((control: any) => {
+            const value = control.value;
+            if (!value) return null;
+            return this.maskService.validateCPF(value) ? null : { cpf: true };
+          });
+          break;
       }
+      
       group[field.name] = ['', validators];
     });
 
@@ -200,10 +292,16 @@ export class LeadModalComponent {
     }
   }
 
-  onFileSelected(event: any) {
+  onFileSelected(event: any, fieldName?: string) {
     const files = event.target.files;
     if (files) {
-      this.selectedFiles = Array.from(files);
+      if (fieldName) {
+        // Armazenar arquivos específicos do campo
+        this.leadForm.patchValue({ [fieldName]: Array.from(files) });
+      } else {
+        // Fallback para compatibilidade
+        this.selectedFiles = Array.from(files);
+      }
     }
   }
 
@@ -222,6 +320,12 @@ export class LeadModalComponent {
       if (control.errors['email']) {
         return 'Email inválido';
       }
+      if (control.errors['cnpj']) {
+        return 'CNPJ inválido';
+      }
+      if (control.errors['cpf']) {
+        return 'CPF inválido';
+      }
     }
     return '';
   }
@@ -229,5 +333,10 @@ export class LeadModalComponent {
   getFieldLabel(fieldName: string): string {
     const field = this.formFields.find(f => f.name === fieldName);
     return field?.label || fieldName;
+  }
+
+  // Getter para acessar o maskService no template
+  get maskHelper() {
+    return this.maskService;
   }
 }

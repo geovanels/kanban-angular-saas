@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Injector } from '@angular/core';
 import { Firestore, collection, doc, getDoc, getDocs, addDoc, setDoc, 
          updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp,
          writeBatch, orderBy, collectionGroup } from '@angular/fire/firestore';
@@ -30,6 +30,7 @@ export interface Column {
   slaDays?: number;
   createdAt?: any;
   updatedAt?: any;
+  isInitialPhase?: boolean;
   // Multi-empresa
   companyId: string;
 }
@@ -62,8 +63,12 @@ export interface Lead {
 })
 export class FirestoreService {
   private firestore = inject(Firestore);
-  private companyService = inject(CompanyService);
   private authService = inject(AuthService);
+  private injector = inject(Injector);
+  
+  private get companyService() {
+    return this.injector.get(CompanyService);
+  }
   
   // Current company context
   private currentCompanyId: string | null = null;
@@ -210,18 +215,88 @@ export class FirestoreService {
   async deleteBoard(userId: string, boardId: string) {
     try {
       if (!this.currentCompanyId) {
-        await this.initializeCompanyContext();
-      }
-      
-      if (!this.currentCompanyId) {
         throw new Error('Contexto da empresa não inicializado');
       }
 
+      console.log('🗑️ Iniciando exclusão completa do quadro:', boardId);
+      
+      // 1. Excluir todas as subcoleções primeiro
+      await this.deleteBoardSubcollections(boardId);
+      
+      // 2. Por último, excluir o documento principal do board
       const boardRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId);
-      return await deleteDoc(boardRef);
+      await deleteDoc(boardRef);
+      
+      console.log('✅ Quadro excluído completamente:', boardId);
     } catch (error) {
-      console.error('Erro ao excluir quadro:', error);
+      console.error('❌ Erro ao excluir quadro:', error);
       throw error;
+    }
+  }
+
+  private async deleteBoardSubcollections(boardId: string): Promise<void> {
+    if (!this.currentCompanyId) return;
+
+    const basePath = `companies/${this.currentCompanyId}/boards/${boardId}`;
+    console.log('🔄 Excluindo subcoleções do quadro:', basePath);
+
+    try {
+      // Excluir em lotes para melhor performance
+      const subcollections = [
+        'leads',
+        'columns', 
+        'emailTemplates',
+        'automations',
+        'phaseFormConfigs',
+        'outboxEmails',
+        'mail',
+        'automationHistory'
+      ];
+
+      for (const subcollection of subcollections) {
+        await this.deleteCollection(`${basePath}/${subcollection}`);
+      }
+      
+      console.log('✅ Subcoleções excluídas com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao excluir subcoleções:', error);
+      throw error;
+    }
+  }
+
+  private async deleteCollection(collectionPath: string): Promise<void> {
+    try {
+      const collectionRef = collection(this.firestore, collectionPath);
+      const snapshot = await getDocs(collectionRef);
+      
+      if (snapshot.empty) {
+        console.log(`📭 Coleção ${collectionPath} já está vazia`);
+        return;
+      }
+
+      console.log(`🗑️ Excluindo ${snapshot.docs.length} documentos de ${collectionPath}`);
+      
+      // Excluir em lotes de 500 documentos (limite do Firestore)
+      const batchSize = 500;
+      const batches: Promise<void>[] = [];
+      
+      for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+        const batchDocs = snapshot.docs.slice(i, i + batchSize);
+        const batch = writeBatch(this.firestore);
+        
+        batchDocs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        
+        batches.push(batch.commit());
+      }
+      
+      await Promise.all(batches);
+      console.log(`✅ ${snapshot.docs.length} documentos excluídos de ${collectionPath}`);
+      
+    } catch (error) {
+      console.warn(`⚠️ Erro ao excluir coleção ${collectionPath}:`, error);
+      // Não propagar o erro para não interromper a exclusão de outras coleções
     }
   }
 
@@ -668,19 +743,48 @@ export class FirestoreService {
     });
   }
 
+  async clearOutboxEmails(userId: string, boardId: string): Promise<void> {
+    try {
+      const outboxRef = collection(this.firestore, `users/${userId}/boards/${boardId}/mail`);
+      const querySnapshot = await getDocs(outboxRef);
+      
+      const deletePromises = querySnapshot.docs.map(docSnapshot => 
+        deleteDoc(docSnapshot.ref)
+      );
+      
+      await Promise.all(deletePromises);
+      console.log(`✅ Excluídos ${deletePromises.length} emails da caixa de saída`);
+    } catch (error) {
+      console.error('❌ Erro ao limpar caixa de saída:', error);
+      throw error;
+    }
+  }
+
   // EMAIL TEMPLATES MANAGEMENT
   async getEmailTemplates(userId: string, boardId: string) {
     try {
+      // Usar estrutura multi-empresa se há contexto de empresa
+      if (this.currentCompanyId) {
+        const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
+        console.log('Buscando templates em (multi-empresa):', templatesPath);
+        
+        const templatesRef = collection(this.firestore, templatesPath);
+        const snapshot = await getDocs(templatesRef);
+        const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        console.log(`Templates encontrados (multi-empresa): ${templates.length} itens`);
+        return templates;
+      }
+      
+      // Fallback para estrutura antiga
       const templatesPath = userId ? `users/${userId}/boards/${boardId}/emailTemplates` : `boards/${boardId}/emailTemplates`;
-      console.log('Buscando templates em:', templatesPath);
+      console.log('Buscando templates em (estrutura antiga):', templatesPath);
       
       const templatesRef = collection(this.firestore, templatesPath);
-      
-      // Tentar primeiro sem orderBy para evitar problemas de índice
       const snapshot = await getDocs(templatesRef);
       const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      console.log(`Templates encontrados: ${templates.length} itens`);
+      console.log(`Templates encontrados (estrutura antiga): ${templates.length} itens`);
       return templates;
     } catch (error) {
       console.error('Erro ao buscar templates:', error);
@@ -689,64 +793,76 @@ export class FirestoreService {
   }
 
   async createEmailTemplate(userId: string, boardId: string, templateData: any) {
-    const templatesRef = collection(this.firestore, `users/${userId}/boards/${boardId}/emailTemplates`);
+    // Usar estrutura multi-empresa se há contexto de empresa
+    const templatesPath = this.currentCompanyId 
+      ? `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`
+      : `users/${userId}/boards/${boardId}/emailTemplates`;
+    
+    const templatesRef = collection(this.firestore, templatesPath);
     const newTemplate = {
       ...templateData,
       boardId: boardId, // Adicionar boardId para o filtro do collectionGroup
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
-    console.log('Criando template em:', `users/${userId}/boards/${boardId}/emailTemplates`, newTemplate);
+    console.log('Criando template em:', templatesPath, newTemplate);
     return await addDoc(templatesRef, newTemplate);
   }
 
   async updateEmailTemplate(userId: string, boardId: string, templateId: string, updates: any) {
-    const templateRef = doc(this.firestore, `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`);
+    // Usar estrutura multi-empresa se há contexto de empresa
+    const templatePath = this.currentCompanyId 
+      ? `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates/${templateId}`
+      : `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`;
+    
+    const templateRef = doc(this.firestore, templatePath);
     const updatedTemplate = {
       ...updates,
       boardId: boardId, // Garantir que o boardId esteja sempre presente
       updatedAt: serverTimestamp()
     };
-    console.log('Atualizando template em:', `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`, updatedTemplate);
+    console.log('Atualizando template em:', templatePath, updatedTemplate);
     return await updateDoc(templateRef, updatedTemplate);
   }
 
   async deleteEmailTemplate(userId: string, boardId: string, templateId: string) {
-    const templateRef = doc(this.firestore, `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`);
+    // Usar estrutura multi-empresa se há contexto de empresa
+    const templatePath = this.currentCompanyId 
+      ? `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates/${templateId}`
+      : `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`;
+    
+    const templateRef = doc(this.firestore, templatePath);
     return await deleteDoc(templateRef);
   }
 
   subscribeToEmailTemplates(userId: string, boardId: string, callback: (templates: any[]) => void) {
     console.log(`Iniciando subscrição de templates para boardId: ${boardId}`);
     
-    // Tentar primeiro com collectionGroup
-    const templatesGroup = collectionGroup(this.firestore, 'emailTemplates');
-    const q = query(templatesGroup, where('boardId', '==', boardId));
+    if (!this.currentCompanyId) {
+      console.warn('Contexto da empresa não definido, retornando array vazio');
+      callback([]);
+      return () => {}; // Retorna função de limpeza vazia
+    }
     
-    return onSnapshot(q, 
+    // Usar apenas estrutura multi-empresa
+    const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
+    console.log('Subscribing templates em:', templatesPath);
+    
+    const templatesRef = collection(this.firestore, templatesPath);
+    
+    return onSnapshot(templatesRef, 
       snapshot => {
-        const templates = snapshot.docs.map(doc => ({ id: doc.id, path: doc.ref.path, ...doc.data() }));
-        console.log(`Templates encontrados via collectionGroup para boardId: ${boardId}:`, templates);
+        const templates = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          path: doc.ref.path, 
+          ...doc.data() 
+        }));
+        console.log(`Templates encontrados (multi-empresa) para boardId: ${boardId}:`, templates.length);
         callback(templates);
       },
       error => {
-        console.error('Erro ao subscrever templates via collectionGroup, tentando estrutura users:', error);
-        
-        // Fallback para estrutura users
-        const templatesRef = collection(this.firestore, `users/${userId}/boards/${boardId}/emailTemplates`);
-        const fallbackQuery = query(templatesRef);
-        
-        return onSnapshot(fallbackQuery, 
-          snapshot => {
-            const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            console.log(`Templates encontrados (fallback users) para userId: ${userId}, boardId: ${boardId}:`, templates);
-            callback(templates);
-          },
-          fallbackError => {
-            console.error('Erro ao subscrever templates (fallback users):', fallbackError);
-            callback([]);
-          }
-        );
+        console.error('Erro ao subscrever templates (multi-empresa):', error);
+        callback([]);
       }
     );
   }
@@ -754,69 +870,34 @@ export class FirestoreService {
   // AUTOMATIONS MANAGEMENT
   async getAutomations(userId: string, boardId: string) {
     try {
-      console.log('Buscando automações para userId:', userId, 'boardId:', boardId);
+      console.log('Buscando automações para boardId:', boardId);
       
-      // Tentar primeiro a estrutura users/{userId}/boards/{boardId}/automations
-      try {
-        const automationsPath = `users/${userId}/boards/${boardId}/automations`;
-        console.log('Tentando caminho:', automationsPath);
+      // Usar estrutura multi-empresa se há contexto de empresa
+      if (this.currentCompanyId) {
+        const automationsPath = `companies/${this.currentCompanyId}/boards/${boardId}/automations`;
+        console.log('Buscando automações em (multi-empresa):', automationsPath);
         
         const automationsRef = collection(this.firestore, automationsPath);
         const snapshot = await getDocs(automationsRef);
         const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        if (automations.length > 0) {
-          console.log(`Automações encontradas em users/{userId}/boards/{boardId}/automations: ${automations.length} itens`);
-          return automations;
-        }
-      } catch (error) {
-        console.log('Erro ao buscar em users/{userId}/boards/{boardId}/automations:', error);
+        console.log(`Automações encontradas (multi-empresa): ${automations.length} itens`);
+        return automations;
       }
-
-      // Se não encontrou, tentar a estrutura boards/{boardId}/automations
-      try {
-        const alternativePath = `boards/${boardId}/automations`;
-        console.log('Tentando caminho alternativo:', alternativePath);
-        
-        const automationsRef = collection(this.firestore, alternativePath);
-        const snapshot = await getDocs(automationsRef);
-        const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        if (automations.length > 0) {
-          console.log(`Automações encontradas em boards/{boardId}/automations: ${automations.length} itens`);
-          return automations;
-        }
-      } catch (error) {
-        console.log('Erro ao buscar em boards/{boardId}/automations:', error);
-      }
-
-      // Se não encontrou em nenhum lugar, usar collectionGroup
-      try {
-        console.log('Tentando buscar usando collectionGroup');
-        const automationsGroup = collectionGroup(this.firestore, 'automations');
-        const snapshot = await getDocs(automationsGroup);
-        const allAutomations = snapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          path: doc.ref.path,
-          ...doc.data() 
-        }));
-        
-        // Filtrar apenas as automações do board correto
-        const filteredAutomations = allAutomations.filter(automation => {
-          const pathParts = automation.path.split('/');
-          return pathParts.includes(boardId);
-        });
-        
-        console.log(`Automações encontradas via collectionGroup: ${filteredAutomations.length} itens`);
-        return filteredAutomations;
-      } catch (error) {
-        console.log('Erro ao buscar via collectionGroup:', error);
-      }
-
-      console.log('Nenhuma automação encontrada');
-      return [];
+      
+      // Fallback para estrutura antiga se não há contexto de empresa
+      console.log('Contexto de empresa não definido, usando estrutura antiga');
+      const automationsPath = `users/${userId}/boards/${boardId}/automations`;
+      console.log('Buscando automações em (estrutura antiga):', automationsPath);
+      
+      const automationsRef = collection(this.firestore, automationsPath);
+      const snapshot = await getDocs(automationsRef);
+      const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      console.log(`Automações encontradas (estrutura antiga): ${automations.length} itens`);
+      return automations;
     } catch (error) {
-      console.error('Erro geral ao buscar automações:', error);
+      console.error('Erro ao buscar automações:', error);
       return [];
     }
   }
@@ -903,91 +984,110 @@ export class FirestoreService {
   }
 
   subscribeToAutomations(userId: string, boardId: string, callback: (automations: any[]) => void) {
-    console.log(`=== SUBSCRIBETOAUTOMATIONS ===`);
-    console.log(`userId: ${userId}, boardId: ${boardId}`);
+    console.log(`Iniciando subscrição de automações para boardId: ${boardId}`);
     
-    // Estratégia 1: users/{userId}/boards/{boardId}/automations
-    const primaryPath = `users/${userId}/boards/${boardId}/automations`;
-    console.log('Tentando subscrição no caminho primário:', primaryPath);
+    if (!this.currentCompanyId) {
+      console.warn('Contexto da empresa não definido, retornando array vazio');
+      callback([]);
+      return () => {}; // Retorna função de limpeza vazia
+    }
     
-    const automationsRef = collection(this.firestore, primaryPath);
+    // Usar apenas estrutura multi-empresa
+    const automationsPath = `companies/${this.currentCompanyId}/boards/${boardId}/automations`;
+    console.log('Subscribing automações em:', automationsPath);
     
-    const unsubscribe = onSnapshot(automationsRef, 
+    const automationsRef = collection(this.firestore, automationsPath);
+    
+    return onSnapshot(automationsRef, 
       snapshot => {
-        const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`Automações encontradas via subscrição (${primaryPath}):`, automations);
-        
-        if (automations.length > 0) {
-          callback(automations);
-        } else {
-          // Se não encontrou no caminho primário, tentar caminho alternativo
-          console.log('Nenhuma automação encontrada no caminho primário, tentando alternativo...');
-          this.tryAlternativeAutomationPaths(userId, boardId, callback);
-        }
-      },
-      error => {
-        console.error('Erro na subscrição primária:', error);
-        console.log('Tentando caminho alternativo devido ao erro...');
-        this.tryAlternativeAutomationPaths(userId, boardId, callback);
-      }
-    );
-    
-    return unsubscribe;
-  }
-
-  private tryAlternativeAutomationPaths(userId: string, boardId: string, callback: (automations: any[]) => void) {
-    // Estratégia 2: boards/{boardId}/automations
-    const alternativePath = `boards/${boardId}/automations`;
-    console.log('Tentando caminho alternativo:', alternativePath);
-    
-    const alternativeRef = collection(this.firestore, alternativePath);
-    
-    return onSnapshot(alternativeRef,
-      snapshot => {
-        const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`Automações encontradas via caminho alternativo (${alternativePath}):`, automations);
-        
-        if (automations.length > 0) {
-          callback(automations);
-        } else {
-          // Estratégia 3: collectionGroup
-          console.log('Tentando collectionGroup...');
-          this.tryCollectionGroupAutomations(boardId, callback);
-        }
-      },
-      error => {
-        console.error('Erro no caminho alternativo:', error);
-        console.log('Tentando collectionGroup devido ao erro...');
-        this.tryCollectionGroupAutomations(boardId, callback);
-      }
-    );
-  }
-
-  private tryCollectionGroupAutomations(boardId: string, callback: (automations: any[]) => void) {
-    const automationsGroup = collectionGroup(this.firestore, 'automations');
-    
-    return onSnapshot(automationsGroup,
-      snapshot => {
-        const allAutomations = snapshot.docs.map(doc => ({ 
+        const automations = snapshot.docs.map(doc => ({ 
           id: doc.id, 
-          path: doc.ref.path,
+          path: doc.ref.path, 
           ...doc.data() 
         }));
-        
-        // Filtrar apenas as automações do board correto
-        const filteredAutomations = allAutomations.filter(automation => {
-          const pathParts = automation.path.split('/');
-          return pathParts.includes(boardId);
-        });
-        
-        console.log(`Automações encontradas via collectionGroup: ${filteredAutomations.length} itens`);
-        callback(filteredAutomations);
+        console.log(`Automações encontradas (multi-empresa) para boardId: ${boardId}:`, automations.length);
+        callback(automations);
       },
       error => {
-        console.error('Erro no collectionGroup:', error);
+        console.error('Erro ao subscrever automações (multi-empresa):', error);
         callback([]);
       }
     );
+  }
+
+  // 🧹 MÉTODO TEMPORÁRIO PARA LIMPEZA DE QUADROS (PRESERVA USUÁRIOS/EMPRESAS/SMTP)
+  async clearAllData(currentUserId: string): Promise<void> {
+    try {
+      const batch = writeBatch(this.firestore);
+      let operationCount = 0;
+      
+      // Limpar apenas a empresa atual (respeitando permissões)
+      if (this.currentCompanyId) {
+        // Listar todos os boards da empresa atual
+        const boardsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards`);
+        const boardsSnapshot = await getDocs(boardsRef);
+        
+        for (const boardDoc of boardsSnapshot.docs) {
+          const boardId = boardDoc.id;
+          
+          // Subcoleções para limpar (relacionadas aos quadros)
+          const subcollections = [
+            'leads', 'columns', 'emailTemplates', 'automations', 
+            'phaseFormConfigs', 'outboxEmails', 'mail', 'automationHistory'
+          ];
+          
+          // Limpar cada subcoleção do board
+          for (const subcollectionName of subcollections) {
+            try {
+              const subcollectionRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/${subcollectionName}`);
+              const subcollectionSnapshot = await getDocs(subcollectionRef);
+              
+              subcollectionSnapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+                operationCount++;
+              });
+            } catch (error) {
+              // Sem permissão para acessar subcoleção - pular silenciosamente
+            }
+          }
+          
+          // Excluir o board
+          batch.delete(boardDoc.ref);
+          operationCount++;
+        }
+      }
+      
+      // Limpar apenas estruturas antigas do usuário atual (preservando usuários)
+      if (currentUserId) {
+        // Limpar apenas estruturas antigas relacionadas a quadros
+        const oldBoardStructures = [
+          'boards', 'emailTemplates', 'automations', 
+          'outboxEmails', 'leads', 'columns'
+        ];
+        
+        for (const structureName of oldBoardStructures) {
+          try {
+            const structureRef = collection(this.firestore, `users/${currentUserId}/${structureName}`);
+            const structureSnapshot = await getDocs(structureRef);
+            
+            structureSnapshot.docs.forEach(doc => {
+              batch.delete(doc.ref);
+              operationCount++;
+            });
+          } catch (error) {
+            // Sem permissão para acessar estrutura antiga - pular silenciosamente
+          }
+        }
+      }
+      
+      // Executar limpeza em lotes
+      if (operationCount > 0) {
+        await batch.commit();
+      }
+      
+    } catch (error) {
+      throw error;
+    }
   }
 
 

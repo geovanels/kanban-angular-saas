@@ -10,7 +10,8 @@ export interface LeadIntakeRequest {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
-  phaseId?: string;
+  boardId?: string; // ID do quadro onde o lead será criado
+  phaseId?: string; // ID da fase específica (opcional, usará fase inicial se não fornecido)
   customFields?: { [key: string]: any };
   source?: string;
   utm_source?: string;
@@ -209,13 +210,18 @@ export class ApiService {
   }
 
   // Testar endpoint da API
-  testApiEndpoint(): Observable<any> {
+  testApiEndpoint(boardId?: string): Observable<any> {
     const testPayload: LeadIntakeRequest = {
+      boardId: boardId || undefined, // Será usado o quadro padrão se não fornecido
       companyName: 'Empresa Teste',
       contactName: 'Teste API',
       contactEmail: 'teste@api.com',
       contactPhone: '(11) 99999-9999',
-      source: 'api-test'
+      source: 'api-test',
+      customFields: {
+        testField: 'Valor de teste',
+        timestamp: new Date().toISOString()
+      }
     };
 
     return this.submitLead(testPayload).pipe(
@@ -262,7 +268,7 @@ export class ApiService {
   }
 
   // Gerar exemplo de código para integração
-  getIntegrationExamples(): { [key: string]: string } {
+  getIntegrationExamples(boardId?: string, formFields?: any[]): { [key: string]: string } {
     const company = this.subdomainService.getCurrentCompany();
     
     if (!company) {
@@ -271,6 +277,12 @@ export class ApiService {
 
     const apiUrl = this.getLeadIntakeUrl();
     const token = company.apiConfig.token;
+    
+    // Gerar campos dinâmicos baseados no formulário configurado
+    const dynamicFields = this.generateDynamicFieldsExample(formFields);
+    const fieldsComment = formFields && formFields.length > 0 
+      ? '    // Campos configurados no formulário:\n' + formFields.map(f => `    // "${f.name}": "${f.type}"`).join(',\n') + '\n'
+      : '    // Configure campos personalizados no Visual Form Builder\n';
 
     return {
       curl: `curl -X POST "${apiUrl}" \\
@@ -278,15 +290,15 @@ export class ApiService {
   -H "Authorization: Bearer ${token}" \\
   -H "X-Company-Subdomain: ${company.subdomain}" \\
   -d '{
+    "boardId": "${boardId || 'ID_DO_QUADRO'}",
     "companyName": "Nome da Empresa Exemplo",
     "cnpj": "00.000.000/0001-00",
     "contactName": "Nome do Contato",
     "contactEmail": "email@exemplo.com",
-    "contactPhone": "(11) 99999-9999",
-    "phaseId": "(Opcional) ID da fase"
+    "contactPhone": "(11) 99999-9999"${dynamicFields ? ',\n' + dynamicFields : ''}
   }'`,
 
-      javascript: `fetch('${apiUrl}', {
+      javascript: `${fieldsComment}fetch('${apiUrl}', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -294,26 +306,27 @@ export class ApiService {
     'X-Company-Subdomain': '${company.subdomain}'
   },
   body: JSON.stringify({
+    boardId: '${boardId || 'ID_DO_QUADRO'}',
     companyName: 'Nome da Empresa Exemplo',
     cnpj: '00.000.000/0001-00',
     contactName: 'Nome do Contato',
     contactEmail: 'email@exemplo.com',
-    contactPhone: '(11) 99999-9999',
-    phaseId: '(Opcional) ID da fase'
+    contactPhone: '(11) 99999-9999'${dynamicFields ? ',\n    ' + dynamicFields.replace(/    /g, '    ') : ''}
   })
 })
 .then(response => response.json())
 .then(data => console.log(data));`,
 
       php: `<?php
+// ${fieldsComment.replace(/\/\//g, '//')}
 $url = '${apiUrl}';
 $data = [
+    'boardId' => '${boardId || 'ID_DO_QUADRO'}',
     'companyName' => 'Nome da Empresa Exemplo',
     'cnpj' => '00.000.000/0001-00',
     'contactName' => 'Nome do Contato',
     'contactEmail' => 'email@exemplo.com',
-    'contactPhone' => '(11) 99999-9999',
-    'phaseId' => '(Opcional) ID da fase'
+    'contactPhone' => '(11) 99999-9999'${this.generateDynamicFieldsPhp(formFields)}
 ];
 
 $options = [
@@ -336,6 +349,7 @@ echo $result;
       python: `import requests
 import json
 
+# ${fieldsComment.replace(/\/\//g, '#')}
 url = '${apiUrl}'
 headers = {
     'Content-Type': 'application/json',
@@ -343,17 +357,96 @@ headers = {
     'X-Company-Subdomain': '${company.subdomain}'
 }
 data = {
+    'boardId': '${boardId || 'ID_DO_QUADRO'}',
     'companyName': 'Nome da Empresa Exemplo',
     'cnpj': '00.000.000/0001-00',
     'contactName': 'Nome do Contato',
     'contactEmail': 'email@exemplo.com',
-    'contactPhone': '(11) 99999-9999',
-    'phaseId': '(Opcional) ID da fase'
+    'contactPhone': '(11) 99999-9999'${this.generateDynamicFieldsPython(formFields)}
 }
 
 response = requests.post(url, headers=headers, json=data)
 print(response.json())`
     };
+  }
+
+  // Gerar campos dinâmicos para JSON
+  private generateDynamicFieldsExample(formFields?: any[]): string {
+    if (!formFields || formFields.length === 0) {
+      return '';
+    }
+
+    return formFields
+      .filter(field => field.includeInApi !== false)
+      .map(field => {
+        const fieldName = field.apiFieldName || field.name;
+        const exampleValue = this.getExampleValue(field.type);
+        return `    "${fieldName}": "${exampleValue}"`;
+      })
+      .join(',\n');
+  }
+
+  // Gerar campos dinâmicos para PHP
+  private generateDynamicFieldsPhp(formFields?: any[]): string {
+    if (!formFields || formFields.length === 0) {
+      return '';
+    }
+
+    return ',\n' + formFields
+      .filter(field => field.includeInApi !== false)
+      .map(field => {
+        const fieldName = field.apiFieldName || field.name;
+        const exampleValue = this.getExampleValue(field.type);
+        return `    '${fieldName}' => '${exampleValue}'`;
+      })
+      .join(',\n');
+  }
+
+  // Gerar campos dinâmicos para Python
+  private generateDynamicFieldsPython(formFields?: any[]): string {
+    if (!formFields || formFields.length === 0) {
+      return '';
+    }
+
+    return ',\n' + formFields
+      .filter(field => field.includeInApi !== false)
+      .map(field => {
+        const fieldName = field.apiFieldName || field.name;
+        const exampleValue = this.getExampleValue(field.type);
+        return `    '${fieldName}': '${exampleValue}'`;
+      })
+      .join(',\n');
+  }
+
+  // Obter valor de exemplo baseado no tipo do campo
+  private getExampleValue(fieldType: string): string {
+    switch (fieldType) {
+      case 'email':
+        return 'exemplo@email.com';
+      case 'tel':
+        return '(11) 99999-9999';
+      case 'number':
+        return '123';
+      case 'cnpj':
+        return '00.000.000/0001-00';
+      case 'cpf':
+        return '000.000.000-00';
+      case 'date':
+        return '2024-01-01';
+      case 'time':
+        return '14:30';
+      case 'temperatura':
+        return 'Quente';
+      case 'textarea':
+        return 'Texto de exemplo';
+      case 'select':
+      case 'radio':
+        return 'Opção 1';
+      case 'checkbox':
+        return 'true';
+      default:
+        return 'Valor exemplo';
+    }
   }
 
   // Headers padrão para autenticação

@@ -5,6 +5,7 @@ import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
 import { provideAuth, getAuth } from '@angular/fire/auth';
 import { provideFirestore, getFirestore } from '@angular/fire/firestore';
 import { provideStorage, getStorage } from '@angular/fire/storage';
+import { provideFunctions, getFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormlyModule } from '@ngx-formly/core';
 import { FormlyBootstrapModule } from '@ngx-formly/bootstrap';
@@ -41,6 +42,21 @@ export const appConfig: ApplicationConfig = {
     provideAuth(() => getAuth()),
     provideFirestore(() => getFirestore()),
     provideStorage(() => getStorage()),
+    provideFunctions(() => {
+      const functions = getFunctions();
+      // Conectar ao emulador em desenvolvimento
+      if (!environment.production) {
+        // Verificar se já não está conectado ao emulador
+        if (!(functions as any)._delegate?._emulator) {
+          try {
+            connectFunctionsEmulator(functions, 'localhost', 5001);
+          } catch (error) {
+            console.warn('Emulador Functions já conectado:', error);
+          }
+        }
+      }
+      return functions;
+    }),
     // Inicializador de branding
     {
       provide: APP_INITIALIZER,

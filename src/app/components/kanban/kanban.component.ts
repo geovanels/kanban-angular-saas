@@ -5,6 +5,7 @@ import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Board, Column, Lead } from '../../services/firestore.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { AutomationService } from '../../services/automation.service';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
 import { LeadModalComponent } from '../lead-modal/lead-modal.component';
 import { ColumnModalComponent } from '../column-modal/column-modal.component';
@@ -26,6 +27,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private firestoreService = inject(FirestoreService);
   private subdomainService = inject(SubdomainService);
+  private automationService = inject(AutomationService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -67,6 +69,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.ownerId = this.route.snapshot.queryParamMap.get('ownerId') || this.currentUser?.uid || '';
     
     console.log('KanbanComponent - boardId:', this.boardId, 'ownerId:', this.ownerId);
+    
+    // Definir contexto da empresa no FirestoreService
+    const company = this.subdomainService.getCurrentCompany();
+    if (company) {
+      console.log('Definindo contexto da empresa no FirestoreService:', company.name, company.id);
+      this.firestoreService.setCompanyContext(company);
+    } else {
+      console.warn('Empresa não encontrada no contexto');
+    }
     
     if (this.currentUser && this.boardId && this.ownerId) {
       this.loadBoardData();
@@ -300,6 +311,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   async onLeadDrop(event: CdkDragDrop<Lead[]>) {
     const leadId = event.item.data;
     const targetColumnId = event.container.id.replace('column-', '');
+    const previousColumnId = event.previousContainer.id.replace('column-', '');
     
     if (event.previousContainer === event.container) {
       // Reordenar dentro da mesma coluna
@@ -313,6 +325,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
         event.currentIndex
       );
 
+      // Buscar dados completos do lead
+      const lead = this.leads.find(l => l.id === leadId);
+      
       // Atualizar no Firestore
       try {
         await this.firestoreService.moveLead(
@@ -321,6 +336,27 @@ export class KanbanComponent implements OnInit, OnDestroy {
           leadId,
           targetColumnId
         );
+
+        // Processar automações para mudança de fase
+        if (lead) {
+          console.log('🔄 Processando automações para mudança de fase:', {
+            leadId: lead.id,
+            oldColumn: previousColumnId,
+            newColumn: targetColumnId
+          });
+          
+          try {
+            await this.automationService.processPhaseChangeAutomations(
+              lead,
+              targetColumnId,
+              previousColumnId,
+              this.boardId,
+              this.ownerId
+            );
+          } catch (automationError) {
+            console.error('Erro ao processar automações de mudança de fase:', automationError);
+          }
+        }
       } catch (error) {
         console.error('Erro ao mover lead:', error);
         // Reverter a mudança visual se houver erro
@@ -395,9 +431,23 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.leadDetailModal.show(lead);
   }
 
-  onLeadCreated() {
+  async onLeadCreated() {
     // Os leads serão atualizados automaticamente via real-time subscription
     console.log('Novo lead criado!');
+    
+    // Processar automações para novo lead
+    // Aguardar um pouco para garantir que o lead foi persistido
+    setTimeout(async () => {
+      try {
+        await this.automationService.processNewLeadAutomations(
+          this.leads[this.leads.length - 1], // Último lead criado
+          this.boardId,
+          this.ownerId
+        );
+      } catch (error) {
+        console.error('Erro ao processar automações de novo lead:', error);
+      }
+    }, 1000);
   }
 
   onLeadUpdated() {
@@ -437,8 +487,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
   // Propriedades para Automações
   automations: any[] = [];
 
-  // Propriedades para gerenciar colunas
-  showColumnMenu: string | null = null;
 
   // Lista de usuários para o modal de detalhes
   users: any[] = [];
@@ -537,30 +585,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   // Métodos para gerenciar colunas
-  toggleColumnMenu(columnId: string) {
-    this.showColumnMenu = this.showColumnMenu === columnId ? null : columnId;
-  }
 
   showCreateColumnModal() {
     this.columnModal.showCreateModal();
-    this.showColumnMenu = null;
   }
 
   editColumn(column: Column) {
     this.columnModal.showEditModal(column);
-    this.showColumnMenu = null;
   }
 
-  async showColumnForm(column: Column) {
-    try {
-      const existingConfig = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
-      this.phaseFormModal.showModal(column, existingConfig as any || undefined);
-    } catch (error) {
-      console.error('Erro ao carregar configuração do formulário:', error);
-      this.phaseFormModal.showModal(column, undefined);
-    }
-    this.showColumnMenu = null;
-  }
 
   async deleteColumn(column: Column) {
     if (confirm(`Tem certeza que deseja excluir a fase "${column.name}"? Esta ação não pode ser desfeita.`)) {
@@ -572,7 +605,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
         alert('Erro ao excluir fase. Tente novamente.');
       }
     }
-    this.showColumnMenu = null;
   }
 
   onColumnCreated() {
@@ -583,9 +615,24 @@ export class KanbanComponent implements OnInit, OnDestroy {
     console.log('Fase atualizada!');
   }
 
+  onColumnDeleted() {
+    console.log('Fase excluída!');
+  }
+
+  async showColumnForm(column: Column) {
+    try {
+      const existingConfig = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
+      this.phaseFormModal.showModal(column, existingConfig as any || undefined);
+    } catch (error) {
+      console.error('Erro ao carregar configuração do formulário:', error);
+      this.phaseFormModal.showModal(column, undefined);
+    }
+  }
+
   onPhaseFormConfigSaved() {
     console.log('Configuração de formulário salva!');
   }
+
 
   // Métodos para SLA
   getSlaStatus(lead: Lead): { status: string; text: string; colorClass: string; borderClass: string } {
@@ -829,6 +876,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
   onCloseHistoryModal() {
     this.showHistoryModal = false;
     this.selectedAutomationForHistory = null;
+  }
+
+  // Outbox Methods
+  async clearOutbox() {
+    if (confirm('Deseja excluir todos os emails da caixa de saída? Esta ação não pode ser desfeita.')) {
+      try {
+        // Buscar e excluir todos os emails do outbox
+        await this.firestoreService.clearOutboxEmails(this.ownerId, this.boardId);
+        console.log('✅ Caixa de saída limpa com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao limpar caixa de saída:', error);
+        alert('Erro ao limpar caixa de saída. Tente novamente.');
+      }
+    }
   }
 
   // API Methods

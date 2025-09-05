@@ -33,11 +33,6 @@ export class UserManagementComponent implements OnInit {
   inviteError = signal<string | null>(null);
   inviteSuccess = signal<string | null>(null);
 
-  // Delete company
-  showDeleteConfirmation = signal(false);
-  deleteConfirmation = signal('');
-  deleteLoading = signal(false);
-  deleteError = signal<string | null>(null);
 
   async ngOnInit() {
     await this.loadUserData();
@@ -56,14 +51,11 @@ export class UserManagementComponent implements OnInit {
     try {
       await this.companyService.seedGobuyerCompany();
       
-      // Associar usuários Gobuyer existentes
-      await this.companyService.associateGobuyerUsers();
-      
       // Recarregar dados da empresa
       const company = this.subdomainService.getCurrentCompany();
       this.currentCompany.set(company);
     } catch (error) {
-      console.error('Erro ao garantir empresa Gobuyer:', error);
+      // Error handled silently
     }
   }
 
@@ -355,42 +347,6 @@ export class UserManagementComponent implements OnInit {
     return true;
   }
 
-  canDeleteCompany(): boolean {
-    const currentUser = this.currentUser();
-    const company = this.currentCompany();
-    
-    if (!currentUser || !company) return false;
-    
-    // Apenas o dono da empresa pode excluir
-    return company.ownerEmail === currentUser.email;
-  }
-
-  async deleteCompany() {
-    const company = this.currentCompany();
-    const confirmation = this.deleteConfirmation().trim();
-    
-    if (!company || confirmation !== company.name) {
-      this.deleteError.set('Digite exatamente o nome da empresa para confirmar');
-      return;
-    }
-
-    this.deleteLoading.set(true);
-    this.deleteError.set(null);
-
-    try {
-      await this.companyService.deleteCompany(company.id!);
-      
-      // Logout e redirect
-      await this.authService.logout();
-      window.location.href = '/login';
-      
-    } catch (error) {
-      console.error('Erro ao excluir empresa:', error);
-      this.deleteError.set('Erro ao excluir empresa. Tente novamente.');
-    } finally {
-      this.deleteLoading.set(false);
-    }
-  }
 
   showInviteFormToggle() {
     this.showInviteForm.set(!this.showInviteForm());
@@ -399,17 +355,6 @@ export class UserManagementComponent implements OnInit {
     this.inviteEmail.set('');
   }
 
-  showDeleteModal() {
-    this.showDeleteConfirmation.set(true);
-    this.deleteConfirmation.set('');
-    this.deleteError.set(null);
-  }
-
-  hideDeleteModal() {
-    this.showDeleteConfirmation.set(false);
-    this.deleteConfirmation.set('');
-    this.deleteError.set(null);
-  }
 
   getRoleLabel(role: string): string {
     switch (role) {
@@ -427,5 +372,10 @@ export class UserManagementComponent implements OnInit {
       case 'user': return 'badge-info';
       default: return 'badge-secondary';
     }
+  }
+
+  getPrimaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.primaryColor || company?.brandingConfig?.primaryColor || '#3B82F6';
   }
 }

@@ -192,20 +192,33 @@ export class BrandingService {
 
   // Aplicar branding completo da empresa
   applyCompanyBranding(company: Company): void {
+    console.log('🎨 Aplicando branding para empresa:', company.name);
+    console.log('🎨 Cores da empresa:', {
+      primaryColor: company.primaryColor,
+      secondaryColor: company.secondaryColor,
+      brandingConfig: company.brandingConfig
+    });
+
+    const primaryColor = company.brandingConfig?.primaryColor || company.primaryColor;
+    const secondaryColor = company.brandingConfig?.secondaryColor || company.secondaryColor;
+
     const branding: BrandingConfig = {
       logoUrl: company.logoUrl,
-      primaryColor: company.primaryColor,
-      secondaryColor: company.secondaryColor
+      primaryColor: primaryColor,
+      secondaryColor: secondaryColor
     };
 
     this.updateBranding(branding);
 
     // Aplicar cores
-    if (company.primaryColor || company.secondaryColor) {
+    if (primaryColor || secondaryColor) {
+      console.log('🎨 Aplicando cores:', { primaryColor, secondaryColor });
       this.applyColors({
-        primaryColor: company.primaryColor,
-        secondaryColor: company.secondaryColor
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor
       });
+    } else {
+      console.log('⚠️ Nenhuma cor encontrada para aplicar');
     }
 
     // Atualizar título da página
@@ -319,41 +332,72 @@ export class BrandingService {
 
   // Apply dynamic styles that override hardcoded colors
   private applyDynamicStyles(colors: { primaryColor?: string; secondaryColor?: string; accentColor?: string }): void {
-    if (!colors.primaryColor) return;
+    console.log('🎨 Aplicando estilos dinâmicos:', colors);
+    
+    if (!colors.primaryColor) {
+      console.log('⚠️ Nenhuma cor primária fornecida');
+      return;
+    }
 
     // Remove existing dynamic styles
     const existingStyle = document.getElementById('dynamic-branding-styles');
     if (existingStyle) {
       existingStyle.remove();
+      console.log('🗑️ Removeu estilos dinâmicos anteriores');
     }
 
     // Create new dynamic styles
     const style = document.createElement('style');
     style.id = 'dynamic-branding-styles';
     style.textContent = `
-      /* Primary buttons - Override all blue variations */
+      /* Primary buttons - Override all blue/green variations with very specific selectors */
       .bg-blue-500, .bg-green-500,
       button.bg-blue-500, button.bg-green-500,
-      .bg-blue-500.hover\\:bg-blue-600, .bg-green-500.hover\\:bg-green-600 {
+      .bg-blue-500.hover\\:bg-blue-600, .bg-green-500.hover\\:bg-green-600,
+      [class*="bg-blue-500"], [class*="bg-green-500"],
+      button[class*="bg-blue-500"], button[class*="bg-green-500"],
+      .text-white.px-4.py-2.rounded-lg,
+      .text-white.px-6.py-2.rounded-lg,
+      .text-white.px-4.py-2.rounded-md {
         background-color: ${colors.primaryColor} !important;
       }
       
       .hover\\:bg-blue-600:hover, .hover\\:bg-green-600:hover,
       button.bg-blue-500:hover, button.bg-green-500:hover,
-      button.hover\\:bg-blue-600:hover, button.hover\\:bg-green-600:hover {
+      button.hover\\:bg-blue-600:hover, button.hover\\:bg-green-600:hover,
+      [class*="hover:bg-blue-600"]:hover, [class*="hover:bg-green-600"]:hover,
+      button[class*="bg-blue-500"]:hover, button[class*="bg-green-500"]:hover,
+      .text-white.px-4.py-2.rounded-lg:hover,
+      .text-white.px-6.py-2.rounded-lg:hover,
+      .text-white.px-4.py-2.rounded-md:hover {
         background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
       }
       
-      /* Dashboard specific buttons - more specific selectors */
-      .bg-blue-500.hover\\:bg-blue-600.text-white,
-      button[class*="bg-blue-500"][class*="hover:bg-blue-600"],
-      .bg-blue-500.hover\\:bg-blue-600.text-white.px-4.py-2 {
+      /* Very specific selectors for common button patterns */
+      .px-4.py-2.bg-blue-500,
+      .px-6.py-2.bg-blue-500,
+      .px-6.py-3.bg-blue-500,
+      .px-4.py-2.bg-green-500,
+      button.px-4.py-2.bg-blue-500,
+      button.px-6.py-2.bg-blue-500,
+      button.px-6.py-3.bg-blue-500 {
         background-color: ${colors.primaryColor} !important;
       }
       
-      button[class*="bg-blue-500"][class*="hover:bg-blue-600"]:hover,
-      .bg-blue-500.hover\\:bg-blue-600.text-white.px-4.py-2:hover {
+      .px-4.py-2.bg-blue-500:hover,
+      .px-6.py-2.bg-blue-500:hover,
+      .px-6.py-3.bg-blue-500:hover,
+      button.px-4.py-2.bg-blue-500:hover,
+      button.px-6.py-2.bg-blue-500:hover,
+      button.px-6.py-3.bg-blue-500:hover {
         background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
+      }
+      
+      /* All buttons with white text and blue/green backgrounds */
+      button[style*="background-color"],
+      .bg-blue-500,
+      .bg-green-500 {
+        background-color: ${colors.primaryColor} !important;
       }
       
       /* Focus states */
@@ -426,6 +470,14 @@ export class BrandingService {
         background-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
         border-color: ${this.darkenColor(colors.primaryColor, 10)} !important;
       }
+      
+      /* Canvas style override - for buttons with inline styles */
+      button[style*="background-color: rgb(59, 130, 246)"],
+      button[style*="background-color: rgb(34, 197, 94)"],
+      [style*="background-color: #3B82F6"],
+      [style*="background-color: #22C55E"] {
+        background-color: ${colors.primaryColor} !important;
+      }
     `;
 
     if (colors.secondaryColor) {
@@ -454,6 +506,8 @@ export class BrandingService {
     }
     
     document.head.appendChild(style);
+    console.log('✅ Estilos dinâmicos aplicados com sucesso!');
+    console.log('🎨 Cor primária aplicada:', colors.primaryColor);
   }
 
   // Aplicar favicon

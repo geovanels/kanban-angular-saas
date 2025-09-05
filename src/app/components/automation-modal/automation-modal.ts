@@ -139,7 +139,7 @@ export class AutomationModal implements OnInit {
 
   getAutomationTypeName(triggerType: string): string {
     const types: { [key: string]: string } = {
-      'new-lead-created': 'Novo Lead',
+      'new-lead-created': 'Novo Registro',
       'card-enters-phase': 'Entrada em Fase',
       'card-in-phase-for-time': 'Tempo em Fase',
       'form-not-answered': 'Formulário Pendente',

@@ -426,7 +426,7 @@ export class CompanyLinksComponent implements OnInit {
       // Formulários
       {
         name: 'Formulário Público',
-        url: `${baseUrl}/form`,
+        url: this.subdomainService.getPublicFormUrl() || `${baseUrl}/form`,
         description: 'Formulário público para captura de leads',
         icon: 'fas fa-wpforms',
         category: 'form',

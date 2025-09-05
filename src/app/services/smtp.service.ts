@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
+import { Observable, throwError, from } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { SubdomainService } from './subdomain.service';
 import { Company } from '../models/company.model';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 
 export interface EmailData {
   to: string;
@@ -33,52 +34,85 @@ export interface EmailResponse {
 export class SmtpService {
   private http = inject(HttpClient);
   private subdomainService = inject(SubdomainService);
+  private functions = inject(Functions);
 
-  // Enviar email usando configuração SMTP da empresa
+  // Enviar email usando configuração SMTP da empresa via Firebase Functions
   sendEmail(emailData: EmailData): Observable<EmailResponse> {
     const company = this.subdomainService.getCurrentCompany();
     
     if (!company) {
+      console.error('❌ Contexto da empresa não inicializado');
       return throwError(() => new Error('Contexto da empresa não inicializado'));
     }
 
     if (!this.validateSmtpConfig(company)) {
+      console.error('❌ Configuração SMTP da empresa está incompleta:', company.smtpConfig);
       return throwError(() => new Error('Configuração SMTP da empresa está incompleta'));
     }
 
-    // Preparar dados do email com configuração da empresa
-    const emailPayload = {
-      ...emailData,
+    console.log('📧 Preparando envio de email via Firebase Functions:', {
+      to: emailData.to,
+      subject: emailData.subject,
+      fromEmail: company.smtpConfig.fromEmail,
+      fromName: company.smtpConfig.fromName
+    });
+
+    // Usar Firebase HTTP Function para envio direto
+    const sendEmailCallable = httpsCallable(this.functions, 'sendEmail');
+    
+    const payload = {
+      emailData: {
+        to: emailData.to,
+        subject: emailData.subject,
+        html: emailData.html,
+        text: emailData.text,
+        cc: emailData.cc,
+        bcc: emailData.bcc
+      },
       smtpConfig: {
         host: company.smtpConfig.host,
         port: company.smtpConfig.port,
         secure: company.smtpConfig.secure,
-        auth: {
-          user: company.smtpConfig.user,
-          pass: company.smtpConfig.password
-        }
-      },
-      from: {
-        name: company.smtpConfig.fromName,
-        email: company.smtpConfig.fromEmail
-      },
-      companyId: company.id
+        user: company.smtpConfig.user,
+        password: company.smtpConfig.password,
+        fromName: company.smtpConfig.fromName,
+        fromEmail: company.smtpConfig.fromEmail
+      }
     };
 
-    // URL da API de envio de emails (backend)
-    const apiUrl = this.getEmailApiUrl();
-    
-    return this.http.post<EmailResponse>(apiUrl, emailPayload).pipe(
-      map(response => ({
-        ...response,
-        success: true,
-        messageId: response.messageId
-      })),
+    console.log('📤 Enviando para Firebase Functions:', {
+      ...payload,
+      smtpConfig: {
+        ...payload.smtpConfig,
+        password: payload.smtpConfig.password.substring(0, 10) + '...'
+      }
+    });
+
+    return from(sendEmailCallable(payload)).pipe(
+      map((result: any) => {
+        console.log('✅ Email enviado com sucesso via Firebase Functions:', result.data);
+        return {
+          success: result.data.success || true,
+          messageId: result.data.messageId || 'sent'
+        };
+      }),
       catchError(error => {
-        console.error('Erro ao enviar email:', error);
+        console.error('❌ Erro detalhado ao enviar email via Firebase Functions:', error);
+        
+        let errorMessage = 'Erro desconhecido ao enviar email';
+        
+        if (error.code === 'unauthenticated') {
+          errorMessage = 'Usuário não autenticado. Faça login novamente.';
+        } else if (error.code === 'permission-denied') {
+          errorMessage = 'Acesso negado. Verifique as permissões.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
         return throwError(() => ({
           success: false,
-          error: error.error?.message || 'Erro desconhecido ao enviar email'
+          error: errorMessage,
+          details: error
         }));
       })
     );
@@ -112,17 +146,17 @@ export class SmtpService {
       return throwError(() => new Error('Empresa não encontrada'));
     }
 
-    const subject = `Novo Lead: ${lead.fields.contactName || lead.fields.companyName || 'Lead sem nome'}`;
+    const subject = `Novo Registro: ${lead.fields.contactName || lead.fields.companyName || 'Registro sem nome'}`;
     
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: ${company.primaryColor || '#007bff'}; color: white; padding: 20px; text-align: center;">
           <h1>${company.name}</h1>
-          <h2>Novo Lead Recebido</h2>
+          <h2>Novo Registro Recebido</h2>
         </div>
         
         <div style="padding: 20px; background-color: #f8f9fa;">
-          <h3>Detalhes do Lead:</h3>
+          <h3>Detalhes do Registro:</h3>
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight: bold;">Quadro:</td>
@@ -177,7 +211,7 @@ export class SmtpService {
     });
   }
 
-  // Testar configuração SMTP
+  // Testar configuração SMTP via Firebase Functions
   testSmtpConfiguration(): Observable<EmailResponse> {
     const company = this.subdomainService.getCurrentCompany();
     
@@ -185,23 +219,53 @@ export class SmtpService {
       return throwError(() => new Error('Empresa não encontrada'));
     }
 
-    const testEmail: EmailData = {
-      to: company.ownerEmail,
-      subject: `Teste SMTP - ${company.name}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: ${company.primaryColor || '#007bff'};">Teste de Configuração SMTP</h2>
-          <p>Este é um email de teste para verificar se a configuração SMTP está funcionando corretamente.</p>
-          <p><strong>Empresa:</strong> ${company.name}</p>
-          <p><strong>Subdomínio:</strong> ${company.subdomain}</p>
-          <p><strong>Servidor SMTP:</strong> ${company.smtpConfig.host}:${company.smtpConfig.port}</p>
-          <p><strong>Data/Hora:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-          <p style="color: #28a745; font-weight: bold;">✅ Configuração SMTP funcionando corretamente!</p>
-        </div>
-      `
+    if (!this.validateSmtpConfig(company)) {
+      return throwError(() => new Error('Configuração SMTP da empresa está incompleta'));
+    }
+
+    console.log('🧪 Testando configuração SMTP via Firebase Functions');
+
+    // Usar Firebase Callable Function para teste de configuração
+    const testSmtpCallable = httpsCallable(this.functions, 'testSmtpConfig');
+    
+    const payload = {
+      smtpConfig: {
+        host: company.smtpConfig.host,
+        port: company.smtpConfig.port,
+        secure: company.smtpConfig.secure,
+        user: company.smtpConfig.user,
+        password: company.smtpConfig.password,
+        fromName: company.smtpConfig.fromName,
+        fromEmail: company.smtpConfig.fromEmail
+      },
+      testEmail: company.ownerEmail
     };
 
-    return this.sendEmail(testEmail);
+    return from(testSmtpCallable(payload)).pipe(
+      map((result: any) => {
+        console.log('✅ Teste SMTP realizado com sucesso:', result.data);
+        return {
+          success: result.data.success || true,
+          messageId: result.data.messageId || 'test-sent',
+          message: result.data.message || 'Teste realizado com sucesso'
+        };
+      }),
+      catchError(error => {
+        console.error('❌ Erro ao testar configuração SMTP:', error);
+        
+        let errorMessage = 'Erro ao testar configuração SMTP';
+        
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        return throwError(() => ({
+          success: false,
+          error: errorMessage,
+          details: error
+        }));
+      })
+    );
   }
 
   // Validar configuração SMTP da empresa
@@ -219,11 +283,7 @@ export class SmtpService {
     );
   }
 
-  // Obter URL da API de emails
-  private getEmailApiUrl(): string {
-    const baseUrl = this.subdomainService.getApiUrl();
-    return `${baseUrl}/emails/send`;
-  }
+  // Método removido - agora usa Firebase Functions diretamente
 
   // Obter configurações de email da empresa atual
   getCurrentEmailConfig(): any {

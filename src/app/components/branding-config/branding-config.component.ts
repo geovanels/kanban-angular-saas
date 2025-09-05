@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { BrandingService } from '../../services/branding.service';
+import { AuthService } from '../../services/auth.service';
 import { Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
@@ -252,8 +253,104 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
             </div>
           </div>
         </div>
+
+        <!-- Delete Company Section (apenas para proprietários) -->
+        @if (canDeleteCompany()) {
+          <div class="mt-8 bg-white rounded-lg shadow-sm border border-red-200">
+            <div class="p-6 bg-red-50 rounded-t-lg border-b border-red-200">
+              <h3 class="text-lg font-semibold text-red-800 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Zona Perigosa
+              </h3>
+              <p class="text-sm text-red-700 mt-1">
+                A exclusão da empresa é permanente e não pode ser desfeita. Todos os dados, quadros, leads e usuários serão perdidos.
+              </p>
+            </div>
+            <div class="p-6">
+              <button
+                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                (click)="showDeleteModal()">
+                <i class="fas fa-trash mr-1"></i>
+                Excluir Empresa Permanentemente
+              </button>
+            </div>
+          </div>
+        }
       </div>
     </app-main-layout>
+
+    <!-- Delete Confirmation Modal -->
+    @if (showDeleteConfirmation()) {
+      <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+          <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+                Confirmar Exclusão
+              </h3>
+              <button
+                class="text-gray-400 hover:text-gray-600"
+                (click)="hideDeleteModal()">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+              <strong>ATENÇÃO:</strong> Esta ação não pode ser desfeita!
+            </div>
+            
+            <p class="text-sm text-gray-600 mb-4">Você está prestes a excluir permanentemente:</p>
+            <ul class="text-sm text-gray-600 mb-4 list-disc list-inside">
+              <li>Empresa: <strong>{{ currentCompany()?.name }}</strong></li>
+              <li>Todos os quadros e leads</li>
+              <li>Todos os usuários associados</li>
+              <li>Todas as configurações e dados</li>
+            </ul>
+            
+            <p class="text-sm text-gray-600 mb-4">
+              Para confirmar, digite <strong>{{ currentCompany()?.name }}</strong> abaixo:
+            </p>
+            
+            <input
+              type="text"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500 mb-4"
+              [(ngModel)]="deleteConfirmation"
+              [value]="deleteConfirmation()"
+              (input)="deleteConfirmation.set($any($event.target).value)"
+              placeholder="Nome da empresa">
+            
+            @if (deleteError()) {
+              <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                {{ deleteError() }}
+              </div>
+            }
+            
+            <div class="flex space-x-3">
+              <button
+                class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                (click)="hideDeleteModal()"
+                [disabled]="deleteLoading()">
+                Cancelar
+              </button>
+              <button
+                class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                (click)="deleteCompany()"
+                [disabled]="deleteLoading() || deleteConfirmation() !== currentCompany()?.name">
+                @if (deleteLoading()) {
+                  <i class="fas fa-spinner fa-spin mr-1"></i>
+                  Excluindo...
+                } @else {
+                  <i class="fas fa-trash mr-1"></i>
+                  Excluir Permanentemente
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     :host {
@@ -265,6 +362,7 @@ export class BrandingConfigComponent implements OnInit {
   private companyService = inject(CompanyService);
   private subdomainService = inject(SubdomainService);
   private brandingService = inject(BrandingService);
+  private authService = inject(AuthService);
 
   // Reactive signals
   currentCompany = signal<Company | null>(null);
@@ -275,6 +373,12 @@ export class BrandingConfigComponent implements OnInit {
   isSaving = signal(false);
   successMessage = signal<string | null>(null);
   errorMessage = signal<string | null>(null);
+  
+  // Delete company
+  showDeleteConfirmation = signal(false);
+  deleteConfirmation = signal('');
+  deleteLoading = signal(false);
+  deleteError = signal<string | null>(null);
 
   colorPresets = [
     { name: 'Azul', primary: '#3B82F6', secondary: '#6B7280' },
@@ -397,6 +501,55 @@ export class BrandingConfigComponent implements OnInit {
     // Apply branding to current page (for immediate feedback)
     document.documentElement.style.setProperty('--primary-color', this.primaryColor());
     document.documentElement.style.setProperty('--secondary-color', this.secondaryColor());
+  }
+
+  canDeleteCompany(): boolean {
+    const currentUser = this.authService.getCurrentUser();
+    const company = this.currentCompany();
+    
+    if (!currentUser || !company) return false;
+    
+    // Apenas o dono da empresa pode excluir
+    return company.ownerEmail === currentUser.email;
+  }
+
+  async deleteCompany() {
+    const company = this.currentCompany();
+    const confirmation = this.deleteConfirmation().trim();
+    
+    if (!company || confirmation !== company.name) {
+      this.deleteError.set('Digite exatamente o nome da empresa para confirmar');
+      return;
+    }
+
+    this.deleteLoading.set(true);
+    this.deleteError.set(null);
+
+    try {
+      await this.companyService.deleteCompany(company.id!);
+      
+      // Logout e redirect
+      await this.authService.logout();
+      window.location.href = '/login';
+      
+    } catch (error) {
+      console.error('Erro ao excluir empresa:', error);
+      this.deleteError.set('Erro ao excluir empresa. Tente novamente.');
+    } finally {
+      this.deleteLoading.set(false);
+    }
+  }
+
+  showDeleteModal() {
+    this.showDeleteConfirmation.set(true);
+    this.deleteConfirmation.set('');
+    this.deleteError.set(null);
+  }
+
+  hideDeleteModal() {
+    this.showDeleteConfirmation.set(false);
+    this.deleteConfirmation.set('');
+    this.deleteError.set(null);
   }
 
   applyPreviewColors() {

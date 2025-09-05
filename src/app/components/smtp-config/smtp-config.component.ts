@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { SmtpService } from '../../services/smtp.service';
 import { Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
@@ -15,12 +16,6 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
     <app-main-layout>
       <app-config-header title="Configuração SMTP">
         <div class="flex items-center space-x-3">
-          @if (smtpForm.invalid) {
-            <span class="text-sm text-red-600 flex items-center">
-              <i class="fas fa-exclamation-circle mr-1"></i>
-              Preencha todos os campos
-            </span>
-          }
           <button 
             class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             (click)="saveConfiguration()"
@@ -76,7 +71,7 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
                     [class]="'w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ' + 
                             (smtpForm.get('host')?.invalid && smtpForm.get('host')?.touched ? 
                              'border-red-300 bg-red-50' : 'border-gray-300')"
-                    placeholder="smtp.gmail.com">
+                    placeholder="smtp.sendgrid.net">
                   <p class="text-xs text-gray-500 mt-1">Endereço do servidor SMTP</p>
                 </div>
                 
@@ -97,16 +92,16 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Usuário/Email *
+                    Usuário *
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     formControlName="user"
                     [class]="'w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ' + 
                             (smtpForm.get('user')?.invalid && smtpForm.get('user')?.touched ? 
                              'border-red-300 bg-red-50' : 'border-gray-300')"
-                    placeholder="seu-email@gmail.com">
-                  <p class="text-xs text-gray-500 mt-1">Email para autenticação no servidor</p>
+                    placeholder="apikey">
+                  <p class="text-xs text-gray-500 mt-1">Para SendGrid, use sempre "apikey"</p>
                 </div>
                 
                 <div>
@@ -119,8 +114,8 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
                     [class]="'w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ' + 
                             (smtpForm.get('password')?.invalid && smtpForm.get('password')?.touched ? 
                              'border-red-300 bg-red-50' : 'border-gray-300')"
-                    placeholder="sua-senha-ou-app-password">
-                  <p class="text-xs text-gray-500 mt-1">Senha ou App Password do Gmail</p>
+                    placeholder="SG.xxxxxxxxxx...">
+                  <p class="text-xs text-gray-500 mt-1">API Key do SendGrid (começa com SG.)</p>
                 </div>
               </div>
 
@@ -179,7 +174,8 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
                     placeholder="seu-email@exemplo.com">
                   <button
                     type="button"
-                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                    class="text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                    [style.background-color]="getPrimaryColor()"
                     (click)="sendTestEmail()"
                     [disabled]="isTesting() || !testEmail || smtpForm.invalid">
                     @if (isTesting()) {
@@ -208,6 +204,24 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
           
           <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <!-- SendGrid (Recomendado) -->
+              <div class="border border-green-200 rounded-lg p-4 bg-green-50">
+                <div class="flex items-center mb-3">
+                  <div class="w-8 h-8 bg-green-500 rounded flex items-center justify-center">
+                    <i class="fas fa-paper-plane text-white text-sm"></i>
+                  </div>
+                  <h4 class="ml-3 text-sm font-semibold text-gray-900">SendGrid (Recomendado)</h4>
+                  <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Configurado</span>
+                </div>
+                <div class="text-xs text-gray-600 space-y-1">
+                  <p><strong>Servidor:</strong> smtp.sendgrid.net</p>
+                  <p><strong>Porta:</strong> 587</p>
+                  <p><strong>Usuário:</strong> apikey</p>
+                  <p><strong>Senha:</strong> Sua API Key do SendGrid</p>
+                  <p class="text-green-700"><strong>✓</strong> Maior taxa de entrega</p>
+                </div>
+              </div>
+
               <!-- Gmail -->
               <div class="border border-gray-200 rounded-lg p-4">
                 <div class="flex items-center mb-3">
@@ -271,6 +285,7 @@ export class SmtpConfigComponent implements OnInit {
   private fb = inject(FormBuilder);
   private companyService = inject(CompanyService);
   private subdomainService = inject(SubdomainService);
+  private smtpService = inject(SmtpService);
 
   smtpForm: FormGroup;
   currentCompany = signal<Company | null>(null);
@@ -282,10 +297,10 @@ export class SmtpConfigComponent implements OnInit {
 
   constructor() {
     this.smtpForm = this.fb.group({
-      host: ['smtp.gmail.com', Validators.required],
+      host: ['smtp.sendgrid.net', Validators.required],
       port: [587, [Validators.required, Validators.min(1), Validators.max(65535)]],
       secure: [true],
-      user: ['', [Validators.required, Validators.email]],
+      user: ['apikey', [Validators.required]],
       password: ['', Validators.required],
       fromName: ['', Validators.required],
       fromEmail: ['', [Validators.required, Validators.email]]
@@ -312,11 +327,13 @@ export class SmtpConfigComponent implements OnInit {
           fromEmail: company.smtpConfig.fromEmail
         });
       } else {
-        // Configurar valores padrão para empresas sem configuração SMTP
+        // Configurar valores padrão para empresas sem configuração SMTP (SendGrid)
         this.smtpForm.patchValue({
-          fromName: company.name || 'Sistema Kanban',
+          host: 'smtp.sendgrid.net',
+          port: 587,
           secure: true,
-          port: 587
+          user: 'apikey',
+          fromName: company.name || 'Sistema Kanban'
         });
       }
     }
@@ -375,19 +392,73 @@ export class SmtpConfigComponent implements OnInit {
   }
 
   async sendTestEmail() {
-    if (!this.testEmail || this.smtpForm.invalid) return;
+    if (!this.testEmail || this.smtpForm.invalid) {
+      this.showError('Por favor, preencha um email válido e complete todas as configurações.');
+      return;
+    }
+
+    // Salvar configurações primeiro se necessário
+    if (this.smtpForm.dirty) {
+      await this.saveConfiguration();
+      // Aguardar um tempo para garantir que as configurações foram salvas
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 
     this.isTesting.set(true);
     this.clearMessages();
 
     try {
-      // In a real app, you would call an API to send the test email
-      // For now, we'll simulate it
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      this.showSuccess(`Email de teste enviado para ${this.testEmail}!`);
-    } catch (error) {
-      console.error('Erro ao enviar email de teste:', error);
-      this.showError('Erro ao enviar email de teste. Verifique as configurações.');
+      const testEmailData = {
+        to: this.testEmail,
+        subject: `Teste SMTP - ${this.currentCompany()?.name || 'Sistema'}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: ${this.getPrimaryColor()};">✅ Teste de Configuração SMTP</h2>
+            <p>Parabéns! Sua configuração SMTP está funcionando corretamente.</p>
+            <p><strong>Empresa:</strong> ${this.currentCompany()?.name}</p>
+            <p><strong>Email enviado para:</strong> ${this.testEmail}</p>
+            <p><strong>Data/Hora:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid ${this.getPrimaryColor()}; margin: 20px 0;">
+              <strong>Configurações utilizadas:</strong><br>
+              Host: ${this.smtpForm.get('host')?.value}<br>
+              Porta: ${this.smtpForm.get('port')?.value}<br>
+              Seguro: ${this.smtpForm.get('secure')?.value ? 'Sim' : 'Não'}<br>
+              Remetente: ${this.smtpForm.get('fromName')?.value} &lt;${this.smtpForm.get('fromEmail')?.value}&gt;
+            </div>
+            <p style="color: #28a745; font-weight: bold;">🎉 Sistema de emails configurado com sucesso!</p>
+          </div>
+        `
+      };
+
+      console.log('🧪 Enviando email de teste via SmtpService...');
+      
+      // Usar o SmtpService para enviar o email de teste
+      const result = await this.smtpService.sendEmail(testEmailData).toPromise();
+      
+      if (result?.success) {
+        this.showSuccess(`✅ Email de teste enviado com sucesso para ${this.testEmail}! Verifique sua caixa de entrada.`);
+      } else {
+        throw new Error(result?.error || 'Falha no envio do email');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao enviar email de teste:', error);
+      
+      let errorMsg = 'Erro ao enviar email de teste.';
+      
+      if (error?.error) {
+        errorMsg = error.error;
+      } else if (error?.message) {
+        if (error.message.includes('API Key') || error.message.includes('401')) {
+          errorMsg = 'API Key do SendGrid inválida. Verifique se a chave está correta.';
+        } else if (error.message.includes('configuração') || error.message.includes('incompleta')) {
+          errorMsg = 'Configuração SMTP incompleta. Preencha todos os campos.';
+        } else {
+          errorMsg = `Erro: ${error.message}`;
+        }
+      }
+      
+      this.showError(errorMsg);
     } finally {
       this.isTesting.set(false);
     }
@@ -425,5 +496,10 @@ export class SmtpConfigComponent implements OnInit {
     Object.keys(this.smtpForm.controls).forEach(key => {
       this.smtpForm.get(key)?.markAsTouched();
     });
+  }
+
+  getPrimaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.primaryColor || company?.brandingConfig?.primaryColor || '#3B82F6';
   }
 }
