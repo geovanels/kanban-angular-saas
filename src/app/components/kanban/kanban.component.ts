@@ -1,11 +1,13 @@
-import { Component, inject, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ViewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Board, Column, Lead } from '../../services/firestore.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { AutomationService } from '../../services/automation.service';
+import { ApiService } from '../../services/api.service';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
 import { LeadModalComponent } from '../lead-modal/lead-modal.component';
 import { ColumnModalComponent } from '../column-modal/column-modal.component';
@@ -15,11 +17,13 @@ import { TemplateModalComponent } from '../template-modal/template-modal.compone
 import { AutomationModal } from '../automation-modal/automation-modal';
 import { AutomationHistoryModal } from '../automation-history-modal/automation-history-modal';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
+import { VisualFormBuilderComponent } from '../visual-form-builder/visual-form-builder';
+import { ToastService } from '../toast/toast.service';
 
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [CommonModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent],
   templateUrl: './kanban.component.html',
   styleUrls: ['./kanban.component.scss']
 })
@@ -28,6 +32,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private firestoreService = inject(FirestoreService);
   private subdomainService = inject(SubdomainService);
   private automationService = inject(AutomationService);
+  private apiService = inject(ApiService);
+  private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -41,6 +47,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
   board: Board | null = null;
   columns: Column[] = [];
   leads: Lead[] = [];
+  isDraggingLead = false;
+  // Arrays estáveis por coluna para drag & drop e render
+  displayedLeadsByColumn: Record<string, Lead[]> = {};
+  // Ordem local por coluna (ids) – persistido em localStorage por board
+  leadOrderByColumn: Record<string, string[]> = {};
+  // Controle de mover cards
+  cardMoveEnabled = true;
   currentUser: any = null;
   boardId: string = '';
   ownerId: string = '';
@@ -52,6 +65,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   activeTab: string = 'kanban';
   tabs = [
     { id: 'kanban', name: 'Kanban', icon: 'fa-columns' },
+    { id: 'initial-form', name: 'Formulário inicial', icon: 'fa-list' },
+    { id: 'flow', name: 'Fluxo', icon: 'fa-project-diagram' },
     { id: 'reports', name: 'Relatórios', icon: 'fa-chart-bar' },
     { id: 'outbox', name: 'Caixa de Saída', icon: 'fa-paper-plane' },
     { id: 'templates', name: 'Templates', icon: 'fa-envelope' },
@@ -66,6 +81,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.currentUser = this.authService.getCurrentUser();
     this.boardId = this.route.snapshot.paramMap.get('boardId') || '';
+    try { localStorage.setItem('last-board-id', this.boardId); } catch {}
     this.ownerId = this.route.snapshot.queryParamMap.get('ownerId') || this.currentUser?.uid || '';
     
     console.log('KanbanComponent - boardId:', this.boardId, 'ownerId:', this.ownerId);
@@ -83,6 +99,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.loadBoardData();
       this.subscribeToRealtimeUpdates();
       this.initializeApiEndpoint();
+      // Carregar formulário inicial do board
+      this.loadInitialForm();
+      // Carregar fluxo de transições
+      this.loadFlowConfig();
     } else {
       console.error('Parâmetros faltando:', { currentUser: !!this.currentUser, boardId: this.boardId, ownerId: this.ownerId });
     }
@@ -93,14 +113,35 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   private initializeApiEndpoint() {
+    // Exibir sempre a URL correta da Cloud Function (dev/prod)
     const company = this.subdomainService.getCurrentCompany();
-    if (company) {
-      if (this.subdomainService.isDevelopment()) {
-        this.apiEndpoint = `http://localhost:5000/api/v1/companies/${company.id}/leads`;
-      } else {
-        this.apiEndpoint = `https://api.taskboard.com.br/v1/companies/${company.id}/leads`;
-      }
+    const companyId = company?.id || '{COMPANY_ID}';
+    this.apiEndpoint = this.apiService.getLeadIntakeUrl(companyId, this.boardId);
+  }
+
+  private getFunctionsPort(): number {
+    // 1. Verificar localStorage (configuração salva pelo usuário)
+    const storedPort = localStorage.getItem('firebase-functions-port');
+    if (storedPort) {
+      return parseInt(storedPort, 10);
     }
+    
+    // 2. Tentar detectar pela configuração do Firebase (se disponível)
+    try {
+      const firebaseConfig = (window as any).__FIREBASE_DEFAULTS__;
+      if (firebaseConfig?.emulatorHosts?.functions) {
+        const functionsHost = firebaseConfig.emulatorHosts.functions;
+        const portMatch = functionsHost.match(/:(\d+)$/);
+        if (portMatch) {
+          return parseInt(portMatch[1], 10);
+        }
+      }
+    } catch (error) {
+      // Ignorar erro se não conseguir detectar
+    }
+    
+    // 3. Usar porta padrão (3001 é onde o server.js está rodando)
+    return 3001;
   }
 
   // Company logo methods
@@ -237,6 +278,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
         console.log('Leads recebidos:', leads);
         this.leads = leads;
         this.isLoading = false;
+        this.ensureLeadOrderLoaded();
+        this.rebuildDisplayedLeads();
       }
     );
     this.subscriptions.push({ unsubscribe: leadsUnsub } as Subscription);
@@ -301,7 +344,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   getLeadsForColumn(columnId: string): Lead[] {
-    return this.leads.filter(lead => lead.columnId === columnId);
+    // método legado – manter compatibilidade, mas preferimos displayedLeadsByColumn no template
+    const all = this.leads.filter(lead => lead.columnId === columnId);
+    const filtered = all.filter(lead => this.leadMatchesFilters ? this.leadMatchesFilters(lead) : true);
+    const order = this.leadOrderByColumn[columnId] || [];
+    return filtered.sort((a, b) => (order.indexOf(a.id!) - order.indexOf(b.id!)) || 0);
   }
 
   getColumnConnectedTo(): string[] {
@@ -309,6 +356,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   async onLeadDrop(event: CdkDragDrop<Lead[]>) {
+    // garantir término de estado de arraste
+    this.isDraggingLead = false;
     const leadId = event.item.data;
     const targetColumnId = event.container.id.replace('column-', '');
     const previousColumnId = event.previousContainer.id.replace('column-', '');
@@ -316,6 +365,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (event.previousContainer === event.container) {
       // Reordenar dentro da mesma coluna
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
+      // Atualizar ordem local dessa coluna (considerando apenas visíveis)
+      const visibleIds = (event.container.data as Lead[]).map(l => l.id!);
+      const currentOrder = this.leadOrderByColumn[targetColumnId] || [];
+      const remaining = currentOrder.filter(id => !visibleIds.includes(id));
+      this.leadOrderByColumn[targetColumnId] = [...visibleIds, ...remaining];
+      this.saveLeadOrder();
+      return;
     } else {
       // Mover para outra coluna
       transferArrayItem(
@@ -328,6 +384,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // Buscar dados completos do lead
       const lead = this.leads.find(l => l.id === leadId);
       
+      // Validar fluxo de transição
+      const allowedFrom = this.flowConfig.allowed[previousColumnId] || [];
+      if (!allowedFrom.includes(targetColumnId)) {
+        // Reverter visualmente
+        transferArrayItem(
+          event.container.data,
+          event.previousContainer.data,
+          event.currentIndex,
+          event.previousIndex
+        );
+        this.toast.error('Transição não permitida pelo fluxo.');
+        return;
+      }
+
       // Atualizar no Firestore
       try {
         await this.firestoreService.moveLead(
@@ -336,6 +406,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
           leadId,
           targetColumnId
         );
+
+        // Ajustar ordens locais das duas colunas
+        const targetVisibleIds = (event.container.data as Lead[]).map(l => l.id!);
+        const sourceVisibleIds = (event.previousContainer.data as Lead[]).map(l => l.id!);
+        const sourceOrder = this.leadOrderByColumn[previousColumnId] || [];
+        const targetOrder = this.leadOrderByColumn[targetColumnId] || [];
+        const leadIdStr = String(leadId);
+        // remover do source
+        const sourceRemaining = sourceOrder.filter(id => id !== leadIdStr);
+        // inserir no target respeitando posição visível
+        const targetRemaining = targetOrder.filter(id => !targetVisibleIds.includes(id) && id !== leadIdStr);
+        this.leadOrderByColumn[previousColumnId] = [...sourceVisibleIds, ...sourceRemaining.filter(id => !sourceVisibleIds.includes(id))];
+        this.leadOrderByColumn[targetColumnId] = [...targetVisibleIds, ...targetRemaining];
+        this.saveLeadOrder();
 
         // Processar automações para mudança de fase
         if (lead) {
@@ -363,6 +447,42 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.subscribeToRealtimeUpdates();
       }
     }
+  }
+
+  // trackBy para manter estabilidade dos itens
+  trackByLeadId(index: number, lead: Lead) { return lead.id; }
+
+  private ensureLeadOrderLoaded() {
+    const key = `lead-order-${this.boardId}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        this.leadOrderByColumn = JSON.parse(raw) || {};
+      }
+    } catch {}
+  }
+
+  private saveLeadOrder() {
+    const key = `lead-order-${this.boardId}`;
+    try { localStorage.setItem(key, JSON.stringify(this.leadOrderByColumn)); } catch {}
+  }
+
+  private rebuildDisplayedLeads() {
+    const map: Record<string, Lead[]> = {};
+    for (const col of this.columns) {
+      const all = this.leads.filter(l => l.columnId === col.id);
+      const filtered = all.filter(l => this.leadMatchesFilters ? this.leadMatchesFilters(l) : true);
+      const order = this.leadOrderByColumn[col.id!] || [];
+      const withKnown = filtered.filter(l => order.includes(l.id!)).sort((a, b) => order.indexOf(a.id!) - order.indexOf(b.id!));
+      const without = filtered.filter(l => !order.includes(l.id!));
+      map[col.id!] = [...withKnown, ...without];
+      // se não há ordem para a coluna, inicializar
+      if (!this.leadOrderByColumn[col.id!]) {
+        this.leadOrderByColumn[col.id!] = map[col.id!].map(l => l.id!);
+      }
+    }
+    this.displayedLeadsByColumn = map;
+    this.saveLeadOrder();
   }
 
   async logout() {
@@ -431,6 +551,36 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.leadDetailModal.show(lead);
   }
 
+  onCardClick(lead: Lead, evt?: MouseEvent) {
+    if (this.isDraggingLead) return; // evita abrir modal se estava arrastando
+    this.showLeadDetailModal(lead);
+  }
+
+  onLeadDragStarted() {
+    this.isDraggingLead = true;
+  }
+
+  onLeadDragEnded() {
+    // pequena defasagem para não considerar o click após o drop como click do card
+    setTimeout(() => { this.isDraggingLead = false; }, 0);
+  }
+
+  toggleCardMove() {
+    this.cardMoveEnabled = !this.cardMoveEnabled;
+    if (!this.cardMoveEnabled) this.isDraggingLead = false;
+  }
+
+  @HostListener('window:mouseup')
+  onWindowMouseUpForCards() {
+    // Garante término do drag do card caso mouseup ocorra fora da lista
+    this.isDraggingLead = false;
+  }
+
+  @HostListener('window:touchend')
+  onWindowTouchEndForCards() {
+    this.isDraggingLead = false;
+  }
+
   async onLeadCreated() {
     // Os leads serão atualizados automaticamente via real-time subscription
     console.log('Novo lead criado!');
@@ -487,9 +637,431 @@ export class KanbanComponent implements OnInit, OnDestroy {
   // Propriedades para Automações
   automations: any[] = [];
 
+  // Formulário inicial (aba nova)
+  initialFormFields: any[] = [];
+  apiExampleJson: string = '';
+
+  // Fluxo (transitions) config
+  flowConfig: { allowed: Record<string, string[]> } = { allowed: {} };
+  // Fluxo - nós e arestas para canvas
+  flowNodes: Array<{ id: string; name: string; x: number; y: number; color?: string }>= [];
+  flowEdges: Array<{ fromId: string; toId: string }>= [];
+  isConnecting = false;
+  connectFromId: string | null = null;
+  flowMouse = { x: 0, y: 0 };
+  // drag
+  draggingNodeId: string | null = null;
+  dragOffset = { x: 0, y: 0 };
+  flowMoveEnabled = false;
+
+  private async loadFlowConfig() {
+    try {
+      const cfg = await this.firestoreService.getFlowConfig(this.boardId);
+      this.flowConfig = (cfg as any) || { allowed: {} };
+      this.buildFlowEdgesFromConfig();
+      // Se houver posições salvas, restaurar
+      const nodes = (cfg as any)?.nodes as any[];
+      if (Array.isArray(nodes) && nodes.length) {
+        this.flowNodes = this.columns.map((c, idx) => {
+          const saved = nodes.find(n => n.id === c.id);
+          return {
+            id: c.id!,
+            name: c.name,
+            x: saved?.x ?? 60 + idx * 200,
+            y: saved?.y ?? 160,
+            color: c.color
+          };
+        });
+      } else {
+        this.layoutFlowNodes();
+      }
+    } catch {
+      this.flowConfig = { allowed: {} };
+    }
+  }
+
+  async saveFlowConfig() {
+    try {
+      // Persistir com base nas arestas atuais
+      const allowed: Record<string, string[]> = {};
+      for (const edge of this.flowEdges) {
+        if (!allowed[edge.fromId]) allowed[edge.fromId] = [];
+        if (!allowed[edge.fromId].includes(edge.toId)) allowed[edge.fromId].push(edge.toId);
+      }
+      this.flowConfig = { allowed };
+      const nodes = this.flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+      await this.firestoreService.saveFlowConfig(this.boardId, { allowed, nodes });
+      this.toast.success('Fluxo salvo.');
+    } catch {
+      this.toast.error('Erro ao salvar fluxo.');
+    }
+  }
+
+  // Flow helpers (UI)
+  getAllowedTargets(fromId: string): Column[] {
+    const ids = this.flowConfig.allowed[fromId] || [];
+    return this.columns.filter(c => ids.includes(c.id!));
+  }
+
+  getAvailableTargets(fromId: string): Column[] {
+    const ids = this.flowConfig.allowed[fromId] || [];
+    return this.columns.filter(c => c.id !== fromId && !ids.includes(c.id!));
+  }
+
+  onFlowDropToAllowed(fromId: string, event: CdkDragDrop<Column[]>) {
+    const dropped: Column = event.item.data as Column;
+    const list = this.flowConfig.allowed[fromId] || (this.flowConfig.allowed[fromId] = []);
+    if (!list.includes(dropped.id!)) list.push(dropped.id!);
+  }
+
+  onFlowDropToAvailable(fromId: string, event: CdkDragDrop<Column[]>) {
+    const dropped: Column = event.item.data as Column;
+    const list = this.flowConfig.allowed[fromId] || [];
+    this.flowConfig.allowed[fromId] = list.filter(id => id !== dropped.id);
+  }
+
+  // --- Canvas style flow ---
+  private layoutFlowNodes() {
+    const paddingX = 200;
+    const startX = 60;
+    const y = 160;
+    this.flowNodes = this.columns.map((c, idx) => ({
+      id: c.id!,
+      name: c.name,
+      x: startX + idx * paddingX,
+      y,
+      color: c.color
+    }));
+  }
+
+  private buildFlowEdgesFromConfig() {
+    const edges: Array<{ fromId: string; toId: string }> = [];
+    const allowed = this.flowConfig.allowed || {};
+    Object.keys(allowed).forEach(fromId => {
+      (allowed[fromId] || []).forEach(toId => edges.push({ fromId, toId }));
+    });
+    this.flowEdges = edges;
+  }
+
+  onFlowMouseMove(evt: MouseEvent) {
+    const target = evt.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    this.flowMouse = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    // se estiver arrastando
+    if (this.draggingNodeId) {
+      const node = this.flowNodes.find(n => n.id === this.draggingNodeId);
+      if (node) {
+        const grid = 20;
+        const nextX = this.flowMouse.x - this.dragOffset.x;
+        const nextY = this.flowMouse.y - this.dragOffset.y;
+        node.x = Math.round(nextX / grid) * grid;
+        node.y = Math.round(nextY / grid) * grid;
+      }
+    }
+  }
+
+  startConnect(fromId: string, evt: MouseEvent) {
+    evt.preventDefault();
+    evt.stopPropagation();
+    this.isConnecting = true;
+    this.connectFromId = fromId;
+    const target = evt.currentTarget as HTMLElement;
+    const container = (target.closest('.relative') as HTMLElement) || document.body;
+    const rect = container.getBoundingClientRect();
+    this.flowMouse = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+  }
+
+  endConnect(toId: string, evt: MouseEvent) {
+    evt.stopPropagation();
+    if (!this.isConnecting || !this.connectFromId) return;
+    if (this.connectFromId !== toId) {
+      const exists = this.flowEdges.some(e => e.fromId === this.connectFromId && e.toId === toId);
+      if (!exists) {
+        this.flowEdges.push({ fromId: this.connectFromId, toId });
+      }
+    }
+    this.isConnecting = false;
+    this.connectFromId = null;
+    // Sincronizar com config em memória para refletir listas
+    const allowed = this.flowConfig.allowed[this.connectFromId || ''] || [];
+    // no-op, manter somente edges -> config ao salvar
+  }
+
+  cancelConnect() {
+    this.isConnecting = false;
+    this.connectFromId = null;
+    this.draggingNodeId = null;
+  }
+
+  removeEdge(edge: { fromId: string; toId: string }) {
+    this.flowEdges = this.flowEdges.filter(e => !(e.fromId === edge.fromId && e.toId === edge.toId));
+  }
+
+  getNodeById(id: string) {
+    return this.flowNodes.find(n => n.id === id)!;
+  }
+
+  buildCurvePath(fromId: string, toId: string): string {
+    const a = this.getNodeById(fromId);
+    const b = this.getNodeById(toId);
+    if (!a || !b) return '';
+    const startX = a.x + 120; // right side
+    const startY = a.y + 30;
+    const endX = b.x;
+    const endY = b.y + 30;
+    const dx = Math.max(40, Math.abs(endX - startX) * 0.5);
+    const c1x = startX + dx, c1y = startY;
+    const c2x = endX - dx, c2y = endY;
+    return `M ${startX},${startY} C ${c1x},${c1y} ${c2x},${c2y} ${endX},${endY}`;
+  }
+
+  buildTempCurve(): string {
+    if (!this.isConnecting || !this.connectFromId) return '';
+    const a = this.getNodeById(this.connectFromId);
+    if (!a) return '';
+    const startX = a.x + 120;
+    const startY = a.y + 30;
+    const endX = this.flowMouse.x;
+    const endY = this.flowMouse.y;
+    const dx = Math.max(40, Math.abs(endX - startX) * 0.5);
+    const c1x = startX + dx, c1y = startY;
+    const c2x = endX - dx, c2y = endY;
+    return `M ${startX},${startY} C ${c1x},${c1y} ${c2x},${c2y} ${endX},${endY}`;
+  }
+
+  getEdgeColor(fromId: string, toId: string): string {
+    // verde para avanço (order cresce), laranja para retrocesso
+    const from = this.columns.find(c => c.id === fromId);
+    const to = this.columns.find(c => c.id === toId);
+    if (!from || !to) return '#9CA3AF';
+    return (to.order > from.order) ? '#16a34a' : '#ea580c';
+  }
+
+  getEdgeMarker(fromId: string, toId: string): string {
+    const from = this.columns.find(c => c.id === fromId);
+    const to = this.columns.find(c => c.id === toId);
+    if (!from || !to) return '';
+    return (to.order > from.order) ? 'url(#arrow-green)' : 'url(#arrow-orange)';
+  }
+
+  onNodeDragStart(node: { id: string; x: number; y: number }, evt: MouseEvent) {
+    if (!this.flowMoveEnabled) return;
+    if (evt.button !== 0) return; // apenas botão esquerdo
+    evt.preventDefault();
+    // evitar conflito com conexão: se botão roxo foi clicado, ele já chama startConnect com stopPropagation
+    this.draggingNodeId = node.id;
+    const target = evt.currentTarget as HTMLElement;
+    const container = (target.closest('.relative') as HTMLElement) || document.body;
+    const rect = container.getBoundingClientRect();
+    const mouseX = evt.clientX - rect.left;
+    const mouseY = evt.clientY - rect.top;
+    this.dragOffset = { x: mouseX - node.x, y: mouseY - node.y };
+  }
+
+  onFlowMouseUp(evt: MouseEvent) {
+    // finalizar drag e conexão
+    const wasDragging = !!this.draggingNodeId;
+    this.draggingNodeId = null;
+    if (this.isConnecting) {
+      this.isConnecting = false;
+      this.connectFromId = null;
+    }
+    // auto-desabilitar mover após soltar
+    if (wasDragging) {
+      this.flowMoveEnabled = false;
+    }
+  }
+
+  @HostListener('window:mouseup', ['$event'])
+  onWindowMouseUp(evt: MouseEvent) {
+    // Garante término do drag/conexão mesmo fora da área
+    this.onFlowMouseUp(evt);
+    this.flowMoveEnabled = false; // desativa mover até novo hover
+  }
+
+  @HostListener('window:touchend', ['$event'])
+  onWindowTouchEnd(evt: TouchEvent) {
+    const wasDragging = !!this.draggingNodeId;
+    this.draggingNodeId = null;
+    this.isConnecting = false;
+    this.connectFromId = null;
+    if (wasDragging) {
+      this.flowMoveEnabled = false;
+    }
+    this.flowMoveEnabled = false;
+  }
+
+  onNodeMouseEnter(node: { id: string }) {
+    // Ativa mover apenas quando o mouse está sobre o card do nó (se não estiver conectando)
+    if (!this.isConnecting) {
+      this.flowMoveEnabled = true;
+    }
+  }
+
+  onNodeMouseLeave(node: { id: string }) {
+    // Desativa mover ao sair do card, se não estiver arrastando ou conectando
+    if (!this.draggingNodeId && !this.isConnecting) {
+      this.flowMoveEnabled = false;
+    }
+  }
+
+  autoAlignFlow() {
+    this.layoutFlowNodes();
+    this.toast.success('Fluxo alinhado');
+  }
+
+  toggleFlowMove() {
+    this.flowMoveEnabled = !this.flowMoveEnabled;
+    if (!this.flowMoveEnabled) this.draggingNodeId = null;
+  }
+
+  getColumnById(columnId: string): Column | undefined {
+    return this.columns.find(c => c.id === columnId);
+  }
+
+  // Automações por fase (na aba Fluxo)
+  selectedPhaseIdForAutomations: string | null = null;
+  openPhaseAutomations(phaseId: string) {
+    this.selectedPhaseIdForAutomations = phaseId;
+  }
+  closePhaseAutomations() { this.selectedPhaseIdForAutomations = null; }
+  getAutomationsForPhase(phaseId: string) {
+    return (this.automations || []).filter(a => a?.trigger?.phase === phaseId);
+  }
+  createAutomationForPhase(phaseId: string) {
+    this.selectedAutomation = {
+      name: 'Automação da fase',
+      active: true,
+      trigger: { type: 'card-enters-phase', phase: phaseId },
+      actions: []
+    };
+    this.showAutomationModal = true;
+  }
+
+  private async loadInitialForm() {
+    try {
+      const cfg = await this.firestoreService.getInitialFormConfig(this.boardId);
+      this.initialFormFields = (cfg as any)?.fields || [];
+      this.buildApiExampleFromFields();
+    } catch {
+      this.initialFormFields = [];
+      this.buildApiExampleFromFields();
+    }
+  }
+
+  async saveInitialForm() {
+    try {
+      await this.firestoreService.saveInitialFormConfig(this.boardId, { fields: this.initialFormFields });
+      this.toast.success('Formulário inicial salvo.');
+    } catch {
+      this.toast.error('Erro ao salvar formulário inicial.');
+    }
+  }
+
+  onInitialFieldsChanged(fields: any[]) {
+    this.initialFormFields = fields;
+    this.buildApiExampleFromFields();
+  }
+
+  private buildApiExampleFromFields() {
+    const body: any = {};
+    for (const field of this.initialFormFields || []) {
+      const key = (field.apiFieldName && field.apiFieldName.trim()) ? field.apiFieldName.trim() : (field.name || 'campo');
+      body[key] = this.getSampleForField(field);
+    }
+    this.apiExampleJson = JSON.stringify(body, null, 2);
+  }
+
+  private getSampleForField(field: any): any {
+    const type = (field.type || 'text').toLowerCase();
+    if (type === 'email') return 'email@exemplo.com';
+    if (type === 'tel' || type === 'phone') return '(11) 99999-9999';
+    if (type === 'number') return 123;
+    if (type === 'select' && Array.isArray(field.options) && field.options.length) return field.options[0];
+    if (type === 'temperatura') return 'Quente';
+    if (type === 'textarea') return 'Texto livre';
+    return 'Valor de exemplo';
+  }
+
+  // Configuração de formulário da fase permanece no menu/ícone da própria fase via modal
+
 
   // Lista de usuários para o modal de detalhes
   users: any[] = [];
+
+  // Estado para acordeão mobile
+  expandedMobileColumnId: string | null = null;
+
+  toggleMobileColumn(columnId: string) {
+    this.expandedMobileColumnId = this.expandedMobileColumnId === columnId ? null : columnId;
+  }
+
+  isMobileColumnOpen(columnId: string): boolean {
+    return this.expandedMobileColumnId === columnId;
+  }
+
+  // Filtros
+  filterQuery: string = '';
+  filterOnlyMine: boolean = false;
+  filterTag: string | null = null;
+
+  setTextFilter() {
+    const value = prompt('Filtrar por palavra: (nome, contato, email...)', this.filterQuery || '');
+    if (value !== null) {
+      this.filterQuery = value.trim();
+    }
+  }
+
+  toggleOnlyMine() {
+    this.filterOnlyMine = !this.filterOnlyMine;
+  }
+
+  setTagFilter() {
+    const value = prompt('Filtrar por etiqueta (tag):', this.filterTag || '');
+    if (value !== null) {
+      this.filterTag = value.trim() || null;
+    }
+  }
+
+  clearFilters() {
+    this.filterQuery = '';
+    this.filterOnlyMine = false;
+    this.filterTag = null;
+  }
+
+  private leadMatchesFilters(lead: Lead): boolean {
+    // Only mine
+    if (this.filterOnlyMine) {
+      const me = this.currentUser?.email || this.currentUser?.uid;
+      const owner = lead.responsibleUserEmail || (lead as any).responsibleUserId;
+      if (me && owner && `${owner}`.toLowerCase() !== `${me}`.toLowerCase()) return false;
+    }
+    // Text query
+    if (this.filterQuery) {
+      const q = this.filterQuery.toLowerCase();
+      const fields = (lead as any).fields || {};
+      const haystack = [
+        fields['companyName'], fields['contactName'], fields['contactEmail'], fields['contactPhone'],
+        lead['responsibleUserName'], lead['responsibleUserEmail']
+      ]
+        .filter(Boolean)
+        .map((v: any) => `${v}`.toLowerCase())
+        .join(' ');
+      if (!haystack.includes(q)) return false;
+    }
+    // Tag filter (supports fields.tags as array or comma-separated string)
+    if (this.filterTag) {
+      const fields = (lead as any).fields || {};
+      const tags = (fields['tags'] || fields['etiquetas'] || []) as any;
+      let list: string[] = [];
+      if (Array.isArray(tags)) list = tags.map(t => `${t}`.toLowerCase());
+      else if (typeof tags === 'string') list = tags.split(',').map(s => s.trim().toLowerCase());
+      if (!list.includes(this.filterTag.toLowerCase())) return false;
+    }
+    return true;
+  }
+
+  // (mantido apenas a versão acima)
 
   // Métodos para Caixa de Saída
   updateEmailStatusCounts() {
@@ -688,6 +1260,33 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return 'bg-blue-100 text-blue-800';
   }
 
+  // Helpers para layout mobile
+  getDaysSince(dateLike: any): number {
+    if (!dateLike) return 0;
+    let d: Date;
+    if ((dateLike as any).seconds) d = new Date((dateLike as any).seconds * 1000);
+    else if ((dateLike as any).toDate) d = (dateLike as any).toDate();
+    else if (dateLike instanceof Date) d = dateLike as Date;
+    else d = new Date(dateLike);
+    const diffMs = Date.now() - d.getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  getLeadResponsibleName(lead: Lead): string {
+    return (lead.responsibleUserName || lead.responsibleUserEmail || '').toString();
+  }
+
+  getLeadDueDateLabel(lead: Lead): string | null {
+    const due = (lead as any).fields?.dueDate || (lead as any).dueDate;
+    if (!due) return null;
+    try {
+      if ((due as any).seconds) return new Date((due as any).seconds * 1000).toLocaleDateString('pt-BR');
+      if ((due as any).toDate) return (due as any).toDate().toLocaleDateString('pt-BR');
+      const d = new Date(due);
+      return isNaN(d.getTime()) ? null : d.toLocaleDateString('pt-BR');
+    } catch { return null; }
+  }
+
   // Métodos para Templates e Automações
   getTriggerDescription(trigger: any): string {
     if (!trigger) return 'Não especificado';
@@ -805,8 +1404,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   onTemplateSaved() {
-    // Template foi salvo, fechar modal
-    this.templateModal.hide();
+    // Template foi salvo ou modal foi fechado - não precisa fazer nada
+    // O modal já se fechou internamente
   }
 
   // Variáveis para o modal de automação

@@ -36,7 +36,7 @@ export class SmtpService {
   private subdomainService = inject(SubdomainService);
   private functions = inject(Functions);
 
-  // Enviar email usando configuração SMTP da empresa via Firebase Functions
+  // Enviar email usando HTTP Firebase Function (melhor controle de CORS)
   sendEmail(emailData: EmailData): Observable<EmailResponse> {
     const company = this.subdomainService.getCurrentCompany();
     
@@ -46,19 +46,20 @@ export class SmtpService {
     }
 
     if (!this.validateSmtpConfig(company)) {
-      console.error('❌ Configuração SMTP da empresa está incompleta:', company.smtpConfig);
-      return throwError(() => new Error('Configuração SMTP da empresa está incompleta'));
+      const missingFields = this.getSmtpValidationErrors(company);
+      console.error('❌ Configuração SMTP da empresa está incompleta:', company.smtpConfig, 'Campos faltantes:', missingFields);
+      return throwError(() => new Error(`Configuração SMTP incompleta. Campos faltantes: ${missingFields.join(', ')}`));
     }
 
-    console.log('📧 Preparando envio de email via Firebase Functions:', {
+    console.log('📧 Preparando envio de email via HTTP Firebase Functions:', {
       to: emailData.to,
       subject: emailData.subject,
       fromEmail: company.smtpConfig.fromEmail,
       fromName: company.smtpConfig.fromName
     });
 
-    // Usar Firebase HTTP Function para envio direto
-    const sendEmailCallable = httpsCallable(this.functions, 'sendEmail');
+    // Usar HTTP Function para melhor controle de CORS
+    const httpFunctionUrl = 'https://us-central1-kanban-gobuyer.cloudfunctions.net/sendEmailHttp';
     
     const payload = {
       emailData: {
@@ -69,42 +70,36 @@ export class SmtpService {
         cc: emailData.cc,
         bcc: emailData.bcc
       },
-      smtpConfig: {
-        host: company.smtpConfig.host,
-        port: company.smtpConfig.port,
-        secure: company.smtpConfig.secure,
-        user: company.smtpConfig.user,
-        password: company.smtpConfig.password,
-        fromName: company.smtpConfig.fromName,
-        fromEmail: company.smtpConfig.fromEmail
-      }
+      companyId: company.id // Usar companyId ao invés de passar SMTP config diretamente
     };
 
-    console.log('📤 Enviando para Firebase Functions:', {
-      ...payload,
-      smtpConfig: {
-        ...payload.smtpConfig,
-        password: payload.smtpConfig.password.substring(0, 10) + '...'
-      }
+    console.log('📤 Enviando para HTTP Firebase Function:', {
+      url: httpFunctionUrl,
+      payload: { ...payload }
     });
 
-    return from(sendEmailCallable(payload)).pipe(
+    return this.http.post<EmailResponse>(httpFunctionUrl, payload).pipe(
       map((result: any) => {
-        console.log('✅ Email enviado com sucesso via Firebase Functions:', result.data);
+        console.log('✅ Email enviado com sucesso via HTTP Function:', result);
         return {
-          success: result.data.success || true,
-          messageId: result.data.messageId || 'sent'
+          success: result.success || true,
+          messageId: result.messageId || 'sent',
+          message: result.message
         };
       }),
       catchError(error => {
-        console.error('❌ Erro detalhado ao enviar email via Firebase Functions:', error);
+        console.error('❌ Erro detalhado ao enviar email via HTTP Function:', error);
         
         let errorMessage = 'Erro desconhecido ao enviar email';
         
-        if (error.code === 'unauthenticated') {
-          errorMessage = 'Usuário não autenticado. Faça login novamente.';
-        } else if (error.code === 'permission-denied') {
-          errorMessage = 'Acesso negado. Verifique as permissões.';
+        if (error.status === 400) {
+          errorMessage = error.error?.error || 'Dados inválidos para envio de email';
+        } else if (error.status === 404) {
+          errorMessage = 'Empresa não encontrada';
+        } else if (error.status === 500) {
+          errorMessage = error.error?.error || 'Erro interno do servidor';
+        } else if (error.error?.error) {
+          errorMessage = error.error.error;
         } else if (error.message) {
           errorMessage = error.message;
         }
@@ -220,7 +215,8 @@ export class SmtpService {
     }
 
     if (!this.validateSmtpConfig(company)) {
-      return throwError(() => new Error('Configuração SMTP da empresa está incompleta'));
+      const missingFields = this.getSmtpValidationErrors(company);
+      return throwError(() => new Error(`Configuração SMTP incompleta. Campos faltantes: ${missingFields.join(', ')}`));
     }
 
     console.log('🧪 Testando configuração SMTP via Firebase Functions');
@@ -281,6 +277,26 @@ export class SmtpService {
       config.fromName &&
       config.fromEmail
     );
+  }
+
+  // Validar configuração SMTP e retornar campos faltantes
+  private getSmtpValidationErrors(company: Company): string[] {
+    const config = company.smtpConfig;
+    const errors: string[] = [];
+    
+    if (!config) {
+      errors.push('Configuração SMTP não encontrada');
+      return errors;
+    }
+    
+    if (!config.host) errors.push('Servidor SMTP (host)');
+    if (!config.port) errors.push('Porta SMTP');
+    if (!config.user) errors.push('Usuário SMTP');
+    if (!config.password) errors.push('Senha SMTP');
+    if (!config.fromName) errors.push('Nome do remetente');
+    if (!config.fromEmail) errors.push('Email do remetente');
+    
+    return errors;
   }
 
   // Método removido - agora usa Firebase Functions diretamente

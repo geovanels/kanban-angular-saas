@@ -1,7 +1,8 @@
-import { Injectable, inject, Injector } from '@angular/core';
+import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { 
   Firestore, 
   collection, 
+  collectionGroup,
   doc, 
   getDoc, 
   setDoc, 
@@ -77,16 +78,18 @@ export class CompanyService {
 
   private async queryCompanyBySubdomain(subdomain: string): Promise<Company | null> {
     try {
-      const companiesRef = collection(this.firestore, 'companies');
-      const q = query(companiesRef, where('subdomain', '==', subdomain));
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        return null;
-      }
-      
-      const docData = querySnapshot.docs[0];
-      return { id: docData.id, ...docData.data() } as Company;
+      return await runInInjectionContext(this.injector, async () => {
+        const companiesRef = collection(this.firestore, 'companies');
+        const q = query(companiesRef, where('subdomain', '==', subdomain));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          return null;
+        }
+        
+        const docData = querySnapshot.docs[0];
+        return { id: docData.id, ...docData.data() } as Company;
+      });
     } catch (error) {
       // Erro silencioso para segurança
       return null;
@@ -95,17 +98,39 @@ export class CompanyService {
 
   async getCompany(companyId: string): Promise<Company | null> {
     try {
-      const companyRef = doc(this.firestore, 'companies', companyId);
-      const docSnap = await getDoc(companyRef);
-      
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Company;
-      }
-      
-      return null;
+      return await runInInjectionContext(this.injector, async () => {
+        const companyRef = doc(this.firestore, 'companies', companyId);
+        const docSnap = await getDoc(companyRef);
+        
+        if (docSnap.exists()) {
+          return { id: docSnap.id, ...docSnap.data() } as Company;
+        }
+        
+        return null;
+      });
     } catch (error) {
       // Erro ao buscar empresa
       throw error;
+    }
+  }
+
+  async getCompaniesByOwner(ownerId: string): Promise<Company[]> {
+    try {
+      return await runInInjectionContext(this.injector, async () => {
+        const companiesRef = collection(this.firestore, 'companies');
+        const q = query(companiesRef, where('ownerId', '==', ownerId));
+        const querySnapshot = await getDocs(q);
+        
+        const companies: Company[] = [];
+        querySnapshot.docs.forEach((doc) => {
+          companies.push({ id: doc.id, ...doc.data() } as Company);
+        });
+        
+        return companies;
+      });
+    } catch (error) {
+      // Erro ao buscar empresas do proprietário
+      return [];
     }
   }
 
@@ -139,8 +164,19 @@ export class CompanyService {
       
       try {
         await this.sendInvitationEmail(userEmail, role, companyId);
-      } catch (emailError) {
-        throw new Error('Usuário adicionado com sucesso, mas houve erro ao enviar email de convite. Verifique a configuração do SMTP.');
+      } catch (emailError: any) {
+        console.error('Erro ao enviar email de convite:', emailError);
+        let errorMessage = 'Usuário adicionado com sucesso, mas houve erro ao enviar email de convite.';
+        
+        if (emailError?.message && emailError.message.includes('Configuração SMTP')) {
+          errorMessage = `Erro ao enviar convite: ${emailError.message}`;
+        } else if (emailError?.message) {
+          errorMessage = `Erro ao enviar convite: ${emailError.message}`;
+        } else {
+          errorMessage += ' Verifique a configuração do SMTP.';
+        }
+        
+        throw new Error(errorMessage);
       }
       
     } catch (error) {
@@ -217,7 +253,7 @@ export class CompanyService {
   async getCompanyUsers(companyId: string): Promise<CompanyUser[]> {
     try {
       const usersRef = collection(this.firestore, 'companies', companyId, 'users');
-      const querySnapshot = await getDocs(usersRef);
+      const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
       
       const users = querySnapshot.docs.map(doc => ({
         uid: doc.id,
@@ -257,7 +293,7 @@ export class CompanyService {
     try {
       // Excluir todos os usuários da empresa
       const usersRef = collection(this.firestore, 'companies', companyId, 'users');
-      const usersSnapshot = await getDocs(usersRef);
+      const usersSnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
       
       for (const userDoc of usersSnapshot.docs) {
         await deleteDoc(userDoc.ref);
@@ -265,28 +301,28 @@ export class CompanyService {
 
       // Excluir configurações da empresa
       const settingsRef = doc(this.firestore, 'companies', companyId, 'settings', 'general');
-      const settingsDoc = await getDoc(settingsRef);
+      const settingsDoc = await runInInjectionContext(this.injector, () => getDoc(settingsRef));
       if (settingsDoc.exists()) {
         await deleteDoc(settingsRef);
       }
 
       // Excluir todos os quadros da empresa (e seus dados relacionados)
       const boardsRef = collection(this.firestore, 'companies', companyId, 'boards');
-      const boardsSnapshot = await getDocs(boardsRef);
+      const boardsSnapshot = await runInInjectionContext(this.injector, () => getDocs(boardsRef));
       
       for (const boardDoc of boardsSnapshot.docs) {
         const boardId = boardDoc.id;
         
         // Excluir colunas do quadro
         const columnsRef = collection(this.firestore, 'companies', companyId, 'boards', boardId, 'columns');
-        const columnsSnapshot = await getDocs(columnsRef);
+        const columnsSnapshot = await runInInjectionContext(this.injector, () => getDocs(columnsRef));
         for (const colDoc of columnsSnapshot.docs) {
           await deleteDoc(colDoc.ref);
         }
         
         // Excluir leads do quadro
         const leadsRef = collection(this.firestore, 'companies', companyId, 'boards', boardId, 'leads');
-        const leadsSnapshot = await getDocs(leadsRef);
+        const leadsSnapshot = await runInInjectionContext(this.injector, () => getDocs(leadsRef));
         for (const leadDoc of leadsSnapshot.docs) {
           await deleteDoc(leadDoc.ref);
         }
@@ -335,7 +371,7 @@ export class CompanyService {
   async getCompanySettings(companyId: string): Promise<CompanySettings | null> {
     try {
       const settingsRef = doc(this.firestore, 'companies', companyId, 'settings', 'general');
-      const docSnap = await getDoc(settingsRef);
+      const docSnap = await runInInjectionContext(this.injector, () => getDoc(settingsRef));
       
       if (docSnap.exists()) {
         return docSnap.data() as CompanySettings;
@@ -367,60 +403,6 @@ export class CompanyService {
     }
   }
 
-  async seedGobuyerCompany(): Promise<void> {
-    try {
-      // Verificar se a empresa Gobuyer já existe
-      const existingCompany = await this.getCompanyBySubdomain('gobuyer');
-      if (existingCompany) {
-        return;
-      }
-
-      // Criar empresa Gobuyer
-      const gobuyerData: Omit<Company, 'id' | 'createdAt' | 'updatedAt'> = {
-        subdomain: 'gobuyer',
-        name: 'Gobuyer Digital',
-        contactEmail: 'contato@gobuyer.com.br',
-        contactPhone: '+55 11 99999-9999',
-        address: 'São Paulo, SP',
-        cnpj: '12.345.678/0001-90',
-        plan: 'professional',
-        status: 'active',
-        ownerId: 'system',
-        ownerEmail: 'geovane.lopes@gobuyer.com.br',
-        maxUsers: 50,
-        maxBoards: 100,
-        smtpConfig: {
-          host: 'smtp.gmail.com',
-          port: 587,
-          secure: false,
-          user: '',
-          password: '',
-          fromName: 'Gobuyer Digital',
-          fromEmail: 'contato@gobuyer.com.br'
-        },
-        apiConfig: {
-          enabled: true,
-          token: this.generateApiToken(),
-          endpoint: 'https://gobuyer.taskboard.com.br/api/v1/lead-intake',
-          webhookUrl: ''
-        },
-        features: this.getFeaturesByPlan('professional'),
-        brandingConfig: {
-          primaryColor: '#3B82F6',
-          secondaryColor: '#1E40AF',
-          logo: 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png',
-          favicon: '',
-          customCSS: '',
-          companyName: 'Gobuyer Digital'
-        }
-      };
-
-      const companyId = await this.createCompany(gobuyerData);
-      
-    } catch (error) {
-      // Error handled silently
-    }
-  }
 
   getCompanySubdomain(): string | null {
     if (typeof window !== 'undefined') {
@@ -429,7 +411,7 @@ export class CompanyService {
       // Para desenvolvimento local
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         // Pode usar um parâmetro de query ou localStorage para simular
-        return localStorage.getItem('dev-subdomain') || 'gobuyer';
+        return localStorage.getItem('dev-subdomain') || null;
       }
       
       // Para produção: extrair subdomínio de algo.taskboard.com.br
@@ -446,32 +428,32 @@ export class CompanyService {
 
   async getCompanyByUserEmail(userEmail: string): Promise<Company | null> {
     try {
-      // Buscar em todas as empresas para encontrar onde este usuário está
-      const companiesRef = collection(this.firestore, 'companies');
-      const companiesSnapshot = await getDocs(companiesRef);
-      
-      for (const companyDoc of companiesSnapshot.docs) {
-        const companyData = companyDoc.data() as Company;
-        
-        // Verificar se é o owner
-        if (companyData.ownerEmail === userEmail) {
-          return { id: companyDoc.id, ...companyData };
+      return await runInInjectionContext(this.injector, async () => {
+        // 1) Procurar por owner
+        const companiesRef = collection(this.firestore, 'companies');
+        const ownerQuery = query(companiesRef, where('ownerEmail', '==', userEmail), limit(1));
+        const ownerSnap = await getDocs(ownerQuery);
+        if (!ownerSnap.empty) {
+          const d = ownerSnap.docs[0];
+          return { id: d.id, ...d.data() } as Company;
         }
-        
-        // Verificar se está na lista de usuários da empresa
-        const usersRef = collection(this.firestore, 'companies', companyDoc.id, 'users');
-        const usersSnapshot = await getDocs(usersRef);
-        
-        const userFound = usersSnapshot.docs.some(userDoc => 
-          userDoc.data()['email'] === userEmail
-        );
-        
-        if (userFound) {
-          return { id: companyDoc.id, ...companyData };
+
+        // 2) Procurar por usuário em qualquer empresa via collectionGroup('users')
+        const usersGroup = collectionGroup(this.firestore, 'users');
+        const usersSnap = await getDocs(query(usersGroup, where('email', '==', userEmail), limit(1)));
+        if (!usersSnap.empty) {
+          const userDoc = usersSnap.docs[0];
+          const companyRef = userDoc.ref.parent?.parent; // companies/{companyId}
+          if (companyRef) {
+            const companyDoc = await getDoc(companyRef);
+            if (companyDoc.exists()) {
+              return { id: companyDoc.id, ...companyDoc.data() } as Company;
+            }
+          }
         }
-      }
-      
-      return null;
+
+        return null;
+      });
     } catch (error) {
       return null;
     }
@@ -572,12 +554,14 @@ export class CompanyService {
   
   subscribeToCompany(companyId: string, callback: (company: Company | null) => void) {
     const companyRef = doc(this.firestore, 'companies', companyId);
-    return onSnapshot(companyRef, (doc) => {
-      if (doc.exists()) {
-        callback({ id: doc.id, ...doc.data() } as Company);
-      } else {
-        callback(null);
-      }
-    });
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(companyRef, (doc) => {
+        if (doc.exists()) {
+          callback({ id: doc.id, ...doc.data() } as Company);
+        } else {
+          callback(null);
+        }
+      })
+    );
   }
 }

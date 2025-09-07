@@ -6,7 +6,7 @@
   </div>
 
   <!-- Tabs Navigation with Company Logo and Actions -->
-  <nav *ngIf="!isLoading" class="bg-white px-8 border-b border-gray-200">
+  <nav *ngIf="!isLoading" class="bg-white px-4 md:px-8 border-b border-gray-200 sticky top-0 z-30">
     <div class="flex justify-between items-center">
       <!-- Left side: Back Button, Company Logo and Board Name -->
       <div class="flex items-center space-x-4">
@@ -42,7 +42,7 @@
       </div>
 
       <!-- Center: Tab Navigation -->
-      <div class="flex space-x-8">
+      <div class="hidden md:flex space-x-8">
         <button
           *ngFor="let tab of tabs"
           (click)="switchTab(tab.id)"
@@ -58,7 +58,7 @@
       </div>
 
       <!-- Right side: Action Buttons -->
-      <div class="flex items-center space-x-2">
+      <div class="hidden md:flex items-center space-x-2">
         <button 
           (click)="showCreateLeadModal()"
           class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -73,12 +73,21 @@
           <i class="fas fa-plus mr-1"></i>
           Nova Fase
         </button>
+
+        <button 
+          *ngIf="activeTab === 'kanban'"
+          (click)="toggleCardMove()"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+          [class.bg-gray-900]="!cardMoveEnabled" [class.text-white]="!cardMoveEnabled"
+          title="Travar/Destravar arrastar cards">
+          <i class="fas" [class.fa-lock]="!cardMoveEnabled" [class.fa-unlock]="cardMoveEnabled"></i>
+        </button>
       </div>
     </div>
   </nav>
 
-  <!-- Kanban Board Tab -->
-  <div *ngIf="!isLoading && activeTab === 'kanban'" class="kanban-board">
+  <!-- Desktop Kanban Board Tab -->
+  <div *ngIf="!isLoading && activeTab === 'kanban'" class="kanban-board desktop-board">
     <div 
       *ngFor="let column of columns" 
       class="kanban-column"
@@ -119,17 +128,20 @@
         class="kanban-cards"
         cdkDropList
         [id]="'column-' + column.id"
-        [cdkDropListData]="getLeadsForColumn(column.id!)"
+        [cdkDropListData]="displayedLeadsByColumn[column.id!] || []"
         [cdkDropListConnectedTo]="getColumnConnectedTo()"
         (cdkDropListDropped)="onLeadDrop($event)">
         
         <div 
-          *ngFor="let lead of getLeadsForColumn(column.id!)" 
+          *ngFor="let lead of (displayedLeadsByColumn[column.id!] || []); trackBy: trackByLeadId" 
           class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer mb-3 p-4 border-l-4"
           [class]="getSlaStatus(lead).borderClass || getLeadPriorityClass(lead)"
           cdkDrag
+          [cdkDragDisabled]="!cardMoveEnabled"
           [cdkDragData]="lead.id"
-          (click)="showLeadDetailModal(lead)">
+          (cdkDragStarted)="onLeadDragStarted()"
+          (cdkDragEnded)="onLeadDragEnded()"
+          (click)="onCardClick(lead, $event)">
           
           <!-- Card Header -->
           <div class="flex items-start justify-between mb-3">
@@ -202,11 +214,31 @@
         <div *ngIf="getLeadsForColumn(column.id!).length === 0" 
              class="text-center py-8 text-gray-400">
           <i class="fas fa-inbox text-2xl mb-2"></i>
-          <p class="text-sm">Nenhum lead nesta fase</p>
+          <p class="text-sm">Nenhum registro nesta fase</p>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Initial Form Tab -->
+  <div *ngIf="!isLoading && activeTab === 'initial-form'" class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Formulário inicial do quadro</h2>
+
+      <app-visual-form-builder
+        [fields]="initialFormFields"
+        (fieldsChanged)="onInitialFieldsChanged($event)">
+      </app-visual-form-builder>
+
+      <div class="flex justify-end mt-6">
+        <button class="px-4 py-2 text-white rounded-lg" [style.background-color]="getPrimaryColor()" (click)="saveInitialForm()">
+          Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configuração de formulário da fase removida daqui; usar ícone na própria coluna -->
 
   <!-- Empty State - No Columns -->
   <div *ngIf="!isLoading && activeTab === 'kanban' && columns.length === 0" class="text-center py-20">
@@ -220,7 +252,7 @@
   </div>
 
   <!-- Templates Tab -->
-  <div *ngIf="!isLoading && activeTab === 'templates'" class="p-8">
+  <div *ngIf="!isLoading && activeTab === 'templates'" class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold text-gray-900">Templates de Email</h2>
@@ -288,7 +320,7 @@
   </div>
 
   <!-- Automations Tab -->
-  <div *ngIf="!isLoading && activeTab === 'automations'" class="p-8">
+  <div *ngIf="!isLoading && activeTab === 'automations'" class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold text-gray-900">Automações</h2>
@@ -389,7 +421,7 @@
   </div>
 
   <!-- Reports Tab -->
-  <div *ngIf="!isLoading && activeTab === 'reports'" class="p-8">
+  <div *ngIf="!isLoading && activeTab === 'reports'" class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold text-gray-900">Relatórios</h2>
@@ -452,8 +484,104 @@
     </div>
   </div>
 
+  <!-- Flow Tab -->
+  <div *ngIf="!isLoading && activeTab === 'flow'" class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Fluxo de Transições</h2>
+        <div class="flex items-center gap-2">
+          <button (click)="toggleFlowMove()" [class.bg-gray-900]="!flowMoveEnabled" [class.text-white]="!flowMoveEnabled" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-lg font-medium transition-colors" title="Travar/Destravar arrastar nós">
+            <i class="fas" [class.fa-lock]="!flowMoveEnabled" [class.fa-unlock]="flowMoveEnabled"></i>
+          </button>
+          <button (click)="autoAlignFlow()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium transition-colors">
+            <i class="fas fa-ruler-combined mr-2"></i>
+            Alinhar
+          </button>
+          <button (click)="saveFlowConfig()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+            <i class="fas fa-save mr-2"></i>
+            Salvar Fluxo
+          </button>
+        </div>
+      </div>
+
+      <!-- Canvas simples com nós e curvas -->
+      <div class="relative w-full h-[420px] rounded-lg border border-gray-200 overflow-hidden"
+           style="background-image: linear-gradient(#f1f5f9 1px, transparent 1px), linear-gradient(90deg, #f1f5f9 1px, transparent 1px); background-size: 20px 20px; background-color: #fafafa;"
+           (mousemove)="onFlowMouseMove($event)"
+           (mouseleave)="cancelConnect()"
+           (mouseup)="onFlowMouseUp($event)">
+        <!-- SVG das curvas -->
+        <svg class="absolute inset-0 w-full h-full">
+          <defs>
+            <marker id="arrow-green" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"></path>
+            </marker>
+            <marker id="arrow-orange" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ea580c"></path>
+            </marker>
+          </defs>
+          <path *ngFor="let e of flowEdges" [attr.d]="buildCurvePath(e.fromId, e.toId)" stroke="#9CA3AF" stroke-width="3" fill="transparent" stroke-linecap="round"></path>
+          <!-- Linha temporária enquanto conecta -->
+          <path *ngIf="isConnecting" [attr.d]="buildTempCurve()" stroke="#6366F1" stroke-width="3" fill="transparent" stroke-dasharray="6 4" stroke-linecap="round"></path>
+        </svg>
+
+        <!-- Nós -->
+        <div *ngFor="let n of flowNodes" class="absolute select-none" draggable="false" [class.cursor-move]="flowMoveEnabled" [style.left.px]="n.x" [style.top.px]="n.y" (mouseenter)="onNodeMouseEnter(n)" (mouseleave)="onNodeMouseLeave(n)" (mousedown)="onNodeDragStart(n, $event)">
+          <div class="w-[220px] h-[90px] bg-white border rounded-lg shadow-sm flex items-center justify-between px-3"
+               [style.border-color]="n.color || '#CBD5E1'"
+               (mouseup)="endConnect(n.id, $event)">
+            <div class="flex-1 min-w-0 pr-3">
+              <div class="font-medium text-gray-800 truncate">{{ n.name }}</div>
+              <div class="mt-1 text-[11px] text-gray-500 truncate">{{ getColumnById(n.id)?.slaDays ? ('SLA: ' + getColumnById(n.id)?.slaDays + 'd') : 'Sem SLA' }}</div>
+              <div class="mt-2">
+                <button class="text-[11px] text-blue-600 hover:underline" (click)="showColumnForm(getColumnById(n.id)!)">Formulário</button>
+                <span class="mx-2 text-gray-300">|</span>
+                <button class="text-[11px] text-purple-600 hover:underline" (click)="openPhaseAutomations(n.id)">Automações</button>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center cursor-crosshair" (mousedown)="startConnect(n.id, $event)" title="Conectar">&rsaquo;</button>
+            </div>
+          </div>
+          <!-- Área de drop removida; usamos mouseup no card acima -->
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">Clique no botão roxo de um nó e solte sobre outro para criar uma seta. Use “Alinhar” para distribuir os nós. Clique em Salvar Fluxo.</p>
+
+      <!-- Automations drawer inside Flow -->
+      <div *ngIf="selectedPhaseIdForAutomations" class="mt-4 p-4 border rounded-lg bg-white shadow">
+        <div class="flex justify-between items-center mb-3">
+          <div class="font-semibold">Automações da fase: {{ getColumnById(selectedPhaseIdForAutomations!)?.name }}</div>
+          <button class="text-gray-600 hover:text-gray-900" (click)="closePhaseAutomations()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="space-y-2">
+          <div *ngFor="let a of getAutomationsForPhase(selectedPhaseIdForAutomations!)" class="p-3 border rounded">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="font-medium">{{ a.name || 'Automação sem nome' }}</div>
+                <div class="text-xs text-gray-500">Trigger: {{ getTriggerDescription(a.trigger) }}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-xs flex items-center gap-1">
+                  <input type="checkbox" [checked]="a.active" (change)="toggleAutomation(a)" /> Ativa
+                </label>
+                <button class="text-blue-600 text-sm" (click)="editAutomation(a)">Editar</button>
+                <button class="text-red-600 text-sm" (click)="deleteAutomation(a)">Excluir</button>
+              </div>
+            </div>
+          </div>
+          <div class="pt-2">
+            <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm" (click)="createAutomationForPhase(selectedPhaseIdForAutomations!)">
+              <i class="fas fa-plus mr-1"></i> Nova automação nesta fase
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Outbox/Caixa de Saída Tab -->
-  <div *ngIf="!isLoading && activeTab === 'outbox'" class="p-8">
+  <div *ngIf="!isLoading && activeTab === 'outbox'" class="p-4 md:p-8">
     <div class="max-w-6xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold text-gray-900">Caixa de Saída</h2>
@@ -560,7 +688,7 @@
   </div>
 
   <!-- API Tab -->
-  <div *ngIf="!isLoading && activeTab === 'api'" class="p-8">
+  <div *ngIf="!isLoading && activeTab === 'api'" class="p-4 md:p-8">
     <div class="max-w-4xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold text-gray-900">Configuração da API</h2>
@@ -635,14 +763,7 @@
 Content-Type: application/json
 Authorization: Bearer {{ apiToken }}
 
-&#123;
-  "companyName": "Nome da Empresa Exemplo",
-  "cnpj": "00.000.000/0001-00",
-  "contactName": "Nome do Contato",
-  "contactEmail": "email@exemplo.com",
-  "contactPhone": "(11) 99999-9999",
-  "phaseId": "(Opcional) ID da fase para onde o lead deve ir"
-&#125;</code></pre>
+{{ apiExampleJson }}</code></pre>
           </div>
         </div>
       </div>
@@ -708,6 +829,95 @@ Authorization: Bearer {{ apiToken }}
     </div>
   </div>
 
+  <!-- Mobile board: stages list + cards feed -->
+  <div *ngIf="!isLoading && activeTab === 'kanban'" class="mobile-board">
+    <div class="p-4 space-y-3">
+      <!-- Mobile filters (placeholders) -->
+      <div class="flex gap-2 overflow-x-auto pb-2">
+        <button (click)="setTextFilter()" class="px-3 py-2 bg-gray-100 rounded-full text-gray-600 text-sm flex items-center gap-2">
+          <i class="fas fa-search"></i>
+          {{ filterQuery ? ('"' + filterQuery + '"') : 'Filtrar por palavra' }}
+        </button>
+        <button (click)="toggleOnlyMine()" class="px-3 py-2 rounded-full text-sm"
+                [class.bg-blue-100]="filterOnlyMine" [class.text-blue-700]="filterOnlyMine" [class.bg-gray-100]="!filterOnlyMine" [class.text-gray-600]="!filterOnlyMine">
+          Seus cards
+        </button>
+        <button (click)="setTagFilter()" class="px-3 py-2 bg-gray-100 rounded-full text-gray-600 text-sm flex items-center gap-2">
+          <i class="fas fa-tag"></i>
+          {{ filterTag || 'Por etiqueta' }}
+        </button>
+        <button *ngIf="filterQuery || filterOnlyMine || filterTag" (click)="clearFilters()" class="px-3 py-2 bg-gray-100 rounded-full text-gray-600 text-sm">
+          Limpar
+        </button>
+      </div>
+
+      <!-- Stages as accordion list -->
+      <div class="space-y-2">
+        <div *ngFor="let column of columns" class="rounded-2xl border border-gray-200 bg-white">
+          <button (click)="toggleMobileColumn(column.id!)" class="w-full px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="inline-block w-3 h-3 rounded-full" [style.background-color]="column.color || '#22c55e'"></span>
+              <div class="font-semibold text-gray-800">{{ column.name }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-500">{{ getLeadsForColumn(column.id!).length }}</span>
+              <i class="fas" [class.fa-chevron-down]="!isMobileColumnOpen(column.id!)" [class.fa-chevron-up]="isMobileColumnOpen(column.id!)"></i>
+            </div>
+          </button>
+          <div *ngIf="isMobileColumnOpen(column.id!)" class="px-4 pb-4">
+            <div class="space-y-3">
+              <div *ngFor="let lead of getLeadsForColumn(column.id!)" class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                <div class="text-base font-bold text-gray-900 mb-1">{{ lead.fields['companyName'] || 'Sem título' }}</div>
+                <div class="text-[13px] text-gray-500 mb-2" *ngIf="getLeadResponsibleName(lead)">
+                  {{ getLeadResponsibleName(lead) }}
+                </div>
+                <div class="text-sm text-gray-700" *ngIf="lead.fields?.['contactName']">
+                  <span class="uppercase tracking-wide text-gray-400 text-[11px]">NOME DO CONTATO</span><br>
+                  {{ lead.fields['contactName'] }}
+                </div>
+                <div class="mt-3 flex items-center gap-5 text-xs text-gray-500">
+                  <div class="flex items-center gap-1"><i class="far fa-comment"></i> 1</div>
+                  <div class="flex items-center gap-1"><i class="far fa-clock text-orange-400"></i> {{ getDaysSince(lead.createdAt) }}d</div>
+                  <div class="flex items-center gap-1"><i class="fas fa-history text-blue-500"></i> {{ getDaysSince(lead.movedToCurrentColumnAt) }}d</div>
+                  <div class="flex items-center gap-1" *ngIf="getLeadDueDateLabel(lead)"><i class="far fa-calendar-check text-green-500"></i> {{ getLeadDueDateLabel(lead) }}</div>
+                </div>
+              </div>
+              <div *ngIf="getLeadsForColumn(column.id!).length === 0" class="text-center text-gray-400 text-sm py-2">Nenhum registro nesta fase</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards feed (pipefy-like) -->
+      <div class="mt-4 space-y-3">
+        <div *ngFor="let lead of leads" class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div class="text-base font-bold text-gray-900 mb-1">{{ lead.fields['companyName'] || 'Sem título' }}</div>
+          <div class="text-[13px] text-gray-500 mb-2" *ngIf="getLeadResponsibleName(lead)">
+            {{ getLeadResponsibleName(lead) }}
+          </div>
+          <div class="text-sm text-gray-700" *ngIf="lead.fields?.['contactName']">
+            <span class="uppercase tracking-wide text-gray-400 text-[11px]">NOME DO CONTATO</span><br>
+            {{ lead.fields['contactName'] }}
+          </div>
+          <div class="mt-3 flex items-center gap-5 text-xs text-gray-500">
+            <div class="flex items-center gap-1"><i class="far fa-comment"></i> 1</div>
+            <div class="flex items-center gap-1"><i class="far fa-clock text-orange-400"></i> {{ getDaysSince(lead.createdAt) }}d</div>
+            <div class="flex items-center gap-1"><i class="fas fa-history text-blue-500"></i> {{ getDaysSince(lead.movedToCurrentColumnAt) }}d</div>
+            <div class="flex items-center gap-1" *ngIf="getLeadDueDateLabel(lead)"><i class="far fa-calendar-check text-green-500"></i> {{ getLeadDueDateLabel(lead) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky bottom action -->
+    <div class="fixed bottom-4 inset-x-4 z-40 md:hidden">
+      <button (click)="showCreateLeadModal()" class="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold shadow-lg flex items-center justify-center gap-2">
+        <span class="inline-flex w-6 h-6 items-center justify-center bg-blue-700/60 rounded-full"><i class="fas fa-plus text-xs"></i></span>
+        Novo lead
+      </button>
+    </div>
+  </div>
+
   <!-- Modal de Lead -->
   <app-lead-modal 
     [ownerId]="ownerId"
@@ -762,6 +972,8 @@ Authorization: Bearer {{ apiToken }}
     [isVisible]="showAutomationModal"
     [automation]="selectedAutomation"
     [phases]="columns"
+    [allowedTriggerTypes]="selectedPhaseIdForAutomations ? ['card-enters-phase','card-in-phase-for-time','form-not-answered','sla-overdue'] : null"
+    [fixedPhaseId]="selectedPhaseIdForAutomations || null"
     [emailTemplates]="emailTemplates"
     [users]="users"
     (closeModalEvent)="onCloseAutomationModal()"

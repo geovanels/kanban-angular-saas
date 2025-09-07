@@ -14,8 +14,6 @@ export interface CompanyRegistration {
   ownerPhone: string;
   companyName: string;
   subdomain: string;
-  contactEmail?: string;
-  website?: string;
 }
 
 @Component({
@@ -70,8 +68,6 @@ export class LoginComponent implements OnInit {
       ownerPhone: ['', [Validators.required, this.phoneValidator]],
       companyName: ['', [Validators.required, Validators.minLength(2)]],
       subdomain: ['', [Validators.required, Validators.minLength(3), this.aliasValidator.bind(this)]],
-      contactEmail: [''],
-      website: ['', this.urlValidator],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required],
       agreeTerms: [false, Validators.requiredTrue]
@@ -199,8 +195,7 @@ export class LoginComponent implements OnInit {
       const companyData = {
         subdomain: formData.subdomain,
         name: formData.companyName,
-        contactEmail: formData.contactEmail || formData.ownerEmail,
-        website: formData.website,
+        contactEmail: formData.ownerEmail,
         ownerId: authResult.user?.uid || '',
         ownerEmail: formData.ownerEmail,
         plan: 'free' as const,
@@ -257,7 +252,10 @@ export class LoginComponent implements OnInit {
       }, 2000);
 
     } catch (error: any) {
-      this.errorMessage.set(error.message || 'Erro ao criar empresa. Tente novamente.');
+      const errorMessage = error?.code 
+        ? this.getFirebaseErrorMessage(error.code)
+        : error?.message || 'Erro ao criar empresa. Tente novamente.';
+      this.errorMessage.set(errorMessage);
     } finally {
       this.isLoading.set(false);
     }
@@ -292,29 +290,7 @@ export class LoginComponent implements OnInit {
         return;
       }
 
-      // Se o usuário é da Gobuyer, configurar contexto e ir para dashboard
-      if (currentUser.email.includes('gobuyer.com.br')) {
-        // Set up Gobuyer context for development
-        if (this.subdomainService.isDevelopment()) {
-          localStorage.setItem('dev-subdomain', 'gobuyer');
-        }
-        
-        // Try to get real company data or create it
-        await this.subdomainService.initializeFromSubdomain();
-        
-        // Em desenvolvimento, apenas navegar localmente
-        if (this.subdomainService.isDevelopment()) {
-          this.router.navigate(['/dashboard']);
-          return;
-        }
-        
-        // Em produção, redirecionar para o subdomínio correto da Gobuyer
-        const gobuyerUrl = this.subdomainService.getCompanyUrl('gobuyer');
-        window.location.href = gobuyerUrl + '/dashboard';
-        return;
-      }
-
-      // Para outros usuários, tentar buscar empresa
+      // Buscar empresa do usuário logado
       try {
         const userCompany = await this.companyService.getCompanyByUserEmail(currentUser.email);
         
@@ -403,6 +379,31 @@ export class LoginComponent implements OnInit {
     });
   }
 
+  // Firebase Error Handler
+  private getFirebaseErrorMessage(errorCode: string): string {
+    const errorMessages: { [key: string]: string } = {
+      'auth/email-already-in-use': 'Este email já está sendo utilizado. Tente fazer login ou use outro email.',
+      'auth/weak-password': 'A senha deve ter pelo menos 6 caracteres.',
+      'auth/invalid-email': 'Por favor, insira um email válido.',
+      'auth/user-not-found': 'Usuário não encontrado. Verifique o email ou crie uma conta.',
+      'auth/wrong-password': 'Senha incorreta. Tente novamente.',
+      'auth/user-disabled': 'Esta conta foi desabilitada. Entre em contato com o suporte.',
+      'auth/too-many-requests': 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
+      'auth/network-request-failed': 'Erro de conexão. Verifique sua internet e tente novamente.',
+      'auth/invalid-credential': 'Email ou senha incorretos.',
+      'auth/account-exists-with-different-credential': 'Já existe uma conta com este email usando um método diferente.',
+      'auth/popup-closed-by-user': 'Login cancelado pelo usuário.',
+      'auth/popup-blocked': 'Pop-up bloqueado pelo navegador. Habilite pop-ups e tente novamente.',
+      'auth/credential-already-in-use': 'Esta credencial já está sendo usada por outra conta.',
+      'auth/requires-recent-login': 'Esta operação requer login recente. Faça login novamente.',
+      'auth/quota-exceeded': 'Cota excedida. Tente novamente mais tarde.',
+      'auth/internal-error': 'Erro interno do servidor. Tente novamente.',
+      'auth/operation-not-allowed': 'Operação não permitida. Entre em contato com o suporte.'
+    };
+
+    return errorMessages[errorCode] || 'Ocorreu um erro inesperado. Tente novamente.';
+  }
+
   // Validators
   private phoneValidator(control: AbstractControl) {
     if (!control.value) return null;
@@ -468,25 +469,34 @@ export class LoginComponent implements OnInit {
     return result;
   }
 
-  private getErrorMessage(error: string): string {
-    if (error.includes('user-not-found')) {
-      return 'Usuário não encontrado.';
+  private getErrorMessage(error: any): string {
+    // Se for um objeto error com código Firebase, usar o método específico
+    if (error?.code) {
+      return this.getFirebaseErrorMessage(error.code);
     }
-    if (error.includes('wrong-password')) {
-      return 'Senha incorreta.';
+    
+    // Se for uma string, tratar como antes
+    if (typeof error === 'string') {
+      if (error.includes('user-not-found')) {
+        return 'Usuário não encontrado. Verifique o email ou crie uma conta.';
+      }
+      if (error.includes('wrong-password')) {
+        return 'Senha incorreta. Tente novamente.';
+      }
+      if (error.includes('invalid-email')) {
+        return 'Por favor, insira um email válido.';
+      }
+      if (error.includes('email-already-in-use')) {
+        return 'Este email já está sendo utilizado. Tente fazer login ou use outro email.';
+      }
+      if (error.includes('weak-password')) {
+        return 'A senha deve ter pelo menos 6 caracteres.';
+      }
+      if (error.includes('too-many-requests')) {
+        return 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.';
+      }
     }
-    if (error.includes('invalid-email')) {
-      return 'E-mail inválido.';
-    }
-    if (error.includes('email-already-in-use')) {
-      return 'Este e-mail já está em uso.';
-    }
-    if (error.includes('weak-password')) {
-      return 'Senha muito fraca. Use pelo menos 6 caracteres.';
-    }
-    if (error.includes('too-many-requests')) {
-      return 'Muitas tentativas. Tente novamente mais tarde.';
-    }
-    return 'Erro inesperado. Tente novamente.';
+    
+    return error?.message || 'Ocorreu um erro inesperado. Tente novamente.';
   }
 }

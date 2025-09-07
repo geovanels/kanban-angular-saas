@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
          signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, updateProfile } from '@angular/fire/auth';
 import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
@@ -10,6 +10,7 @@ import { Observable, map } from 'rxjs';
 export class AuthService {
   private auth = inject(Auth);
   private firestore = inject(Firestore);
+  private injector = inject(Injector);
   
   user$ = user(this.auth);
   
@@ -76,7 +77,7 @@ export class AuthService {
   async signInWithGoogle() {
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(this.auth, provider);
+      const result = await runInInjectionContext(this.injector, () => signInWithPopup(this.auth, provider));
       
       // Criar ou atualizar usuário no Firestore
       await this.createOrUpdateUser(result.user);
@@ -92,20 +93,20 @@ export class AuthService {
     try {
       // Verificar se o usuário já existe no Firestore
       const userDocRef = doc(this.firestore, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
+      const userDoc = await runInInjectionContext(this.injector, () => getDoc(userDocRef));
       
       if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
+        await runInInjectionContext(this.injector, () => setDoc(userDocRef, {
           email: user.email,
           displayName: user.displayName,
           createdAt: new Date(),
           lastLogin: new Date()
-        });
+        }));
       } else {
         // Atualizar lastLogin
-        await updateDoc(userDocRef, {
+        await runInInjectionContext(this.injector, () => updateDoc(userDocRef, {
           lastLogin: new Date()
-        });
+        }));
       }
     } catch (error) {
       console.error('Erro ao criar/atualizar usuário:', error);
@@ -132,7 +133,7 @@ export class AuthService {
   // Verificar se usuário tem empresa configurada
   async getUserCompany(userId: string): Promise<any> {
     try {
-      const userDoc = await getDoc(doc(this.firestore, 'users', userId));
+      const userDoc = await runInInjectionContext(this.injector, () => getDoc(doc(this.firestore, 'users', userId)));
       if (userDoc.exists()) {
         const userData = userDoc.data();
         return userData['companyId'] || null;

@@ -96,16 +96,8 @@ export class PhaseFormModalComponent {
         })
         .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
     } else {
-      // Configuração padrão
-      this.formFields = [
-        { name: 'companyName', label: 'Nome da Empresa', type: 'text', required: true, order: 0 },
-        { name: 'cnpj', label: 'CNPJ', type: 'text', required: true, order: 1 },
-        { name: 'contactName', label: 'Nome do Contato', type: 'text', required: true, order: 2 },
-        { name: 'phone', label: 'Telefone', type: 'tel', required: true, order: 3 },
-        { name: 'email', label: 'E-mail', type: 'email', required: true, order: 4 },
-        { name: 'segmentOrService', label: 'Segmento/Serviço', type: 'text', required: false, order: 5 },
-        { name: 'description', label: 'Observações', type: 'textarea', required: false, order: 6 }
-      ];
+      // Sem configuração padrão: começar vazio
+      this.formFields = [];
     }
   }
 

@@ -59,6 +59,8 @@ export class LeadDetailModalComponent {
   currentLead: Lead | null = null;
   leadHistory: LeadHistory[] = [];
   phaseHistory: PhaseHistory = {};
+  // Fluxo de transições (permitidas)
+  private flowConfig: { allowed: Record<string, string[]> } = { allowed: {} };
   
   // Form para atualização do lead
   leadForm: FormGroup = this.fb.group({});
@@ -71,6 +73,8 @@ export class LeadDetailModalComponent {
 
   // Link público
   publicLink = '';
+  // Configuração do formulário inicial (somente leitura)
+  initialFormConfig: any | null = null;
 
   async show(lead: Lead) {
     this.currentLead = lead;
@@ -111,6 +115,24 @@ export class LeadDetailModalComponent {
       // Extrair histórico de fases
       this.phaseHistory = this.currentLead.phaseHistory || {};
 
+      // Carregar configuração do formulário inicial do board
+      this.initialFormConfig = await this.firestoreService.getInitialFormConfig(this.boardId);
+
+      // Carregar configuração do formulário da fase atual
+      try {
+        const phaseCfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, this.currentLead.columnId);
+        this.currentFormFields = (phaseCfg as any)?.fields || [];
+      } catch {
+        this.currentFormFields = [];
+      }
+
+      // Carregar fluxo de transições para validar movimentos e listas
+      try {
+        const cfg = await this.firestoreService.getFlowConfig(this.boardId);
+        this.flowConfig = (cfg as any) || { allowed: {} };
+      } catch {
+        this.flowConfig = { allowed: {} };
+      }
 
       // Construir formulário dinâmico baseado na fase atual
       await this.buildDynamicForm();
@@ -129,13 +151,7 @@ export class LeadDetailModalComponent {
 
     const formConfig: any = {};
     
-    // Adicionar campo de responsável
-    formConfig['responsibleUserId'] = [this.currentLead.responsibleUserId || ''];
-    
-    // Adicionar campo de temperatura (padrão)
-    formConfig['temperature'] = [this.currentLead.fields?.['temperature'] || ''];
-    
-    // Adicionar campos dinâmicos
+    // Adicionar campos dinâmicos da fase (se configurados)
     this.currentFormFields.forEach((field: any) => {
       const currentValue = this.currentLead!.fields?.[field.name] || '';
       formConfig[field.name] = [currentValue];
@@ -154,10 +170,18 @@ export class LeadDetailModalComponent {
   }
 
   getInitialFields(): any[] {
-    const initialColumn = this.getInitialColumn();
-    if (!initialColumn) return [];
-    
-    // Retornar campos básicos do lead
+    // Se houver configuração de formulário inicial, usar esses campos na ordem definida
+    if (this.initialFormConfig?.fields?.length) {
+      return this.initialFormConfig.fields
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+        .map((f: any) => ({
+          name: f.name,
+          label: f.label || f.name,
+          value: this.currentLead?.fields?.[f.name] || 'Não informado'
+        }));
+    }
+
+    // Fallback: campos básicos do lead
     const fields = [
       { name: 'companyName', label: 'Empresa' },
       { name: 'cnpj', label: 'CNPJ' },
@@ -240,9 +264,12 @@ export class LeadDetailModalComponent {
       return [];
     }
 
-    // Retornar fases com order maior que a atual (avanço)
+    // Restringir por fluxo (se houver regra definida para a fase atual)
+    const allowed = this.flowConfig.allowed[currentColumn.id!] || [];
+    // Agora: exige aresta explícita no fluxo
     return this.columns
       .filter(col => col.id !== currentColumn.id && col.order > currentColumn.order)
+      .filter(col => allowed.includes(col.id!))
       .sort((a, b) => a.order - b.order);
   }
 
@@ -253,9 +280,11 @@ export class LeadDetailModalComponent {
     // Se estiver na primeira fase, não pode retroceder
     if (currentColumn.order === 0) return [];
 
-    // Retornar fases com order menor que a atual (retrocesso)
+    const allowed = this.flowConfig.allowed[currentColumn.id!] || [];
+    // Agora: exige aresta explícita no fluxo
     return this.columns
       .filter(col => col.id !== currentColumn.id && col.order < currentColumn.order)
+      .filter(col => allowed.includes(col.id!))
       .sort((a, b) => b.order - a.order); // Ordem decrescente para mostrar as mais próximas primeiro
   }
 
@@ -333,6 +362,13 @@ export class LeadDetailModalComponent {
       const currentUser = this.authService.getCurrentUser();
       
       if (!oldColumn || !newColumn || !currentUser) return;
+
+      // Validar fluxo
+      const allowed = this.flowConfig.allowed[oldColumn.id!] || [];
+      if (!allowed.includes(targetColumnId)) {
+        this.errorMessage = 'Transição não permitida pelo fluxo.';
+        return;
+      }
 
       // Atualizar histórico de fases
       const now = new Date();

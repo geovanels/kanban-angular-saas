@@ -79,7 +79,7 @@ describe('ApiService', () => {
   });
 
   describe('submitLead', () => {
-    it('should submit lead with boardId instead of phaseId', () => {
+    it('should submit lead with boardId in URL path, not in body', () => {
       const testLead: LeadIntakeRequest = {
         boardId: 'board-123',
         companyName: 'Test Company',
@@ -103,12 +103,20 @@ describe('ApiService', () => {
         expect(response.leadId).toBe('lead-456');
       });
 
-      const req = httpMock.expectOne(mockCompany.apiConfig.endpoint);
+      // URL deve incluir o boardId (desenvolvimento usa localhost)
+      const expectedUrl = `http://localhost:5000/api/v1/lead-intake/board-123`;
+      const req = httpMock.expectOne(expectedUrl);
       expect(req.request.method).toBe('POST');
-      expect(req.request.body.boardId).toBe('board-123');
+      
+      // boardId NÃO deve estar no corpo
+      expect(req.request.body.boardId).toBeUndefined();
+      
+      // Outros dados devem estar no corpo
       expect(req.request.body.companyId).toBe(mockCompany.id);
       expect(req.request.body.subdomain).toBe(mockCompany.subdomain);
       expect(req.request.body.customFields).toEqual(testLead.customFields);
+      expect(req.request.body.companyName).toBe('Test Company');
+      expect(req.request.body.contactName).toBe('John Doe');
       
       // Verificar headers
       expect(req.request.headers.get('Authorization')).toBe(`Bearer ${mockCompany.apiConfig.token}`);
@@ -140,7 +148,7 @@ describe('ApiService', () => {
 
       service.submitLead(testLead, captchaToken).subscribe();
 
-      const req = httpMock.expectOne(mockCompany.apiConfig.endpoint);
+      const req = httpMock.expectOne('http://localhost:5000/api/v1/lead-intake');
       expect(req.request.headers.get('X-Captcha-Token')).toBe(captchaToken);
 
       req.flush({ success: true });
@@ -148,7 +156,7 @@ describe('ApiService', () => {
   });
 
   describe('testApiEndpoint', () => {
-    it('should test API with boardId parameter', () => {
+    it('should test API with boardId in URL, not in body', () => {
       const boardId = 'test-board-id';
 
       service.testApiEndpoint(boardId).subscribe(response => {
@@ -156,8 +164,14 @@ describe('ApiService', () => {
         expect(response.timestamp).toBeDefined();
       });
 
-      const req = httpMock.expectOne(mockCompany.apiConfig.endpoint);
-      expect(req.request.body.boardId).toBe(boardId);
+      // URL deve incluir o boardId (desenvolvimento usa localhost)
+      const expectedUrl = `http://localhost:5000/api/v1/lead-intake/${boardId}`;
+      const req = httpMock.expectOne(expectedUrl);
+      
+      // boardId NÃO deve estar no corpo
+      expect(req.request.body.boardId).toBeUndefined();
+      
+      // Outros dados devem estar no corpo
       expect(req.request.body.companyName).toBe('Empresa Teste');
       expect(req.request.body.source).toBe('api-test');
       expect(req.request.body.customFields).toBeDefined();
@@ -169,7 +183,8 @@ describe('ApiService', () => {
     it('should test API without boardId parameter', () => {
       service.testApiEndpoint().subscribe();
 
-      const req = httpMock.expectOne(mockCompany.apiConfig.endpoint);
+      // Sem boardId, usa URL base (desenvolvimento)
+      const req = httpMock.expectOne('http://localhost:5000/api/v1/lead-intake');
       expect(req.request.body.boardId).toBeUndefined();
 
       req.flush({ success: true });
@@ -177,7 +192,7 @@ describe('ApiService', () => {
   });
 
   describe('getIntegrationExamples', () => {
-    it('should generate examples with boardId and form fields', () => {
+    it('should generate examples with boardId in URL and form fields', () => {
       const boardId = 'example-board-id';
       const formFields = [
         { name: 'customField1', type: 'text', includeInApi: true },
@@ -187,14 +202,27 @@ describe('ApiService', () => {
 
       const examples = service.getIntegrationExamples(boardId, formFields);
 
-      expect(examples['curl']).toContain(`"boardId": "${boardId}"`);
+      // boardId deve estar na URL, NÃO no corpo (desenvolvimento usa localhost)
+      const expectedUrlWithBoard = `http://localhost:5000/api/v1/lead-intake/${boardId}`;
+      expect(examples['curl']).toContain(expectedUrlWithBoard);
+      expect(examples['curl']).not.toContain(`"boardId"`);
+      
+      // Campos personalizados devem estar no corpo
       expect(examples['curl']).toContain(`"customField1": "Valor exemplo"`);
       expect(examples['curl']).toContain(`"temp": "Quente"`);
       expect(examples['curl']).not.toContain('privateField');
 
-      expect(examples['javascript']).toContain(`boardId: '${boardId}'`);
-      expect(examples['php']).toContain(`'boardId' => '${boardId}'`);
-      expect(examples['python']).toContain(`'boardId': '${boardId}'`);
+      // JavaScript deve ter URL com boardId
+      expect(examples['javascript']).toContain(expectedUrlWithBoard);
+      expect(examples['javascript']).not.toContain(`boardId:`);
+      
+      // PHP deve ter URL com boardId  
+      expect(examples['php']).toContain(expectedUrlWithBoard);
+      expect(examples['php']).not.toContain(`'boardId'`);
+      
+      // Python deve ter URL com boardId
+      expect(examples['python']).toContain(expectedUrlWithBoard);
+      expect(examples['python']).not.toContain(`'boardId'`);
     });
 
     it('should generate examples without form fields', () => {
@@ -202,9 +230,15 @@ describe('ApiService', () => {
 
       const examples = service.getIntegrationExamples(boardId);
 
-      expect(examples['curl']).toContain(`"boardId": "${boardId}"`);
+      // boardId deve estar na URL, NÃO no corpo (desenvolvimento usa localhost)
+      const expectedUrlWithBoard = `http://localhost:5000/api/v1/lead-intake/${boardId}`;
+      expect(examples['curl']).toContain(expectedUrlWithBoard);
+      expect(examples['curl']).not.toContain(`"boardId"`);
       expect(examples['curl']).toContain('Configure campos personalizados');
-      expect(examples['javascript']).toContain(`boardId: '${boardId}'`);
+      
+      // JavaScript deve ter URL com boardId
+      expect(examples['javascript']).toContain(expectedUrlWithBoard);
+      expect(examples['javascript']).not.toContain(`boardId:`);
     });
 
     it('should handle missing company context', () => {
@@ -255,12 +289,12 @@ describe('ApiService', () => {
       expect(url).toBe('http://localhost:5000/api/v1/lead-intake');
     });
 
-    it('should use production URL with subdomain', () => {
+    it('should use production URL with centralized API', () => {
       mockCompany.apiConfig.endpoint = '';
       subdomainService.isDevelopment.and.returnValue(false);
 
       const url = service.getLeadIntakeUrl();
-      expect(url).toBe(`https://${mockCompany.subdomain}.taskboard.com.br/api/v1/lead-intake`);
+      expect(url).toBe(`https://api.taskboard.com.br/v1/companies/${mockCompany.id}/leads`);
     });
   });
 });

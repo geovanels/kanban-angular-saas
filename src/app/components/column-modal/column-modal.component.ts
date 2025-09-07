@@ -158,6 +158,10 @@ export class ColumnModalComponent {
           }
         );
 
+        // Garantir unicidade da fase inicial
+        if (formData.isInitialPhase) {
+          await this.firestoreService.unsetOtherInitialPhases(this.boardId, this.currentColumn.id!);
+        }
         this.columnUpdated.emit();
       } else {
         // Criar nova coluna
@@ -176,7 +180,11 @@ export class ColumnModalComponent {
           updatedAt: new Date()
         };
 
-        await this.firestoreService.createColumn(this.ownerId, this.boardId, newColumn);
+        const created = await this.firestoreService.createColumn(this.ownerId, this.boardId, newColumn);
+        // Se marcada como inicial, desmarcar as demais
+        if (formData.isInitialPhase && created?.id) {
+          await this.firestoreService.unsetOtherInitialPhases(this.boardId, created.id);
+        }
         this.columnCreated.emit();
       }
 

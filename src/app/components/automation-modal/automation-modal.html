@@ -9,18 +9,34 @@
       <div class="border rounded-lg p-4">
         <h3 class="font-semibold text-md mb-3 text-gray-700">Gatilho (Quando...)</h3>
         <select formControlName="triggerType" class="w-full p-2 border rounded-md mb-2 bg-white" (change)="onTriggerTypeChange()">
-          <option value="new-lead-created">Um novo lead é criado</option>
-          <option value="card-enters-phase">Um card entra em uma fase</option>
-          <option value="card-in-phase-for-time">Um card está em uma fase por um tempo</option>
-          <option value="form-not-answered">Ainda não respondeu o formulário da fase</option>
-          <option value="sla-overdue">O SLA de um card vence</option>
+          <ng-container *ngIf="!allowedTriggerTypes">
+            <option value="new-lead-created">Criar novo registro (apenas fase inicial)</option>
+            <option value="card-enters-phase">Um card entrou na fase</option>
+            <option value="card-in-phase-for-time">Um card está na fase por um tempo</option>
+            <option value="form-not-answered">Formulário da fase não respondido</option>
+            <option value="sla-overdue">SLA da fase venceu</option>
+          </ng-container>
+          <ng-container *ngIf="allowedTriggerTypes">
+            <option *ngIf="allowedTriggerTypes.includes('new-lead-created')" value="new-lead-created">Criar novo registro (apenas fase inicial)</option>
+            <option *ngIf="allowedTriggerTypes.includes('card-enters-phase')" value="card-enters-phase">Um card entrou na fase</option>
+            <option *ngIf="allowedTriggerTypes.includes('card-in-phase-for-time')" value="card-in-phase-for-time">Um card está na fase por um tempo</option>
+            <option *ngIf="allowedTriggerTypes.includes('form-not-answered')" value="form-not-answered">Formulário da fase não respondido</option>
+            <option *ngIf="allowedTriggerTypes.includes('sla-overdue')" value="sla-overdue">SLA da fase venceu</option>
+          </ng-container>
         </select>
         
         <div [class.hidden]="!showTriggerPhase">
           <label for="triggerPhase" class="text-sm font-medium text-gray-700">Fase:</label>
-          <select formControlName="triggerPhase" class="w-full p-2 border rounded-md mt-1 bg-white">
-            <option *ngFor="let phase of phases" [value]="phase.id">{{ phase.name }}</option>
-          </select>
+          <ng-container *ngIf="!fixedPhaseId; else fixedPhase">
+            <select formControlName="triggerPhase" class="w-full p-2 border rounded-md mt-1 bg-white">
+              <option *ngFor="let phase of phases" [value]="phase.id">{{ phase.name }}</option>
+            </select>
+          </ng-container>
+          <ng-template #fixedPhase>
+            <div class="mt-1 p-2 bg-gray-50 border rounded text-sm">
+              {{ (phases | json) && (phases.find(p => p.id === fixedPhaseId)?.name || 'Fase selecionada') }}
+            </div>
+          </ng-template>
         </div>
         
         <div [class.hidden]="!showTriggerTime" class="mt-2">
@@ -54,10 +70,15 @@
               </div>
               
               <div *ngSwitchCase="'move-to-phase'">
-                <select [(ngModel)]="action.phaseId" [ngModelOptions]="{standalone: true}" class="w-full p-2 border rounded-md bg-white">
-                  <option value="">Selecione uma fase</option>
-                  <option *ngFor="let phase of phases" [value]="phase.id">{{ phase.name }}</option>
-                </select>
+                <ng-container *ngIf="!fixedPhaseId; else fixedActionPhase">
+                  <select [(ngModel)]="action.phaseId" [ngModelOptions]="{standalone: true}" class="w-full p-2 border rounded-md bg-white">
+                    <option value="">Selecione uma fase</option>
+                    <option *ngFor="let phase of phases" [value]="phase.id">{{ phase.name }}</option>
+                  </select>
+                </ng-container>
+                <ng-template #fixedActionPhase>
+                  <div class="text-sm text-gray-600">Ações usam a fase atual por padrão.</div>
+                </ng-template>
               </div>
               
               <div *ngSwitchCase="'assign-user'">
@@ -81,7 +102,7 @@
       
       <div class="mt-6 flex justify-end gap-4">
         <button type="button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg" (click)="closeModal()">Cancelar</button>
-        <button type="submit" [disabled]="!automationForm.valid" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400">
+        <button type="submit" [disabled]="!canSubmit()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400">
           {{ isEditing ? 'Atualizar' : 'Salvar' }} Automação
         </button>
       </div>

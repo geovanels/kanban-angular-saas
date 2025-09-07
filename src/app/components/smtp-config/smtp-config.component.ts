@@ -5,6 +5,7 @@ import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { SmtpService } from '../../services/smtp.service';
 import { Company } from '../../models/company.model';
+import { AuthService } from '../../services/auth.service';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
@@ -286,6 +287,7 @@ export class SmtpConfigComponent implements OnInit {
   private companyService = inject(CompanyService);
   private subdomainService = inject(SubdomainService);
   private smtpService = inject(SmtpService);
+  private authService = inject(AuthService);
 
   smtpForm: FormGroup;
   currentCompany = signal<Company | null>(null);
@@ -348,7 +350,33 @@ export class SmtpConfigComponent implements OnInit {
       return;
     }
 
-    const company = this.currentCompany();
+    let company = this.currentCompany();
+    if (!company?.id) {
+      try {
+        const sub = this.companyService.getCompanySubdomain();
+        if (sub) {
+          const fetched = await this.companyService.getCompanyBySubdomain(sub);
+          if (fetched?.id) {
+            this.subdomainService.setCurrentCompany(fetched);
+            this.currentCompany.set(fetched);
+            company = fetched;
+          }
+        }
+      } catch {}
+    }
+    if (!company?.id) {
+      try {
+        const currentUser = this.authService.getCurrentUser();
+        if (currentUser?.email) {
+          const byEmail = await this.companyService.getCompanyByUserEmail(currentUser.email);
+          if (byEmail?.id) {
+            this.subdomainService.setCurrentCompany(byEmail);
+            this.currentCompany.set(byEmail);
+            company = byEmail;
+          }
+        }
+      } catch {}
+    }
     if (!company?.id) {
       this.showError('Empresa não encontrada');
       return;

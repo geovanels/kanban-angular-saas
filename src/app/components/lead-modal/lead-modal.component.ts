@@ -56,23 +56,35 @@ export class LeadModalComponent {
   }
 
   private async initializeForm() {
-    // Tentar carregar campos da primeira fase configurada
-    await this.loadFormFieldsFromInitialPhase();
+    // 1) Tentar carregar campos do formulário inicial do board
+    await this.loadFormFieldsFromInitialBoard();
+    // 2) Fallback: tentar carregar campos da fase inicial configurada
+    if (this.formFields.length === 0) {
+      await this.loadFormFieldsFromInitialPhase();
+    }
     
     // Se não encontrou campos da fase, usar campos padrão (fallback)
-    if (this.formFields.length === 0) {
-      this.formFields = [
-        { name: 'companyName', label: 'Nome da Empresa', type: 'text', required: true, order: 0, includeInApi: true, showInCard: false },
-        { name: 'cnpj', label: 'CNPJ', type: 'cnpj', required: true, order: 1, includeInApi: true, showInCard: false },
-        { name: 'contactName', label: 'Nome do Contato', type: 'text', required: true, order: 2, includeInApi: true, showInCard: false },
-        { name: 'contactEmail', label: 'Email do Contato', type: 'email', required: true, order: 3, includeInApi: true, showInCard: false },
-        { name: 'contactPhone', label: 'Telefone do Contato', type: 'tel', required: true, order: 4, includeInApi: true, showInCard: false },
-        { name: 'temperature', label: 'Temperatura', type: 'temperatura', required: false, order: 5, options: ['Quente', 'Morno', 'Frio'], includeInApi: true, showInCard: false },
-        { name: 'description', label: 'Observações', type: 'textarea', required: false, order: 6, includeInApi: true, showInCard: false }
-      ];
-    }
+    // 3) Se ainda não houver configuração, manter vazio para cadastro livre
 
     this.buildForm();
+  }
+
+  private async loadFormFieldsFromInitialBoard() {
+    try {
+      if (!this.boardId) return;
+      const cfg = await this.firestoreService.getInitialFormConfig(this.boardId);
+      if (cfg && (cfg as any).fields) {
+        this.formFields = (cfg as any).fields
+          .map((field: any, index: number) => ({
+            ...field,
+            includeInApi: field.includeInApi !== false,
+            order: field.order ?? index
+          }))
+          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+      }
+    } catch (e) {
+      // Ignorar e deixar fallback cuidar
+    }
   }
 
   private async loadFormFieldsFromInitialPhase() {
@@ -247,14 +259,19 @@ export class LeadModalComponent {
         this.leadUpdated.emit();
       } else {
         // Criar novo lead
-        const firstColumn = this.columns.find(col => col.order === 0);
-        if (!firstColumn) {
-          throw new Error('Nenhuma coluna inicial encontrada');
+        // Usar a coluna inicial marcada como isInitialPhase; se não houver, buscar via serviço; por fim, usar a primeira na ordem
+        let initialColumn = this.columns.find((c: any) => c.isInitialPhase) || this.columns.sort((a, b) => (a.order || 0) - (b.order || 0))[0];
+        if (!initialColumn) {
+          const initialColumnId = await this.firestoreService.getInitialColumnId(this.boardId);
+          if (initialColumnId) {
+            initialColumn = this.columns.find(c => c.id === initialColumnId) || null as any;
+          }
         }
+        if (!initialColumn) throw new Error('Nenhuma coluna inicial encontrada');
 
         const newLead: Omit<Lead, 'id'> = {
           fields: formData,
-          columnId: firstColumn.id!,
+          columnId: initialColumn.id!,
           companyId: '', // Será preenchido pelo FirestoreService
           boardId: this.boardId,
           createdAt: null, // será preenchido pelo serverTimestamp
@@ -275,7 +292,7 @@ export class LeadModalComponent {
           leadRef.id,
           {
             type: 'creation',
-            text: `Lead criado na fase <b>${firstColumn.name}</b>`,
+            text: `Lead criado na fase <b>${initialColumn.name}</b>`,
             user: currentUser.displayName || currentUser.email
           }
         );

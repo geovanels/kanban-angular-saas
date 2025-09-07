@@ -1,23 +1,30 @@
 .kanban-board {
-  display: flex;
-  gap: 16px;
-  padding: 24px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 1fr);
+  gap: 12px;
+  padding: 16px;
   overflow-x: auto;
   min-height: calc(100vh - 80px);
+  scroll-snap-type: x mandatory;
 }
 
+/* Hide mobile layout by default (desktop first) */
+.mobile-board { display: none; }
+
 .kanban-column {
-  min-width: 320px;
-  max-width: 320px;
-  background-color: #e2e8f0;
+  min-width: 280px;
+  max-width: 380px;
+  background-color: #f8fafc;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   transition: opacity 0.2s ease-in-out;
+  scroll-snap-align: start;
 }
 
 .kanban-column-header {
-  padding: 12px 16px;
+  padding: 10px 14px;
   font-weight: 600;
   display: flex;
   justify-content: space-between;
@@ -31,7 +38,7 @@
 
 .kanban-cards {
   flex-grow: 1;
-  padding: 8px 16px;
+  padding: 8px 12px 12px;
   overflow-y: auto;
   min-height: 200px;
 }
@@ -39,7 +46,7 @@
 .kanban-card {
   background-color: white;
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   margin-bottom: 12px;
   cursor: pointer;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
@@ -96,4 +103,20 @@
 
 .cdk-drop-list-dragging .kanban-card:not(.cdk-drag-placeholder) {
   transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+@media (max-width: 768px) {
+  .desktop-board { display: none; }
+  .mobile-board { display: block; }
+  .kanban-board { gap: 8px; padding: 8px; }
+  .kanban-column { min-width: 260px; max-width: 320px; }
+  .kanban-card { padding: 8px; }
+}
+
+@media (max-width: 480px) {
+  .desktop-board { display: none; }
+  .mobile-board { display: block; }
+  .kanban-board { gap: 6px; padding: 6px; }
+  .kanban-column { min-width: 240px; max-width: 280px; }
+  .kanban-card { padding: 8px; }
 }

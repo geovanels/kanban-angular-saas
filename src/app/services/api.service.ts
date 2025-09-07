@@ -11,7 +11,6 @@ export interface LeadIntakeRequest {
   contactEmail?: string;
   contactPhone?: string;
   boardId?: string; // ID do quadro onde o lead será criado
-  phaseId?: string; // ID da fase específica (opcional, usará fase inicial se não fornecido)
   customFields?: { [key: string]: any };
   source?: string;
   utm_source?: string;
@@ -40,27 +39,32 @@ export class ApiService {
   private http = inject(HttpClient);
   private subdomainService = inject(SubdomainService);
 
-  // Lead Intake API - endpoint público para receber leads
+  // Lead Intake API - via Firebase HTTP Function
   submitLead(leadData: LeadIntakeRequest, captchaToken?: string): Observable<LeadIntakeResponse> {
     const company = this.subdomainService.getCurrentCompany();
     
     if (!company) {
       return throwError(() => new Error('Empresa não encontrada'));
     }
-
-    const apiUrl = this.getLeadIntakeUrl();
-    const headers = this.getApiHeaders(company.apiConfig.token);
-
-    // Adicionar token de captcha se fornecido
-    if (captchaToken) {
-      headers.set('X-Captcha-Token', captchaToken);
+    if (!company.id) {
+      return throwError(() => new Error('ID da empresa não encontrado'));
     }
 
+    const boardId = leadData.boardId;
+    const companyId: string = company.id as string;
+    const apiUrl = this.getLeadIntakeUrl(companyId, boardId);
+    let headers = this.getApiHeaders(company.apiConfig.token);
+
+    if (captchaToken) {
+      headers = headers.set('X-Captcha-Token', captchaToken);
+    }
+
+    // Normalizar dados do lead dentro de leadData.fields
+    const { boardId: _ignored, ...rest } = leadData;
+    const normalized = (rest as any).fields ? (rest as any) : { fields: rest };
+
     const payload = {
-      ...leadData,
-      companyId: company.id,
-      subdomain: company.subdomain,
-      timestamp: new Date().toISOString()
+      leadData: normalized
     };
 
     return this.http.post<LeadIntakeResponse>(apiUrl, payload, { headers }).pipe(
@@ -72,7 +76,7 @@ export class ApiService {
         console.error('Erro ao submeter lead:', error);
         return throwError(() => ({
           success: false,
-          error: error.error?.message || 'Erro ao submeter lead'
+          error: error.error?.error || error.error?.message || 'Erro ao submeter lead'
         }));
       })
     );
@@ -234,24 +238,15 @@ export class ApiService {
   }
 
   // URLs e configurações
-  getLeadIntakeUrl(): string {
-    const company = this.subdomainService.getCurrentCompany();
-    
-    if (!company) {
-      throw new Error('Empresa não encontrada');
-    }
-
-    // URL personalizada definida na configuração da empresa
-    if (company.apiConfig.endpoint) {
-      return company.apiConfig.endpoint;
-    }
-
-    // URL padrão baseada no subdomínio
+  getLeadIntakeUrl(companyId: string, boardId?: string): string {
+    const path = boardId
+      ? `/companies/${encodeURIComponent(companyId)}/boards/${encodeURIComponent(boardId)}`
+      : `/companies/${encodeURIComponent(companyId)}`;
     if (this.subdomainService.isDevelopment()) {
-      return `http://localhost:5000/api/v1/lead-intake`;
+      const port = this.getLocalFunctionsPort();
+      return `http://localhost:${port}/kanban-gobuyer/us-central1/leadIntakeHttp${path}`;
     }
-    
-    return `https://${company.subdomain}.taskboard.com.br/api/v1/lead-intake`;
+    return `https://us-central1-kanban-gobuyer.cloudfunctions.net/leadIntakeHttp${path}`;
   }
 
   getCompanyApiUrl(): string {
@@ -261,10 +256,43 @@ export class ApiService {
 
   getBaseApiUrl(): string {
     if (this.subdomainService.isDevelopment()) {
-      return 'http://localhost:5000/api/v1';
+      // Detectar porta dinamicamente para Firebase Functions
+      const functionsPort = this.getLocalFunctionsPort();
+      return `http://localhost:${functionsPort}/api/v1`;
     }
     
     return 'https://api.taskboard.com.br/v1';
+  }
+
+  private getLocalFunctionsPort(): number {
+    // 1. Verificar localStorage (configuração salva pelo usuário)
+    const storedPort = localStorage.getItem('firebase-functions-port');
+    if (storedPort) {
+      return parseInt(storedPort, 10);
+    }
+    
+    // 2. Tentar detectar pela configuração do Firebase (se disponível)
+    try {
+      // Verificar se existe alguma configuração global do Firebase
+      const firebaseConfig = (window as any).__FIREBASE_DEFAULTS__;
+      if (firebaseConfig?.emulatorHosts?.functions) {
+        const functionsHost = firebaseConfig.emulatorHosts.functions;
+        const portMatch = functionsHost.match(/:(\d+)$/);
+        if (portMatch) {
+          return parseInt(portMatch[1], 10);
+        }
+      }
+    } catch (error) {
+      // Ignorar erro se não conseguir detectar
+    }
+    
+    // 3. Usar porta padrão do emulador do Firebase Functions
+    return 5001;
+  }
+
+  // Método para permitir ao usuário definir porta customizada
+  setCustomFunctionsPort(port: number): void {
+    localStorage.setItem('firebase-functions-port', port.toString());
   }
 
   // Gerar exemplo de código para integração
@@ -275,22 +303,29 @@ export class ApiService {
       return {};
     }
 
-    const apiUrl = this.getLeadIntakeUrl();
+    // A URL agora inclui companyId e opcionalmente boardId no path
+    const apiUrl = this.getLeadIntakeUrl(company.id || '{COMPANY_ID}', boardId);
     const token = company.apiConfig.token;
     
     // Gerar campos dinâmicos baseados no formulário configurado
     const dynamicFields = this.generateDynamicFieldsExample(formFields);
     const fieldsComment = formFields && formFields.length > 0 
-      ? '    // Campos configurados no formulário:\n' + formFields.map(f => `    // "${f.name}": "${f.type}"`).join(',\n') + '\n'
+      ? '    // Campos configurados no formulário:\n' + formFields
+          .filter(field => field.includeInApi !== false)
+          .map(f => `    // "${f.name}": "${f.type}"`)
+          .join(',\n') + '\n'
       : '    // Configure campos personalizados no Visual Form Builder\n';
 
+    const urlComment = boardId 
+      ? `// URL inclui o ID do quadro: ${boardId}\n` 
+      : `// Substitua {BOARD_ID} pelo ID do quadro desejado na URL\n`;
+
     return {
-      curl: `curl -X POST "${apiUrl}" \\
+      curl: `${urlComment}${fieldsComment}curl -X POST "${apiUrl}" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${token}" \\
   -H "X-Company-Subdomain: ${company.subdomain}" \\
   -d '{
-    "boardId": "${boardId || 'ID_DO_QUADRO'}",
     "companyName": "Nome da Empresa Exemplo",
     "cnpj": "00.000.000/0001-00",
     "contactName": "Nome do Contato",
@@ -298,7 +333,7 @@ export class ApiService {
     "contactPhone": "(11) 99999-9999"${dynamicFields ? ',\n' + dynamicFields : ''}
   }'`,
 
-      javascript: `${fieldsComment}fetch('${apiUrl}', {
+      javascript: `${urlComment}${fieldsComment}fetch('${apiUrl}', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -306,7 +341,6 @@ export class ApiService {
     'X-Company-Subdomain': '${company.subdomain}'
   },
   body: JSON.stringify({
-    boardId: '${boardId || 'ID_DO_QUADRO'}',
     companyName: 'Nome da Empresa Exemplo',
     cnpj: '00.000.000/0001-00',
     contactName: 'Nome do Contato',
@@ -318,10 +352,9 @@ export class ApiService {
 .then(data => console.log(data));`,
 
       php: `<?php
-// ${fieldsComment.replace(/\/\//g, '//')}
+${urlComment.replace(/\/\//g, '//')}// ${fieldsComment.replace(/\/\//g, '//')}
 $url = '${apiUrl}';
 $data = [
-    'boardId' => '${boardId || 'ID_DO_QUADRO'}',
     'companyName' => 'Nome da Empresa Exemplo',
     'cnpj' => '00.000.000/0001-00',
     'contactName' => 'Nome do Contato',
@@ -349,7 +382,7 @@ echo $result;
       python: `import requests
 import json
 
-# ${fieldsComment.replace(/\/\//g, '#')}
+${urlComment.replace(/\/\//g, '#')}# ${fieldsComment.replace(/\/\//g, '#')}
 url = '${apiUrl}'
 headers = {
     'Content-Type': 'application/json',
@@ -357,7 +390,6 @@ headers = {
     'X-Company-Subdomain': '${company.subdomain}'
 }
 data = {
-    'boardId': '${boardId || 'ID_DO_QUADRO'}',
     'companyName': 'Nome da Empresa Exemplo',
     'cnpj': '00.000.000/0001-00',
     'contactName': 'Nome do Contato',

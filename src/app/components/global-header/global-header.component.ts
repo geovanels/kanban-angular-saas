@@ -91,9 +91,9 @@ import { SubdomainService } from '../../services/subdomain.service';
               @if (userMenuOpen) {
                 <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5">
                   <div class="py-1">
-                    <div class="px-4 py-2 border-b border-gray-100">
+                    <div class="px-4 py-2 border-b border-gray-100 max-w-[16rem]">
                       <p class="text-sm font-medium text-gray-900">{{ currentUser()?.displayName || 'Usuário' }}</p>
-                      <p class="text-xs text-gray-500">{{ currentUser()?.email }}</p>
+                      <p class="text-xs text-gray-500 truncate" title="{{ currentUser()?.email }}">{{ currentUser()?.email }}</p>
                     </div>
                     <button (click)="logout()" class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
                       <i class="fas fa-sign-out-alt mr-2"></i>
@@ -180,9 +180,14 @@ export class GlobalHeaderComponent {
   }
 
   async logout() {
-    const result = await this.authService.logout();
-    if (result.success) {
-      this.router.navigate(['/login']);
+    try {
+      const result = await this.authService.logout();
+      if (result.success) {
+        this.subdomainService.clearCurrentCompany();
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      // Silently handle error
     }
   }
 }

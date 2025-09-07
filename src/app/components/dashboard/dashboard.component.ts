@@ -214,42 +214,5 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  // 🧹 MÉTODO TEMPORÁRIO PARA LIMPEZA DE QUADROS
-  async clearAllData() {
-    const confirmation = prompt(
-      '🧹 LIMPEZA DE QUADROS (Preserva usuários/empresas/SMTP)\n\n' +
-      '✅ SERÁ PRESERVADO:\n' +
-      '• Dados dos usuários\n' +
-      '• Configurações das empresas\n' +
-      '• Configurações de SMTP\n' +
-      '• Configurações de branding\n' +
-      '• Links da empresa\n\n' +
-      '❌ SERÁ REMOVIDO:\n' +
-      '• Todos os quadros Kanban\n' +
-      '• Todas as fases/colunas\n' +
-      '• Todos os leads/registros\n' +
-      '• Templates de email dos quadros\n' +
-      '• Automações dos quadros\n' +
-      '• Caixa de saída\n' +
-      '• Histórico de automações\n\n' +
-      'Digite "LIMPAR QUADROS" para confirmar:'
-    );
-
-    if (confirmation === 'LIMPAR QUADROS') {
-      try {
-        this.isLoading = true;
-        await this.firestoreService.clearAllData(this.currentUser.uid);
-        
-        // Recarregar a lista de quadros (deve ficar vazia)
-        await this.loadBoards();
-        
-        alert('✅ Banco de dados limpo com sucesso!');
-        
-      } catch (error) {
-        alert('❌ Erro durante a limpeza. Tente novamente.');
-      } finally {
-        this.isLoading = false;
-      }
-    }
-  }
+  
 }

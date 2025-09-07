@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/components/api-config/api-config.component.ts"],
+  "sourcesContent": ["\n    .api-config-container {\n      max-width: 900px;\n      margin: 0 auto;\n      padding: 20px;\n    }\n    \n    .card-header h3 {\n      margin: 0;\n      color: #495057;\n    }\n    \n    .input-group {\n      position: relative;\n    }\n    \n    .nav-tabs .nav-link {\n      border: none;\n      color: #6c757d;\n    }\n    \n    .nav-tabs .nav-link.active {\n      background-color: #007bff;\n      color: white;\n      border-color: #007bff;\n    }\n    \n    pre {\n      font-size: 0.875rem;\n      max-height: 400px;\n      overflow-y: auto;\n    }\n    \n    .badge {\n      font-size: 0.75rem;\n    }\n    \n    .border {\n      border: 1px solid #dee2e6 !important;\n    }\n    \n    code {\n      color: #e83e8c;\n      font-size: 0.875rem;\n    }\n    \n    .btn-close {\n      background: none;\n      border: none;\n      font-size: 1.5rem;\n      line-height: 1;\n      opacity: 0.5;\n    }\n    \n    .btn-close:hover {\n      opacity: 0.75;\n    }\n  "],
+  "mappings": ";AACI,CAAA;AACE,aAAA;AACA,UAAA,EAAA;AACA,WAAA;;AAGF,CAAA,YAAA;AACE,UAAA;AACA,SAAA;;AAGF,CAAA;AACE,YAAA;;AAGF,CAAA,SAAA,CAAA;AACE,UAAA;AACA,SAAA;;AAGF,CALA,SAKA,CALA,QAKA,CAAA;AACE,oBAAA;AACA,SAAA;AACA,gBAAA;;AAGF;AACE,aAAA;AACA,cAAA;AACA,cAAA;;AAGF,CAAA;AACE,aAAA;;AAGF,CAAA;AACE,UAAA,IAAA,MAAA;;AAGF;AACE,SAAA;AACA,aAAA;;AAGF,CAAA;AACE,cAAA;AACA,UAAA;AACA,aAAA;AACA,eAAA;AACA,WAAA;;AAGF,CARA,SAQA;AACE,WAAA;;",
+  "names": []
+}

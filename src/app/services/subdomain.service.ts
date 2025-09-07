@@ -26,15 +26,6 @@ export class SubdomainService {
 
       let company = await this.companyService.getCompanyBySubdomain(subdomain);
       
-      // Se não encontrou a empresa e é subdomain "gobuyer", criar automaticamente
-      if (!company && subdomain === 'gobuyer') {
-        try {
-          await this.companyService.seedGobuyerCompany();
-          company = await this.companyService.getCompanyBySubdomain(subdomain);
-        } catch (error) {
-          // Handle error silently or show user-friendly error
-        }
-      }
       
       if (company) {
         this.currentCompanySubject.next(company);
@@ -73,9 +64,8 @@ export class SubdomainService {
         return subdomainParam;
       }
       
-      // Definir subdomínio padrão para desenvolvimento
-      localStorage.setItem('dev-subdomain', 'gobuyer');
-      return 'gobuyer';
+      // Sem subdomínio padrão - deve ser configurado pelo usuário
+      return null;
     }
 
     // Para produção: extrair de subdomain.taskboard.com.br
@@ -105,46 +95,18 @@ export class SubdomainService {
   }
 
   private handleInvalidSubdomain(subdomain: string) {
-    // Implementar lógica para lidar com subdomínio inválido
-    
     if (typeof window !== 'undefined') {
-      // Em desenvolvimento, não redirecionar - apenas logar
       if (this.isDevelopment()) {
-        console.warn(`Empresa '${subdomain}' não encontrada em desenvolvimento. Criando automaticamente...`);
-        // Tentar criar empresa automaticamente em desenvolvimento
-        this.createDevelopmentCompany(subdomain);
         return;
       }
       
       const hostname = window.location.hostname;
       
-      // Se já estamos no subdomínio correto mas a empresa não foi encontrada no Firebase
       if (hostname.includes(`${subdomain}.taskboard.com.br`)) {
-        console.error(`Empresa '${subdomain}' não encontrada no Firebase.`);
-        
-        // Se for a empresa 'gobuyer', tentar criar automaticamente
-        if (subdomain === 'gobuyer') {
-          // Tentando criar empresa Gobuyer automaticamente
-          this.companyService.seedGobuyerCompany().then(async () => {
-            // Tentar buscar novamente após criar
-            const company = await this.companyService.getCompanyBySubdomain('gobuyer');
-            if (company) {
-              this.currentCompanySubject.next(company);
-              window.location.reload();
-            }
-          }).catch(error => {
-            console.error('Erro ao criar empresa Gobuyer:', error);
-            alert(`Empresa 'gobuyer' não pôde ser criada. Entre em contato com o suporte.`);
-          });
-          return;
-        }
-        
-        // Para outras empresas, mostrar erro
         alert(`Empresa '${subdomain}' não encontrada. Entre em contato com o suporte.`);
         return;
       }
       
-      // Apenas em produção e se não estivermos no subdomínio correto, redirecionar
       window.location.href = 'https://taskboard.com.br/empresa-nao-encontrada?subdomain=' + encodeURIComponent(subdomain);
     }
   }
@@ -153,8 +115,42 @@ export class SubdomainService {
     return this.currentCompanySubject.value;
   }
 
-  setCurrentCompany(company: Company) {
+  setCurrentCompany(company: Company | null) {
     this.currentCompanySubject.next(company);
+    if (typeof window !== 'undefined') {
+      try {
+        if (company) {
+          localStorage.setItem('current-company', JSON.stringify({ id: company.id, subdomain: company.subdomain, name: company.name }));
+        } else {
+          localStorage.removeItem('current-company');
+        }
+      } catch {}
+    }
+  }
+
+  clearCurrentCompany() {
+    this.currentCompanySubject.next(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('current-company');
+    }
+  }
+
+  // Recuperar empresa persistida (fallback ao iniciar)
+  restorePersistedCompany(): Company | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('current-company');
+      if (!raw) return null;
+      const basic = JSON.parse(raw);
+      if (basic?.id && basic?.subdomain) {
+        const company: Company = { id: basic.id, subdomain: basic.subdomain, name: basic.name } as any;
+        this.currentCompanySubject.next(company);
+        return company;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   // Método para desenvolvimento - definir subdomínio manualmente
@@ -213,10 +209,38 @@ export class SubdomainService {
     }
 
     if (this.isDevelopment()) {
-      return `http://localhost:5000/api/v1/companies/${company.id}`;
+      // Usar porta padrão 5001 do Firebase Functions
+      const functionsPort = this.getFunctionsPort();
+      return `http://localhost:${functionsPort}/api/v1/companies/${company.id}`;
     }
     
     return `https://api.taskboard.com.br/v1/companies/${company.id}`;
+  }
+
+  // Método para obter porta do Firebase Functions
+  private getFunctionsPort(): number {
+    // 1. Verificar localStorage (configuração salva pelo usuário)
+    const storedPort = localStorage.getItem('firebase-functions-port');
+    if (storedPort) {
+      return parseInt(storedPort, 10);
+    }
+    
+    // 2. Tentar detectar pela configuração do Firebase (se disponível)
+    try {
+      const firebaseConfig = (window as any).__FIREBASE_DEFAULTS__;
+      if (firebaseConfig?.emulatorHosts?.functions) {
+        const functionsHost = firebaseConfig.emulatorHosts.functions;
+        const portMatch = functionsHost.match(/:(\d+)$/);
+        if (portMatch) {
+          return parseInt(portMatch[1], 10);
+        }
+      }
+    } catch (error) {
+      // Ignorar erro se não conseguir detectar
+    }
+    
+    // 3. Usar porta padrão (3001 é onde o server.js está rodando)  
+    return 3001;
   }
 
   // Gerar URL do formulário público para a empresa atual
@@ -233,62 +257,8 @@ export class SubdomainService {
     return `https://${company.subdomain}.taskboard.com.br/form`;
   }
 
-  // Criar empresa automaticamente em desenvolvimento
+  // Método removido - sem automação de criação de empresas
   private async createDevelopmentCompany(subdomain: string) {
-    try {
-      // Criando empresa de desenvolvimento
-      
-      const companyData = {
-        subdomain: subdomain,
-        name: `Empresa ${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}`,
-        contactEmail: `contato@${subdomain}.dev`,
-        contactPhone: '+55 11 99999-9999',
-        address: 'Desenvolvimento Local',
-        cnpj: '00.000.000/0001-00',
-        plan: 'professional' as const,
-        status: 'active' as const,
-        ownerId: 'dev-user',
-        ownerEmail: `admin@${subdomain}.dev`,
-        maxUsers: 50,
-        maxBoards: 100,
-        smtpConfig: {
-          host: 'smtp.gmail.com',
-          port: 587,
-          secure: false,
-          user: '',
-          password: '',
-          fromName: `Empresa ${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}`,
-          fromEmail: `contato@${subdomain}.dev`
-        },
-        apiConfig: {
-          enabled: true,
-          token: '',
-          endpoint: `${this.getBaseUrl()}/api/v1/lead-intake`,
-          webhookUrl: ''
-        },
-        features: {
-          maxBoards: 10,
-          maxUsers: 20,
-          maxLeadsPerMonth: 5000,
-          maxEmailsPerMonth: 2500,
-          customBranding: true,
-          apiAccess: true,
-          webhooks: true,
-          advancedReports: true,
-          whiteLabel: false
-        }
-      };
-
-      const companyId = await this.companyService.createCompany(companyData);
-      const company = await this.companyService.getCompany(companyId);
-      
-      if (company) {
-        this.currentCompanySubject.next(company);
-        // Empresa criada com sucesso
-      }
-      
-    } catch (error) {
-      console.error('Erro ao criar empresa de desenvolvimento:', error);
-    }
+    // Automação removida conforme solicitado
   }
 }

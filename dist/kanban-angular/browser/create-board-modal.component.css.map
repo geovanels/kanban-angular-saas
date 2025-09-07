@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/components/create-board-modal/create-board-modal.component.scss"],
+  "sourcesContent": ["// Animações para o modal\n.fixed {\n  animation: fadeIn 0.2s ease-out;\n}\n\n.bg-white {\n  animation: slideUp 0.3s ease-out;\n}\n\n@keyframes fadeIn {\n  from {\n    opacity: 0;\n  }\n  to {\n    opacity: 1;\n  }\n}\n\n@keyframes slideUp {\n  from {\n    opacity: 0;\n    transform: translateY(20px);\n  }\n  to {\n    opacity: 1;\n    transform: translateY(0);\n  }\n}"],
+  "mappings": ";AACA,CAAA;AACE,aAAA,OAAA,KAAA;;AAGF,CAAA;AACE,aAAA,QAAA,KAAA;;AAGF,WAPE;AAQA;AACE,aAAA;;AAEF;AACE,aAAA;;;AAIJ,WAZE;AAaA;AACE,aAAA;AACA,eAAA,WAAA;;AAEF;AACE,aAAA;AACA,eAAA,WAAA;;;",
+  "names": []
+}
