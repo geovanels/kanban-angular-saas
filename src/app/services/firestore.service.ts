@@ -1,9 +1,11 @@
-import { Injectable, inject, Injector } from '@angular/core';
+
+import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { Firestore, collection, doc, getDoc, getDocs, addDoc, setDoc, 
          updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp,
-         writeBatch, orderBy, collectionGroup } from '@angular/fire/firestore';
+         writeBatch, orderBy, collectionGroup, limit } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { CompanyService } from './company.service';
+import { SubdomainService } from './subdomain.service';
 import { Company } from '../models/company.model';
 import { AuthService } from './auth.service';
 
@@ -25,7 +27,7 @@ export interface Column {
   name: string;
   order: number;
   color: string;
-  endStageType?: 'success' | 'failure' | 'none';
+  endStageType?: 'success' | 'fail' | 'none';
   boardId: string;
   slaDays?: number;
   createdAt?: any;
@@ -72,23 +74,55 @@ export class FirestoreService {
   
   // Current company context
   private currentCompanyId: string | null = null;
+
+  // Utilitário para tratar getDocs com permissões
+  private async safeGetDocs(collectionRef: any, operationName: string = 'buscar dados'): Promise<any[]> {
+    try {
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(collectionRef));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+    } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        console.log(`Permissões para ${operationName} não configuradas - retornando array vazio`);
+        return [];
+      }
+      console.error(`Erro crítico ao ${operationName}:`, error);
+      return [];
+    }
+  }
   private currentCompany: Company | null = null;
 
   // COMPANY CONTEXT METHODS
   async initializeCompanyContext(): Promise<Company | null> {
     try {
+      // 1) Tentar SubdomainService (empresa já carregada no app)
+      const subdomainService = this.injector.get(SubdomainService);
+      const fromSubdomain = subdomainService?.getCurrentCompany?.();
+      if (fromSubdomain?.id) {
+        this.setCompanyContext(fromSubdomain);
+        return fromSubdomain;
+      }
+
+      // 2) Tentar por subdomínio disponível
       const subdomain = this.companyService.getCompanySubdomain();
-      if (!subdomain) {
-        return null;
+      if (subdomain) {
+        const bySub = await this.companyService.getCompanyBySubdomain(subdomain);
+        if (bySub?.id) {
+          this.setCompanyContext(bySub);
+          return bySub;
+        }
       }
 
-      this.currentCompany = await this.companyService.getCompanyBySubdomain(subdomain);
-      if (!this.currentCompany) {
-        return null;
+      // 3) Tentar por email do usuário autenticado
+      const currentUser = this.authService.getCurrentUser();
+      if (currentUser?.email) {
+        const byEmail = await this.companyService.getCompanyByUserEmail(currentUser.email);
+        if (byEmail?.id) {
+          this.setCompanyContext(byEmail);
+          return byEmail;
+        }
       }
 
-      this.currentCompanyId = this.currentCompany.id!;
-      return this.currentCompany;
+      return null;
     } catch (error) {
       return null;
     }
@@ -127,9 +161,9 @@ export class FirestoreService {
       }
 
       try {
-        // Buscar boards da empresa atual
-        const boardsRef = collection(this.firestore, 'companies', companyId, 'boards');
-        const querySnapshot = await getDocs(boardsRef);
+        // Buscar boards da empresa atual (tudo dentro do InjectionContext)
+        const boardsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', companyId, 'boards'));
+        const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(boardsRef));
         let allBoards = querySnapshot.docs.map(doc => ({ 
           id: doc.id, 
           ...doc.data(),
@@ -139,8 +173,8 @@ export class FirestoreService {
         // Se não encontrou boards na nova estrutura, buscar na estrutura antiga
         if (allBoards.length === 0) {
           try {
-            const oldBoardsRef = collection(this.firestore, 'users', userId, 'boards');
-            const oldSnapshot = await getDocs(oldBoardsRef);
+            const oldBoardsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'users', userId, 'boards'));
+            const oldSnapshot = await runInInjectionContext(this.injector, () => getDocs(oldBoardsRef));
             const oldBoards = oldSnapshot.docs.map(doc => ({ 
               id: doc.id, 
               ...doc.data(),
@@ -178,7 +212,7 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const boardsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards');
+      const boardsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards'));
       const newBoard = {
         ...board,
         companyId: this.currentCompanyId,
@@ -187,7 +221,7 @@ export class FirestoreService {
         status: 'active' as const,
         createdAt: serverTimestamp()
       };
-      return await addDoc(boardsRef, newBoard);
+      return await runInInjectionContext(this.injector, () => addDoc(boardsRef, newBoard));
     } catch (error) {
       console.error('Erro ao criar quadro:', error);
       throw error;
@@ -204,8 +238,8 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const boardRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId);
-      return await updateDoc(boardRef, updates);
+      const boardRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId));
+      return await runInInjectionContext(this.injector, () => updateDoc(boardRef, updates));
     } catch (error) {
       console.error('Erro ao atualizar quadro:', error);
       throw error;
@@ -267,7 +301,7 @@ export class FirestoreService {
   private async deleteCollection(collectionPath: string): Promise<void> {
     try {
       const collectionRef = collection(this.firestore, collectionPath);
-      const snapshot = await getDocs(collectionRef);
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(collectionRef));
       
       if (snapshot.empty) {
         console.log(`📭 Coleção ${collectionPath} já está vazia`);
@@ -302,29 +336,23 @@ export class FirestoreService {
 
   // COLUMNS (Updated for multi-company)
   async getColumns(userId: string, boardId: string) {
-    try {
-      if (!this.currentCompanyId) {
-        await this.initializeCompanyContext();
-      }
-      
-      if (!this.currentCompanyId) {
-        console.error('Contexto da empresa não inicializado');
-        return [];
-      }
-
-      const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
-      const q = query(columnsRef, orderBy('order'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        companyId: this.currentCompanyId,
-        boardId: boardId
-      } as Column));
-    } catch (error) {
-      console.error('Erro ao buscar colunas:', error);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    
+    if (!this.currentCompanyId) {
+      console.log('Contexto da empresa não inicializado - retornando array vazio');
       return [];
     }
+
+    const columnsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'columns'));
+    const q = query(columnsRef, orderBy('order'));
+    const columns = await this.safeGetDocs(q, 'buscar colunas');
+    return columns.map(doc => ({ 
+      ...doc,
+      companyId: this.currentCompanyId,
+      boardId: boardId
+    } as Column));
   }
 
   async createColumn(userId: string, boardId: string, column: Omit<Column, 'id' | 'boardId'>) {
@@ -337,7 +365,7 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
+      const columnsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'columns'));
       const newColumn = {
         ...column,
         companyId: this.currentCompanyId,
@@ -345,7 +373,7 @@ export class FirestoreService {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-      return await addDoc(columnsRef, newColumn);
+      return await runInInjectionContext(this.injector, () => addDoc(columnsRef, newColumn));
     } catch (error) {
       console.error('Erro ao criar coluna:', error);
       throw error;
@@ -362,8 +390,8 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const columnRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns', columnId);
-      return await updateDoc(columnRef, updates);
+      const columnRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'columns', columnId));
+      return await runInInjectionContext(this.injector, () => updateDoc(columnRef, updates));
     } catch (error) {
       console.error('Erro ao atualizar coluna:', error);
       throw error;
@@ -380,8 +408,8 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const columnRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns', columnId);
-      return await deleteDoc(columnRef);
+      const columnRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'columns', columnId));
+      return await runInInjectionContext(this.injector, () => deleteDoc(columnRef));
     } catch (error) {
       console.error('Erro ao excluir coluna:', error);
       throw error;
@@ -400,8 +428,8 @@ export class FirestoreService {
         return [];
       }
 
-      const leadsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads');
-      const snapshot = await getDocs(leadsRef);
+      const leadsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads'));
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(leadsRef));
       return snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data(),
@@ -424,7 +452,7 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const leadsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads');
+      const leadsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads'));
       const newLead = {
         ...lead,
         companyId: this.currentCompanyId,
@@ -432,7 +460,7 @@ export class FirestoreService {
         createdAt: serverTimestamp(),
         movedToCurrentColumnAt: serverTimestamp()
       };
-      return await addDoc(leadsRef, newLead);
+      return await runInInjectionContext(this.injector, () => addDoc(leadsRef, newLead));
     } catch (error) {
       console.error('Erro ao criar lead:', error);
       throw error;
@@ -449,8 +477,8 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const leadRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId);
-      return await updateDoc(leadRef, updates);
+      const leadRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads', leadId));
+      return await runInInjectionContext(this.injector, () => updateDoc(leadRef, updates));
     } catch (error) {
       console.error('Erro ao atualizar lead:', error);
       throw error;
@@ -467,8 +495,8 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const leadRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId);
-      return await deleteDoc(leadRef);
+      const leadRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads', leadId));
+      return await runInInjectionContext(this.injector, () => deleteDoc(leadRef));
     } catch (error) {
       console.error('Erro ao excluir lead:', error);
       throw error;
@@ -485,12 +513,12 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      const leadRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId);
+      const leadRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads', leadId));
       const updates = {
         columnId: newColumnId,
         movedToCurrentColumnAt: serverTimestamp()
       };
-      return await updateDoc(leadRef, updates);
+      return await runInInjectionContext(this.injector, () => updateDoc(leadRef, updates));
     } catch (error) {
       console.error('Erro ao mover lead:', error);
       throw error;
@@ -518,14 +546,16 @@ export class FirestoreService {
     }
 
     const boardsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards');
-    return onSnapshot(boardsRef, snapshot => {
-      const boards = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        companyId: this.currentCompanyId
-      } as Board)).filter(board => (board.status || 'active') === 'active');
-      callback(boards);
-    });
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(boardsRef, snapshot => {
+        const boards = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data(),
+          companyId: this.currentCompanyId
+        } as Board)).filter(board => (board.status || 'active') === 'active');
+        callback(boards);
+      })
+    );
   }
 
   subscribeToColumns(userId: string, boardId: string, callback: (columns: Column[]) => void) {
@@ -549,15 +579,17 @@ export class FirestoreService {
 
     const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
     const q = query(columnsRef, orderBy('order'));
-    return onSnapshot(q, snapshot => {
-      const columns = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        companyId: this.currentCompanyId,
-        boardId: boardId
-      } as Column));
-      callback(columns);
-    });
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(q, snapshot => {
+        const columns = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data(),
+          companyId: this.currentCompanyId,
+          boardId: boardId
+        } as Column));
+        callback(columns);
+      })
+    );
   }
 
   subscribeToLeads(userId: string, boardId: string, callback: (leads: Lead[]) => void) {
@@ -580,15 +612,17 @@ export class FirestoreService {
     }
 
     const leadsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads');
-    return onSnapshot(leadsRef, snapshot => {
-      const leads = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        companyId: this.currentCompanyId,
-        boardId: boardId
-      } as Lead));
-      callback(leads);
-    });
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(leadsRef, snapshot => {
+        const leads = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data(),
+          companyId: this.currentCompanyId,
+          boardId: boardId
+        } as Lead));
+        callback(leads);
+      })
+    );
   }
 
   // BULK OPERATIONS (Updated for multi-company)
@@ -652,8 +686,8 @@ export class FirestoreService {
 
       const historyRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId, 'history');
       const q = query(historyRef, orderBy('timestamp', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
     } catch (error) {
       console.error('Erro ao buscar histórico do lead:', error);
       return [];
@@ -661,10 +695,51 @@ export class FirestoreService {
   }
 
   // PHASE FORM CONFIGURATIONS
+  // INITIAL FORM CONFIG (one per board)
+  async getInitialFormConfig(boardId: string): Promise<any | null> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return null;
+
+    try {
+      const docRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/initialForm/config`);
+      const snap = await runInInjectionContext(this.injector, () => getDoc(docRef));
+      if (snap.exists()) {
+        return { id: snap.id, ...snap.data() };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async saveInitialFormConfig(boardId: string, config: any): Promise<void> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) throw new Error('Contexto da empresa não inicializado');
+
+    const docRef = runInInjectionContext(this.injector, () => doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/initialForm/config`));
+    await runInInjectionContext(this.injector, () => setDoc(docRef, {
+      ...config,
+      boardId,
+      companyId: this.currentCompanyId,
+      updatedAt: serverTimestamp(),
+      createdAt: config?.createdAt || serverTimestamp()
+    }));
+  }
   async createPhaseFormConfig(userId: string, boardId: string, formConfig: any) {
-    const formConfigsRef = collection(this.firestore, `users/${userId}/boards/${boardId}/phaseFormConfigs`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) throw new Error('Contexto da empresa não inicializado');
+
+    const formConfigsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/phaseFormConfigs`);
     const newConfig = {
       ...formConfig,
+      boardId,
+      companyId: this.currentCompanyId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -672,46 +747,144 @@ export class FirestoreService {
   }
 
   async updatePhaseFormConfig(userId: string, boardId: string, configId: string, updates: any) {
-    const configRef = doc(this.firestore, `users/${userId}/boards/${boardId}/phaseFormConfigs/${configId}`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) throw new Error('Contexto da empresa não inicializado');
+
+    const configRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/phaseFormConfigs/${configId}`);
     const updatedConfig = {
       ...updates,
+      boardId,
+      companyId: this.currentCompanyId,
       updatedAt: serverTimestamp()
     };
     return await updateDoc(configRef, updatedConfig);
   }
 
   async getPhaseFormConfig(userId: string, boardId: string, columnId: string) {
-    const formConfigsRef = collection(this.firestore, `users/${userId}/boards/${boardId}/phaseFormConfigs`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return null;
+
+    const formConfigsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/phaseFormConfigs`);
     const q = query(formConfigsRef, where('columnId', '==', columnId));
-    const snapshot = await getDocs(q);
+    const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
     
     if (!snapshot.empty) {
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() };
+      const docSnap = snapshot.docs[0];
+      return { id: docSnap.id, ...docSnap.data() };
     }
     return null;
   }
 
   async deletePhaseFormConfig(userId: string, boardId: string, configId: string) {
-    const configRef = doc(this.firestore, `users/${userId}/boards/${boardId}/phaseFormConfigs/${configId}`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) throw new Error('Contexto da empresa não inicializado');
+
+    const configRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/phaseFormConfigs/${configId}`);
     return await deleteDoc(configRef);
+  }
+
+  async getInitialColumnId(boardId: string): Promise<string | null> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return null;
+
+    const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
+    const qInitial = query(columnsRef, where('isInitialPhase', '==', true), orderBy('order'), limit(1));
+    const snap = await runInInjectionContext(this.injector, () => getDocs(qInitial));
+    if (!snap.empty) return snap.docs[0].id;
+    return null;
+  }
+
+  // FLOW CONFIG (allowed transitions between phases)
+  async getFlowConfig(boardId: string): Promise<any | null> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return null;
+
+    try {
+      const flowDoc = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/flow/config`);
+      const snap = await runInInjectionContext(this.injector, () => getDoc(flowDoc));
+      if (snap.exists()) {
+        return { id: snap.id, ...snap.data() } as any;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async saveFlowConfig(boardId: string, config: any): Promise<void> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) throw new Error('Contexto da empresa não inicializado');
+
+    const flowDoc = runInInjectionContext(this.injector, () => doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/flow/config`));
+    await runInInjectionContext(this.injector, () => setDoc(flowDoc, {
+      ...config,
+      boardId,
+      companyId: this.currentCompanyId,
+      updatedAt: serverTimestamp(),
+      createdAt: config?.createdAt || serverTimestamp()
+    }));
+  }
+
+  async unsetOtherInitialPhases(boardId: string, keepColumnId: string): Promise<void> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return;
+
+    const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
+    const snap = await runInInjectionContext(this.injector, () => getDocs(columnsRef));
+    const updates: Promise<any>[] = [];
+    snap.docs.forEach(d => {
+      if (d.id !== keepColumnId && d.data()['isInitialPhase']) {
+        updates.push(updateDoc(doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'columns', d.id), { isInitialPhase: false }));
+      }
+    });
+    await Promise.all(updates);
   }
 
   // EMAIL OUTBOX MANAGEMENT (usando coleção 'mail' como no sistema original)
   async getOutboxEmails(userId: string, boardId: string) {
-    const emailsRef = collection(this.firestore, `users/${userId}/boards/${boardId}/mail`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      console.log('Contexto da empresa não inicializado - retornando array vazio');
+      return [];
+    }
+
+    const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
     const q = query(emailsRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    // Filtrar apenas emails que têm 'to' (como no sistema original)
+    const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
     return snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter((item: any) => item.to);
   }
 
   async createOutboxEmail(userId: string, boardId: string, emailData: any) {
-    const emailsRef = collection(this.firestore, `users/${userId}/boards/${boardId}/mail`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
     const newEmail = {
       ...emailData,
+      companyId: this.currentCompanyId,
+      boardId: boardId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -719,7 +892,14 @@ export class FirestoreService {
   }
 
   async updateOutboxEmail(userId: string, boardId: string, emailId: string, updates: any) {
-    const emailRef = doc(this.firestore, `users/${userId}/boards/${boardId}/mail/${emailId}`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const emailRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail/${emailId}`);
     const updatedEmail = {
       ...updates,
       updatedAt: serverTimestamp()
@@ -728,25 +908,47 @@ export class FirestoreService {
   }
 
   async deleteOutboxEmail(userId: string, boardId: string, emailId: string) {
-    const emailRef = doc(this.firestore, `users/${userId}/boards/${boardId}/mail/${emailId}`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const emailRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail/${emailId}`);
     return await deleteDoc(emailRef);
   }
 
   subscribeToOutboxEmails(userId: string, boardId: string, callback: (emails: any[]) => void) {
-    const emailsRef = collection(this.firestore, `users/${userId}/boards/${boardId}/mail`);
+    if (!this.currentCompanyId) {
+      console.warn('Contexto da empresa não definido, retornando array vazio');
+      callback([]);
+      return () => {};
+    }
+
+    const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
     const q = query(emailsRef, orderBy('createdAt', 'desc'));
-    return onSnapshot(q, snapshot => {
-      const emails = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((item: any) => item.to); // Filtrar apenas emails que têm 'to'
-      callback(emails);
-    });
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(q, snapshot => {
+        const emails = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter((item: any) => item.to);
+        callback(emails);
+      })
+    );
   }
 
   async clearOutboxEmails(userId: string, boardId: string): Promise<void> {
     try {
-      const outboxRef = collection(this.firestore, `users/${userId}/boards/${boardId}/mail`);
-      const querySnapshot = await getDocs(outboxRef);
+      if (!this.currentCompanyId) {
+        await this.initializeCompanyContext();
+      }
+      if (!this.currentCompanyId) {
+        throw new Error('Contexto da empresa não inicializado');
+      }
+
+      const outboxRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
+      const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(outboxRef));
       
       const deletePromises = querySnapshot.docs.map(docSnapshot => 
         deleteDoc(docSnapshot.ref)
@@ -763,45 +965,49 @@ export class FirestoreService {
   // EMAIL TEMPLATES MANAGEMENT
   async getEmailTemplates(userId: string, boardId: string) {
     try {
-      // Usar estrutura multi-empresa se há contexto de empresa
-      if (this.currentCompanyId) {
-        const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
-        console.log('Buscando templates em (multi-empresa):', templatesPath);
-        
-        const templatesRef = collection(this.firestore, templatesPath);
-        const snapshot = await getDocs(templatesRef);
-        const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        console.log(`Templates encontrados (multi-empresa): ${templates.length} itens`);
-        return templates;
+      if (!this.currentCompanyId) {
+        await this.initializeCompanyContext();
       }
-      
-      // Fallback para estrutura antiga
-      const templatesPath = userId ? `users/${userId}/boards/${boardId}/emailTemplates` : `boards/${boardId}/emailTemplates`;
-      console.log('Buscando templates em (estrutura antiga):', templatesPath);
+      if (!this.currentCompanyId) {
+        console.warn('Contexto da empresa não inicializado - retornando array vazio');
+        return [];
+      }
+
+      const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
+      console.log('Buscando templates em (multi-empresa):', templatesPath);
       
       const templatesRef = collection(this.firestore, templatesPath);
-      const snapshot = await getDocs(templatesRef);
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(templatesRef));
       const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      console.log(`Templates encontrados (estrutura antiga): ${templates.length} itens`);
+      console.log(`Templates encontrados (multi-empresa): ${templates.length} itens`);
       return templates;
-    } catch (error) {
-      console.error('Erro ao buscar templates:', error);
+    } catch (error: any) {
+      // Tratar erros de permissão silenciosamente
+      if (error.code === 'permission-denied') {
+        console.log('Permissões de templates não configuradas - retornando array vazio');
+        return [];
+      }
+      // Outros erros são mantidos para debug
+      console.error('Erro crítico ao buscar templates:', error);
       return [];
     }
   }
 
   async createEmailTemplate(userId: string, boardId: string, templateData: any) {
-    // Usar estrutura multi-empresa se há contexto de empresa
-    const templatesPath = this.currentCompanyId 
-      ? `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`
-      : `users/${userId}/boards/${boardId}/emailTemplates`;
-    
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
     const templatesRef = collection(this.firestore, templatesPath);
     const newTemplate = {
       ...templateData,
       boardId: boardId, // Adicionar boardId para o filtro do collectionGroup
+      companyId: this.currentCompanyId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -810,15 +1016,19 @@ export class FirestoreService {
   }
 
   async updateEmailTemplate(userId: string, boardId: string, templateId: string, updates: any) {
-    // Usar estrutura multi-empresa se há contexto de empresa
-    const templatePath = this.currentCompanyId 
-      ? `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates/${templateId}`
-      : `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`;
-    
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const templatePath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates/${templateId}`;
     const templateRef = doc(this.firestore, templatePath);
     const updatedTemplate = {
       ...updates,
       boardId: boardId, // Garantir que o boardId esteja sempre presente
+      companyId: this.currentCompanyId,
       updatedAt: serverTimestamp()
     };
     console.log('Atualizando template em:', templatePath, updatedTemplate);
@@ -826,11 +1036,14 @@ export class FirestoreService {
   }
 
   async deleteEmailTemplate(userId: string, boardId: string, templateId: string) {
-    // Usar estrutura multi-empresa se há contexto de empresa
-    const templatePath = this.currentCompanyId 
-      ? `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates/${templateId}`
-      : `users/${userId}/boards/${boardId}/emailTemplates/${templateId}`;
-    
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const templatePath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates/${templateId}`;
     const templateRef = doc(this.firestore, templatePath);
     return await deleteDoc(templateRef);
   }
@@ -850,20 +1063,29 @@ export class FirestoreService {
     
     const templatesRef = collection(this.firestore, templatesPath);
     
-    return onSnapshot(templatesRef, 
-      snapshot => {
-        const templates = snapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          path: doc.ref.path, 
-          ...doc.data() 
-        }));
-        console.log(`Templates encontrados (multi-empresa) para boardId: ${boardId}:`, templates.length);
-        callback(templates);
-      },
-      error => {
-        console.error('Erro ao subscrever templates (multi-empresa):', error);
-        callback([]);
-      }
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(templatesRef, 
+        snapshot => {
+          const templates = snapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            path: doc.ref.path, 
+            ...doc.data() 
+          }));
+          console.log(`Templates encontrados (multi-empresa) para boardId: ${boardId}:`, templates.length);
+          callback(templates);
+        },
+        error => {
+          // Tratar erros de permissão silenciosamente em desenvolvimento
+          if (error.code === 'permission-denied') {
+            console.log('Permissões de templates não configuradas - retornando array vazio');
+            callback([]);
+            return;
+          }
+          // Outros erros são mantidos para debug
+          console.error('Erro crítico ao subscrever templates:', error);
+          callback([]);
+        }
+      )
     );
   }
 
@@ -878,7 +1100,7 @@ export class FirestoreService {
         console.log('Buscando automações em (multi-empresa):', automationsPath);
         
         const automationsRef = collection(this.firestore, automationsPath);
-        const snapshot = await getDocs(automationsRef);
+        const snapshot = await runInInjectionContext(this.injector, () => getDocs(automationsRef));
         const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         console.log(`Automações encontradas (multi-empresa): ${automations.length} itens`);
@@ -891,91 +1113,123 @@ export class FirestoreService {
       console.log('Buscando automações em (estrutura antiga):', automationsPath);
       
       const automationsRef = collection(this.firestore, automationsPath);
-      const snapshot = await getDocs(automationsRef);
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(automationsRef));
       const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       console.log(`Automações encontradas (estrutura antiga): ${automations.length} itens`);
       return automations;
-    } catch (error) {
-      console.error('Erro ao buscar automações:', error);
+    } catch (error: any) {
+      // Tratar erros de permissão silenciosamente
+      if (error.code === 'permission-denied') {
+        console.log('Permissões de automações não configuradas - retornando array vazio');
+        return [];
+      }
+      // Outros erros são mantidos para debug
+      console.error('Erro crítico ao buscar automações:', error);
       return [];
     }
   }
 
   async createAutomation(userId: string, boardId: string, automationData: any) {
-    const automationsRef = collection(this.firestore, `users/${userId}/boards/${boardId}/automations`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const automationsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/automations`);
     const newAutomation = {
       ...automationData,
-      boardId: boardId, // Adicionar boardId para o filtro do collectionGroup
+      boardId: boardId,
+      companyId: this.currentCompanyId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       active: true
     };
-    console.log('Criando automação em:', `users/${userId}/boards/${boardId}/automations`, newAutomation);
+    console.log('Criando automação em (multi-empresa):', `companies/${this.currentCompanyId}/boards/${boardId}/automations`, newAutomation);
     return await addDoc(automationsRef, newAutomation);
   }
 
   async updateAutomation(userId: string, boardId: string, automationId: string, updates: any) {
-    const automationRef = doc(this.firestore, `users/${userId}/boards/${boardId}/automations/${automationId}`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const automationRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`);
     const updatedAutomation = {
       ...updates,
-      boardId: boardId, // Garantir que o boardId esteja sempre presente
+      boardId: boardId,
+      companyId: this.currentCompanyId,
       updatedAt: serverTimestamp()
     };
-    console.log('Atualizando automação em:', `users/${userId}/boards/${boardId}/automations/${automationId}`, updatedAutomation);
+    console.log('Atualizando automação em (multi-empresa):', `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`, updatedAutomation);
     return await updateDoc(automationRef, updatedAutomation);
   }
 
 
   async deleteAutomation(userId: string, boardId: string, automationId: string) {
-    const automationRef = doc(this.firestore, `users/${userId}/boards/${boardId}/automations/${automationId}`);
-    console.log('Excluindo automação:', `users/${userId}/boards/${boardId}/automations/${automationId}`);
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) {
+      throw new Error('Contexto da empresa não inicializado');
+    }
+
+    const automationRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`);
+    console.log('Excluindo automação (multi-empresa):', `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`);
     return await deleteDoc(automationRef);
   }
 
   // AUTOMATION HISTORY MANAGEMENT
   subscribeToAutomationHistory(userId: string, boardId: string, automationId: string, callback: (historyItems: any[]) => void) {
     console.log('Subscribing to automation history for:', { userId, boardId, automationId });
-    
-    const historyRef = collection(this.firestore, `users/${userId}/boards/${boardId}/automationHistory`);
+
+    if (!this.currentCompanyId) {
+      console.warn('Contexto da empresa não definido, retornando array vazio');
+      callback([]);
+      return () => {};
+    }
+
+    const historyRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/automationHistory`);
     const q = query(historyRef, where("automationId", "==", automationId));
-    
-    return onSnapshot(q, 
-      snapshot => {
-        const historyItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`Histórico de automação encontrado: ${historyItems.length} itens`);
-        callback(historyItems);
-      },
-      error => {
-        console.error('Erro ao buscar histórico de automação:', error);
-        // Tentar estrutura alternativa
-        const altHistoryRef = collection(this.firestore, `boards/${boardId}/automationHistory`);
-        const altQuery = query(altHistoryRef, where("automationId", "==", automationId));
-        
-        return onSnapshot(altQuery,
-          snapshot => {
-            const historyItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            console.log(`Histórico de automação (estrutura alternativa): ${historyItems.length} itens`);
-            callback(historyItems);
-          },
-          altError => {
-            console.error('Erro ao buscar histórico de automação (estrutura alternativa):', altError);
-            callback([]);
-          }
-        );
-      }
+
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(q,
+        snapshot => {
+          const historyItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          console.log(`Histórico de automação (multi-empresa): ${historyItems.length} itens`);
+          callback(historyItems);
+        },
+        error => {
+          console.error('Erro ao buscar histórico de automação (multi-empresa):', error);
+          callback([]);
+        }
+      )
     );
   }
 
   async addAutomationHistoryItem(userId: string, boardId: string, historyItem: any) {
     try {
-      const historyRef = collection(this.firestore, `users/${userId}/boards/${boardId}/automationHistory`);
+      if (!this.currentCompanyId) {
+        await this.initializeCompanyContext();
+      }
+      if (!this.currentCompanyId) {
+        throw new Error('Contexto da empresa não inicializado');
+      }
+
+      const historyRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/automationHistory`);
       const docRef = await addDoc(historyRef, {
         ...historyItem,
-        timestamp: new Date(),
-        createdAt: new Date()
+        companyId: this.currentCompanyId,
+        boardId: boardId,
+        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp()
       });
-      console.log('Item de histórico de automação adicionado:', docRef.id);
+      console.log('Item de histórico de automação adicionado (multi-empresa):', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('Erro ao adicionar item de histórico de automação:', error);
@@ -998,20 +1252,29 @@ export class FirestoreService {
     
     const automationsRef = collection(this.firestore, automationsPath);
     
-    return onSnapshot(automationsRef, 
-      snapshot => {
-        const automations = snapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          path: doc.ref.path, 
-          ...doc.data() 
-        }));
-        console.log(`Automações encontradas (multi-empresa) para boardId: ${boardId}:`, automations.length);
-        callback(automations);
-      },
-      error => {
-        console.error('Erro ao subscrever automações (multi-empresa):', error);
-        callback([]);
-      }
+    return runInInjectionContext(this.injector, () => 
+      onSnapshot(automationsRef, 
+        snapshot => {
+          const automations = snapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            path: doc.ref.path, 
+            ...doc.data() 
+          }));
+          console.log(`Automações encontradas (multi-empresa) para boardId: ${boardId}:`, automations.length);
+          callback(automations);
+        },
+        error => {
+          // Tratar erros de permissão silenciosamente em desenvolvimento
+          if (error.code === 'permission-denied') {
+            console.log('Permissões de automações não configuradas - retornando array vazio');
+            callback([]);
+            return;
+          }
+          // Outros erros são mantidos para debug
+          console.error('Erro crítico ao subscrever automações:', error);
+          callback([]);
+        }
+      )
     );
   }
 
@@ -1025,7 +1288,7 @@ export class FirestoreService {
       if (this.currentCompanyId) {
         // Listar todos os boards da empresa atual
         const boardsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards`);
-        const boardsSnapshot = await getDocs(boardsRef);
+        const boardsSnapshot = await runInInjectionContext(this.injector, () => getDocs(boardsRef));
         
         for (const boardDoc of boardsSnapshot.docs) {
           const boardId = boardDoc.id;
@@ -1040,7 +1303,7 @@ export class FirestoreService {
           for (const subcollectionName of subcollections) {
             try {
               const subcollectionRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/${subcollectionName}`);
-              const subcollectionSnapshot = await getDocs(subcollectionRef);
+              const subcollectionSnapshot = await runInInjectionContext(this.injector, () => getDocs(subcollectionRef));
               
               subcollectionSnapshot.docs.forEach(doc => {
                 batch.delete(doc.ref);
@@ -1068,7 +1331,7 @@ export class FirestoreService {
         for (const structureName of oldBoardStructures) {
           try {
             const structureRef = collection(this.firestore, `users/${currentUserId}/${structureName}`);
-            const structureSnapshot = await getDocs(structureRef);
+            const structureSnapshot = await runInInjectionContext(this.injector, () => getDocs(structureRef));
             
             structureSnapshot.docs.forEach(doc => {
               batch.delete(doc.ref);

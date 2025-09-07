@@ -35,10 +35,8 @@ export class UserManagementComponent implements OnInit {
 
 
   async ngOnInit() {
+    await this.ensureCompanyContext();
     await this.loadUserData();
-    
-    // Garantir que a empresa Gobuyer existe
-    await this.ensureGobuyerCompany();
     
     // Primeiro, tentar sincronizar o usuário atual com a empresa
     await this.forceAddCurrentUser();
@@ -47,17 +45,6 @@ export class UserManagementComponent implements OnInit {
     await this.loadCompanyUsers();
   }
 
-  private async ensureGobuyerCompany() {
-    try {
-      await this.companyService.seedGobuyerCompany();
-      
-      // Recarregar dados da empresa
-      const company = this.subdomainService.getCurrentCompany();
-      this.currentCompany.set(company);
-    } catch (error) {
-      // Error handled silently
-    }
-  }
 
   private async forceAddCurrentUser() {
     const currentUser = this.authService.getCurrentUser();
@@ -124,11 +111,36 @@ export class UserManagementComponent implements OnInit {
     this.currentUser.set(user);
   }
 
+  private async ensureCompanyContext() {
+    let company = this.subdomainService.getCurrentCompany();
+    if (!company) {
+      try {
+        company = await this.subdomainService.initializeFromSubdomain();
+      } catch {}
+    }
+    if (!company) {
+      const currentUser = this.authService.getCurrentUser();
+      if (currentUser?.email) {
+        try {
+          const found = await this.companyService.getCompanyByUserEmail(currentUser.email);
+          if (found) {
+            this.subdomainService.setCurrentCompany(found);
+            this.currentCompany.set(found);
+          }
+        } catch {}
+      }
+    } else {
+      this.currentCompany.set(company);
+    }
+  }
+
   private async loadCompanyUsers() {
-    const company = this.currentCompany();
+    let company = this.currentCompany();
     
     if (!company || !company.id) {
-      return;
+      await this.ensureCompanyContext();
+      company = this.currentCompany();
+      if (!company || !company.id) return;
     }
 
     this.isLoading.set(true);
@@ -255,9 +267,22 @@ export class UserManagementComponent implements OnInit {
         this.inviteSuccess.set(null);
       }, 2000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao convidar usuário:', error);
-      this.inviteError.set('Erro ao enviar convite. Tente novamente.');
+      
+      let errorMessage = 'Erro ao enviar convite. Tente novamente.';
+      
+      if (error?.message) {
+        if (error.message.includes('Configuração SMTP')) {
+          errorMessage = `❌ ${error.message}. Configure o SMTP na seção de configurações antes de enviar convites.`;
+        } else if (error.message.includes('email de convite')) {
+          errorMessage = error.message;
+        } else {
+          errorMessage = `Erro: ${error.message}`;
+        }
+      }
+      
+      this.inviteError.set(errorMessage);
     } finally {
       this.inviteLoading.set(false);
     }

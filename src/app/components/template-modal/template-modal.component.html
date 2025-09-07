@@ -104,52 +104,20 @@
           </div>
           
           <div class="border border-gray-300 rounded-lg overflow-hidden">
-            <!-- Editor Toolbar -->
-            <div *ngIf="!showHtmlMode" class="border-b border-gray-300 p-2 bg-gray-50">
-              <div class="flex gap-1 flex-wrap">
-                <button type="button" (click)="execCommand('bold')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Negrito">
-                  <strong>B</strong>
-                </button>
-                <button type="button" (click)="execCommand('italic')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Itálico">
-                  <em>I</em>
-                </button>
-                <button type="button" (click)="execCommand('underline')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Sublinhado">
-                  <u>U</u>
-                </button>
-                <div class="border-l border-gray-300 mx-1"></div>
-                <button type="button" (click)="execCommand('insertUnorderedList')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Lista">
-                  •
-                </button>
-                <button type="button" (click)="execCommand('insertOrderedList')" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Lista Numerada">
-                  1.
-                </button>
-                <div class="border-l border-gray-300 mx-1"></div>
-                <button type="button" (click)="createLink()" class="px-2 py-1 text-sm bg-white border rounded hover:bg-gray-100" title="Link">
-                  🔗
-                </button>
-              </div>
+            <!-- Visual -->
+            <div *ngIf="!showHtmlMode">
+              <ckeditor 
+                [editor]="Editor"
+                [config]="editorConfig"
+                formControlName="body"
+                class="min-h-[420px] max-h-[70vh] overflow-auto">
+              </ckeditor>
             </div>
-            
-            <!-- Editor Visual -->
-            <div 
-              *ngIf="!showHtmlMode"
-              #visualEditor
-              contenteditable="true"
-              (input)="onVisualEditorInput($event)"
-              class="min-h-[300px] p-4 focus:outline-none"
-              [innerHTML]="editorContent"
-              style="max-height: 400px; overflow-y: auto;">
-            </div>
-            
-            <!-- Editor HTML -->
-            <textarea 
-              *ngIf="showHtmlMode"
-              #htmlEditor
-              (input)="onHtmlEditorInput($event)"
-              [value]="editorContent"
-              class="w-full min-h-[300px] max-h-[400px] p-4 font-mono text-sm focus:outline-none resize-none"
-              placeholder="Digite o HTML aqui...">
-            </textarea>
+            <!-- HTML -->
+            <textarea *ngIf="showHtmlMode"
+              formControlName="body"
+              class="w-full min-h-[420px] max-h-[70vh] p-4 font-mono text-sm focus:outline-none resize-y overflow-auto whitespace-pre"
+              placeholder="Digite o HTML aqui..."></textarea>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { CompanyService } from '../../services/company.service';
@@ -9,7 +9,7 @@ import { Company } from '../../models/company.model';
 @Component({
   selector: 'app-api-config',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule],
   template: `
     <div class="api-config-container">
       <!-- API Configuration -->
@@ -37,7 +37,10 @@ import { Company } from '../../models/company.model';
                     <i class="fas fa-copy"></i>
                   </button>
                 </div>
-                <div class="form-text">URL para envio de leads via API</div>
+                <div class="form-text">
+                  <span *ngIf="getCurrentBoardId()">URL para envio de leads neste quadro ({{ getCurrentBoardId() }})</span>
+                  <span *ngIf="!getCurrentBoardId()">URL base para envio de leads. Adicione /{{ '{' }}boardId{{ '}' }} ao final para especificar o quadro</span>
+                </div>
               </div>
             </div>
             
@@ -246,11 +249,39 @@ import { Company } from '../../models/company.model';
             <div class="col-md-6">
               <h6>Campos Opcionais:</h6>
               <ul class="small">
-                <li><strong>phaseId:</strong> ID da fase de destino</li>
+                <li><strong>companyId:</strong> Obrigatório na URL (ex: .../leadIntakeHttp/companies/{{ '{' }}companyId{{ '}' }})</li>
+                <li><strong>boardId:</strong> Recomendado na URL (ex: .../boards/{{ '{' }}boardId{{ '}' }})</li>
                 <li><strong>source:</strong> Origem do lead</li>
                 <li><strong>utm_*:</strong> Parâmetros UTM</li>
                 <li><strong>customFields:</strong> Campos personalizados</li>
               </ul>
+              
+              <div class="mt-3" *ngIf="subdomainService.isDevelopment()">
+                <h6 class="small text-muted">Configuração de Desenvolvimento:</h6>
+                <p class="small text-muted mb-1">Porta do Firebase Functions: <strong>{{ getCurrentFunctionsPort() }}</strong></p>
+                <button 
+                  class="btn btn-sm btn-outline-secondary" 
+                  (click)="showPortConfig = !showPortConfig">
+                  {{ showPortConfig ? 'Ocultar' : 'Configurar Porta' }}
+                </button>
+                
+                <div class="mt-2" *ngIf="showPortConfig">
+                  <div class="input-group input-group-sm">
+                    <input 
+                      type="number" 
+                      class="form-control" 
+                      [(ngModel)]="customPort"
+                      placeholder="3001">
+                    <button 
+                      class="btn btn-outline-primary" 
+                      type="button"
+                      (click)="updateFunctionsPort()">
+                      Atualizar
+                    </button>
+                  </div>
+                  <small class="text-muted">Reinicie a página após alterar a porta</small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -318,7 +349,7 @@ import { Company } from '../../models/company.model';
 })
 export class ApiConfigComponent implements OnInit {
   private apiService = inject(ApiService);
-  private subdomainService = inject(SubdomainService);
+  subdomainService = inject(SubdomainService);
   private companyService = inject(CompanyService);
 
   currentCompany = signal<Company | null>(null);
@@ -330,6 +361,10 @@ export class ApiConfigComponent implements OnInit {
   selectedLanguage = signal('curl');
   apiStats = signal<any>(null);
   integrationExamples = signal<{ [key: string]: string }>({});
+  
+  // Para configuração de porta em desenvolvimento
+  showPortConfig = false;
+  customPort: number = 3001;
 
   ngOnInit() {
     this.currentCompany.set(this.subdomainService.getCurrentCompany());
@@ -339,7 +374,22 @@ export class ApiConfigComponent implements OnInit {
 
   getLeadIntakeUrl(): string {
     try {
-      return this.apiService.getLeadIntakeUrl();
+      const boardId = this.getCurrentBoardId();
+      const companyId = this.currentCompany()?.id || '{COMPANY_ID}';
+      const url = this.apiService.getLeadIntakeUrl(companyId, boardId);
+      
+      // DEBUG: Logs temporários
+      console.log('=== DEBUG API ENDPOINT ===');
+      console.log('BoardId detectado:', boardId);
+      console.log('URL atual:', window.location.pathname);
+      console.log('URL atual completa:', window.location.href);
+      console.log('URL gerada:', url);
+      console.log('URL completa deveria ser:', url + (boardId ? '' : '/' + boardId));
+      console.log('Empresa atual:', this.currentCompany());
+      console.log('isDevelopment:', this.subdomainService.isDevelopment());
+      console.log('Porta no localStorage:', localStorage.getItem('firebase-functions-port'));
+      
+      return url;
     } catch (error) {
       return 'Erro: empresa não configurada';
     }
@@ -348,18 +398,32 @@ export class ApiConfigComponent implements OnInit {
   getCurrentBoardId(): string | undefined {
     // 1. Buscar o boardId da URL atual
     const url = window.location.pathname;
-    const boardMatch = url.match(/\/board\/([^\/]+)/);
+    console.log('DEBUG getCurrentBoardId - URL pathname:', url);
+    
+    // Padrão: /kanban/BOARD_ID ou /board/BOARD_ID
+    const boardMatch = url.match(/\/(?:kanban|board)\/([^\/\?]+)/);
+    console.log('DEBUG getCurrentBoardId - Regex match:', boardMatch);
     if (boardMatch) {
+      console.log('DEBUG getCurrentBoardId - BoardId encontrado na URL:', boardMatch[1]);
       return boardMatch[1];
     }
     
-    // 2. Buscar no localStorage (último quadro acessado)
+    // 2. Buscar nos parâmetros da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const boardIdParam = urlParams.get('boardId');
+    console.log('DEBUG getCurrentBoardId - BoardId nos parâmetros:', boardIdParam);
+    if (boardIdParam) {
+      return boardIdParam;
+    }
+    
+    // 3. Buscar no localStorage (último quadro acessado)
     const lastBoardId = localStorage.getItem('lastBoardId');
+    console.log('DEBUG getCurrentBoardId - BoardId no localStorage:', lastBoardId);
     if (lastBoardId) {
       return lastBoardId;
     }
     
-    // 3. Se não encontrar, retornar undefined (usará configuração padrão)
+    // 4. Se não encontrar, retornar undefined (usará configuração padrão)
     return undefined;
   }
 
@@ -504,5 +568,21 @@ export class ApiConfigComponent implements OnInit {
   private clearMessages() {
     this.successMessage.set(null);
     this.errorMessage.set(null);
+  }
+
+  // Métodos para gerenciar porta do Firebase Functions
+  getCurrentFunctionsPort(): number {
+    const storedPort = localStorage.getItem('firebase-functions-port');
+    return storedPort ? parseInt(storedPort, 10) : 3001;
+  }
+
+  updateFunctionsPort() {
+    if (this.customPort && this.customPort > 0 && this.customPort <= 65535) {
+      this.apiService.setCustomFunctionsPort(this.customPort);
+      this.showSuccess(`Porta atualizada para ${this.customPort}. Recarregue a página para aplicar.`);
+      this.loadIntegrationExamples(); // Recarregar exemplos com nova porta
+    } else {
+      this.showError('Por favor, insira uma porta válida (1-65535).');
+    }
   }
 }

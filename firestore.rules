@@ -1,0 +1,151 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserEmail() {
+      return request.auth.token.email;
+    }
+    
+    function getUserUid() {
+      return request.auth.uid;
+    }
+    
+    // Verifica owner da empresa lendo o doc da empresa (email OU uid)
+    function isCompanyOwner(companyId) {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/companies/$(companyId)).data.ownerEmail == getUserEmail() ||
+        get(/databases/$(database)/documents/companies/$(companyId)).data.ownerId == getUserUid()
+      );
+    }
+    
+    function isCompanyUser(companyId) {
+      return isAuthenticated() && (
+        isCompanyOwner(companyId) ||
+        exists(/databases/$(database)/documents/companies/$(companyId)/users/$(getUserEmail()))
+      );
+    }
+    
+    function getCompanyUserRole(companyId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)/users/$(getUserEmail())).data.role;
+    }
+    
+    function canManageUsers(companyId) {
+      return isCompanyOwner(companyId) || 
+             (isCompanyUser(companyId) && getCompanyUserRole(companyId) in ['admin', 'manager']);
+    }
+
+    // Companies collection
+    match /companies/{companyId} {
+      // Allow reading company data if owner (email/uid) or user of the company
+      allow read: if isAuthenticated() && (
+        resource.data.ownerEmail == getUserEmail() || resource.data.ownerId == getUserUid() ||
+        exists(/databases/$(database)/documents/companies/$(companyId)/users/$(getUserEmail()))
+      );
+      
+      // Allow creating companies if authenticated (less restrictive for development)
+      allow create: if isAuthenticated();
+      
+      // Allow updating companies if user is owner or admin (with fallback for development)
+      allow update: if isAuthenticated() && (
+        isCompanyOwner(companyId) || 
+        (isCompanyUser(companyId) && getCompanyUserRole(companyId) == 'admin') ||
+        resource.data.ownerEmail == getUserEmail()
+      );
+      
+      // Only owner can delete companies
+      allow delete: if isCompanyOwner(companyId);
+      
+      // Company users subcollection
+      match /users/{userEmail} {
+        // Allow reading own membership doc to break discovery circular dependency
+        allow read: if (isAuthenticated() && userEmail == getUserEmail()) || isCompanyUser(companyId);
+        
+        // Allow creating/updating/deleting users if can manage users
+        allow create, update, delete: if canManageUsers(companyId);
+      }
+      
+      // Company boards subcollection  
+      match /boards/{boardId} {
+        // Allow read/write if user is part of company
+        allow read, write: if isCompanyUser(companyId);
+        
+        // Board leads subcollection (direto sob board)
+        match /leads/{leadId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board columns subcollection
+        match /columns/{columnId} {
+          allow read, write: if isCompanyUser(companyId);
+          
+          // Board leads subcollection
+          match /leads/{leadId} {
+            allow read, write: if isCompanyUser(companyId);
+          }
+        }
+
+        // Board email templates
+        match /emailTemplates/{templateId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board automations
+        match /automations/{automationId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board automation history
+        match /automationHistory/{historyId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board outbox/mail
+        match /mail/{mailId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board phase form configurations
+        match /phaseFormConfigs/{configId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board initial form configuration
+        match /initialForm/{docId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+      }
+      
+      // Company settings
+      match /settings/{document=**} {
+        allow read, write: if isCompanyUser(companyId);
+      }
+      
+      // Company templates
+      match /templates/{templateId} {
+        allow read: if isCompanyUser(companyId);
+        allow write: if canManageUsers(companyId);
+      }
+    }
+    
+    // Users collection (global user profiles)
+    match /users/{userId} {
+      // Users can read/write their own profile
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Public collections that can be read by anyone
+    match /public/{document=**} {
+      allow read: if true;
+    }
+    
+    // Deny all other requests
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,182 +1,39 @@
-[debug] [2025-09-02T14:12:14.163Z] ----------------------------------------------------------------------
-[debug] [2025-09-02T14:12:14.165Z] Command:       /Users/geovanelopes/.nvm/versions/node/v20.19.4/bin/node /Users/geovanelopes/.nvm/versions/node/v20.19.4/bin/firebase emulators:start --only functions
-[debug] [2025-09-02T14:12:14.165Z] CLI Version:   14.15.1
-[debug] [2025-09-02T14:12:14.165Z] Platform:      darwin
-[debug] [2025-09-02T14:12:14.165Z] Node Version:  v20.19.4
-[debug] [2025-09-02T14:12:14.165Z] Time:          Tue Sep 02 2025 11:12:14 GMT-0300 (Horário Padrão de Brasília)
-[debug] [2025-09-02T14:12:14.165Z] ----------------------------------------------------------------------
+[debug] [2025-09-07T15:34:20.889Z] ----------------------------------------------------------------------
+[debug] [2025-09-07T15:34:20.893Z] Command:       /Users/geovanelopes/.nvm/versions/node/v20.19.4/bin/node /Users/geovanelopes/.nvm/versions/node/v20.19.4/bin/firebase functions:shell
+[debug] [2025-09-07T15:34:20.893Z] CLI Version:   14.15.1
+[debug] [2025-09-07T15:34:20.894Z] Platform:      darwin
+[debug] [2025-09-07T15:34:20.894Z] Node Version:  v20.19.4
+[debug] [2025-09-07T15:34:20.894Z] Time:          Sun Sep 07 2025 12:34:20 GMT-0300 (Brasilia Standard Time)
+[debug] [2025-09-07T15:34:20.894Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2025-09-02T14:12:14.293Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2025-09-02T14:12:14.293Z] > authorizing via signed-in user (geovanels@gmail.com)
-[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
-[debug] [2025-09-02T14:12:14.418Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-09-02T14:12:14.419Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
-[debug] [2025-09-02T14:12:14.421Z] [hub] writing locator at /var/folders/z8/6gbtrc6d7zn1hrz1ddnyc55c0000gn/T/hub-ordem-pro.json
-[debug] [2025-09-02T14:12:14.545Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-09-02T14:12:14.545Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-09-02T14:12:14.545Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-09-02T14:12:14.545Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
-[warn] ⚠  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect"}}
+[debug] [2025-09-07T15:34:21.138Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-07T15:34:21.139Z] > authorizing via signed-in user (geovanels@gmail.com)
+[debug] [2025-09-07T15:34:21.139Z] [iam] checking project kanban-gobuyer for permissions ["firebase.projects.get"]
+[debug] [2025-09-07T15:34:21.140Z] Checked if tokens are valid: true, expires at: 1757262283991
+[debug] [2025-09-07T15:34:21.140Z] Checked if tokens are valid: true, expires at: 1757262283991
+[debug] [2025-09-07T15:34:21.142Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/kanban-gobuyer:testIamPermissions [none]
+[debug] [2025-09-07T15:34:21.142Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/kanban-gobuyer:testIamPermissions x-goog-quota-user=projects/kanban-gobuyer
+[debug] [2025-09-07T15:34:21.142Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/kanban-gobuyer:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-09-07T15:34:22.151Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/kanban-gobuyer:testIamPermissions 200
+[debug] [2025-09-07T15:34:22.151Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/kanban-gobuyer:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-09-07T15:34:22.153Z] >>> [apiv2][query] GET http://127.0.0.1:4400/emulators [none]
+[debug] [2025-09-07T15:34:22.157Z] <<< [apiv2][status] GET http://127.0.0.1:4400/emulators 200
+[debug] [2025-09-07T15:34:22.157Z] <<< [apiv2][body] GET http://127.0.0.1:4400/emulators {"hub":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"name":"hub","host":"127.0.0.1","port":4400},"ui":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"name":"ui","host":"127.0.0.1","port":4000},"logging":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"name":"logging","host":"127.0.0.1","port":4500},"functions":{"name":"functions","host":"127.0.0.1","port":5001},"firestore":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"name":"firestore","host":"127.0.0.1","port":8080,"pid":60354,"reservedPorts":[9150],"webSocketHost":"127.0.0.1","webSocketPort":9150},"eventarc":{"name":"eventarc","host":"127.0.0.1","port":9299},"tasks":{"name":"tasks","host":"127.0.0.1","port":9499}}
+[debug] [2025-09-07T15:34:22.157Z] Running emulators:  {"hub":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"name":"hub","host":"127.0.0.1","port":4400},"ui":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"name":"ui","host":"127.0.0.1","port":4000},"logging":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"name":"logging","host":"127.0.0.1","port":4500},"functions":{"name":"functions","host":"127.0.0.1","port":5001},"firestore":{"listen":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"name":"firestore","host":"127.0.0.1","port":8080,"pid":60354,"reservedPorts":[9150],"webSocketHost":"127.0.0.1","webSocketPort":9150},"eventarc":{"name":"eventarc","host":"127.0.0.1","port":9299},"tasks":{"name":"tasks","host":"127.0.0.1","port":9499}}
+[warn] ⚠  functions: You are already running the Cloud Functions emulator on port 5001. Running the emulator and the Functions shell simultaenously can result in unexpected behavior. 
+[warn] ⚠  functions: Functions Emulator unable to start on port 5000, starting on 5002 instead. {"metadata":{"emulator":{"name":"functions"},"message":"Functions Emulator unable to start on port 5000, starting on 5002 instead."}}
+[debug] [2025-09-07T15:34:22.395Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
 [warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
-[debug] [2025-09-02T14:12:18.085Z] Checked if tokens are valid: true, expires at: 1756825684239
-[debug] [2025-09-02T14:12:18.085Z] Checked if tokens are valid: true, expires at: 1756825684239
-[debug] [2025-09-02T14:12:18.086Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/ordem-pro/adminSdkConfig [none]
-[debug] [2025-09-02T14:12:18.628Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/ordem-pro/adminSdkConfig 200
-[debug] [2025-09-02T14:12:18.628Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/ordem-pro/adminSdkConfig {"projectId":"ordem-pro","storageBucket":"ordem-pro.firebasestorage.app"}
-[info] i  ui: downloading ui-v1.15.0.zip... {"metadata":{"emulator":{"name":"ui"},"message":"downloading ui-v1.15.0.zip..."}}
-[debug] [2025-09-02T14:12:18.653Z] >>> [apiv2][query] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.15.0.zip 
-[debug] [2025-09-02T14:12:18.923Z] <<< [apiv2][status] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.15.0.zip 200
-[debug] [2025-09-02T14:12:18.923Z] <<< [apiv2][body] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.15.0.zip [stream]
-[debug] [2025-09-02T14:12:19.089Z] Data is 3538469
-[debug] [2025-09-02T14:12:19.090Z] [unzip] Entry: client/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
-[debug] [2025-09-02T14:12:19.090Z] [unzip] Processing entry: client/
-[debug] [2025-09-02T14:12:19.090Z] [unzip] mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/
-[debug] [2025-09-02T14:12:19.091Z] [unzip] Entry: client/favicon-16x16.png (compressed_size=293 bytes, uncompressed_size=293 bytes)
-[debug] [2025-09-02T14:12:19.091Z] [unzip] Processing entry: client/favicon-16x16.png
-[debug] [2025-09-02T14:12:19.091Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.091Z] [unzip] Writing file: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/favicon-16x16.png
-[debug] [2025-09-02T14:12:19.091Z] [unzip] Entry: client/safari-pinned-tab.svg (compressed_size=1433 bytes, uncompressed_size=2611 bytes)
-[debug] [2025-09-02T14:12:19.091Z] [unzip] Processing entry: client/safari-pinned-tab.svg
-[debug] [2025-09-02T14:12:19.091Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.092Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/safari-pinned-tab.svg
-[debug] [2025-09-02T14:12:19.095Z] [unzip] Entry: client/favicon.ico (compressed_size=2933 bytes, uncompressed_size=13294 bytes)
-[debug] [2025-09-02T14:12:19.095Z] [unzip] Processing entry: client/favicon.ico
-[debug] [2025-09-02T14:12:19.095Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.095Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/favicon.ico
-[debug] [2025-09-02T14:12:19.095Z] [unzip] Entry: client/index.html (compressed_size=1364 bytes, uncompressed_size=3071 bytes)
-[debug] [2025-09-02T14:12:19.095Z] [unzip] Processing entry: client/index.html
-[debug] [2025-09-02T14:12:19.095Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.095Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/index.html
-[debug] [2025-09-02T14:12:19.096Z] [unzip] Entry: client/android-chrome-192x192.png (compressed_size=2684 bytes, uncompressed_size=2684 bytes)
-[debug] [2025-09-02T14:12:19.096Z] [unzip] Processing entry: client/android-chrome-192x192.png
-[debug] [2025-09-02T14:12:19.096Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.096Z] [unzip] Writing file: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/android-chrome-192x192.png
-[debug] [2025-09-02T14:12:19.096Z] [unzip] Entry: client/apple-touch-icon.png (compressed_size=2123 bytes, uncompressed_size=2152 bytes)
-[debug] [2025-09-02T14:12:19.096Z] [unzip] Processing entry: client/apple-touch-icon.png
-[debug] [2025-09-02T14:12:19.096Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.096Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/apple-touch-icon.png
-[debug] [2025-09-02T14:12:19.097Z] [unzip] Entry: client/android-chrome-512x512.png (compressed_size=5369 bytes, uncompressed_size=5411 bytes)
-[debug] [2025-09-02T14:12:19.097Z] [unzip] Processing entry: client/android-chrome-512x512.png
-[debug] [2025-09-02T14:12:19.097Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.097Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/android-chrome-512x512.png
-[debug] [2025-09-02T14:12:19.097Z] [unzip] Entry: client/manifest.json (compressed_size=245 bytes, uncompressed_size=551 bytes)
-[debug] [2025-09-02T14:12:19.097Z] [unzip] Processing entry: client/manifest.json
-[debug] [2025-09-02T14:12:19.097Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.097Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/manifest.json
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Entry: client/robots.txt (compressed_size=26 bytes, uncompressed_size=26 bytes)
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Processing entry: client/robots.txt
-[debug] [2025-09-02T14:12:19.098Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Writing file: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/robots.txt
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Entry: client/mstile-150x150.png (compressed_size=2034 bytes, uncompressed_size=2034 bytes)
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Processing entry: client/mstile-150x150.png
-[debug] [2025-09-02T14:12:19.098Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Writing file: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/mstile-150x150.png
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Entry: client/assets/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Processing entry: client/assets/
-[debug] [2025-09-02T14:12:19.098Z] [unzip] mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Entry: client/assets/index-BX-A56oj.js (compressed_size=582089 bytes, uncompressed_size=2092775 bytes)
-[debug] [2025-09-02T14:12:19.098Z] [unzip] Processing entry: client/assets/index-BX-A56oj.js
-[debug] [2025-09-02T14:12:19.098Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets
-[debug] [2025-09-02T14:12:19.098Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/index-BX-A56oj.js
-[debug] [2025-09-02T14:12:19.104Z] [unzip] Entry: client/assets/index-CjB9C900.css (compressed_size=35979 bytes, uncompressed_size=298654 bytes)
-[debug] [2025-09-02T14:12:19.104Z] [unzip] Processing entry: client/assets/index-CjB9C900.css
-[debug] [2025-09-02T14:12:19.104Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets
-[debug] [2025-09-02T14:12:19.104Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/index-CjB9C900.css
-[debug] [2025-09-02T14:12:19.106Z] [unzip] Entry: client/assets/index-BX-A56oj.js.map (compressed_size=2362482 bytes, uncompressed_size=10036679 bytes)
-[debug] [2025-09-02T14:12:19.106Z] [unzip] Processing entry: client/assets/index-BX-A56oj.js.map
-[debug] [2025-09-02T14:12:19.106Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets
-[debug] [2025-09-02T14:12:19.106Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/index-BX-A56oj.js.map
-[debug] [2025-09-02T14:12:19.134Z] [unzip] Entry: client/assets/extensions/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
-[debug] [2025-09-02T14:12:19.135Z] [unzip] Processing entry: client/assets/extensions/
-[debug] [2025-09-02T14:12:19.135Z] [unzip] mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/extensions/
-[debug] [2025-09-02T14:12:19.135Z] [unzip] Entry: client/assets/extensions/default-extension.png (compressed_size=1646 bytes, uncompressed_size=1657 bytes)
-[debug] [2025-09-02T14:12:19.135Z] [unzip] Processing entry: client/assets/extensions/default-extension.png
-[debug] [2025-09-02T14:12:19.135Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/extensions
-[debug] [2025-09-02T14:12:19.135Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/extensions/default-extension.png
-[debug] [2025-09-02T14:12:19.135Z] [unzip] Entry: client/assets/img/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
-[debug] [2025-09-02T14:12:19.135Z] [unzip] Processing entry: client/assets/img/
-[debug] [2025-09-02T14:12:19.135Z] [unzip] mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/img/
-[debug] [2025-09-02T14:12:19.136Z] [unzip] Entry: client/assets/img/database.png (compressed_size=29449 bytes, uncompressed_size=29988 bytes)
-[debug] [2025-09-02T14:12:19.136Z] [unzip] Processing entry: client/assets/img/database.png
-[debug] [2025-09-02T14:12:19.136Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/img
-[debug] [2025-09-02T14:12:19.136Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/img/database.png
-[debug] [2025-09-02T14:12:19.136Z] [unzip] Entry: client/assets/provider-icons/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
-[debug] [2025-09-02T14:12:19.136Z] [unzip] Processing entry: client/assets/provider-icons/
-[debug] [2025-09-02T14:12:19.136Z] [unzip] mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/
-[debug] [2025-09-02T14:12:19.136Z] [unzip] Entry: client/assets/provider-icons/auth_service_saml.svg (compressed_size=575 bytes, uncompressed_size=1226 bytes)
-[debug] [2025-09-02T14:12:19.136Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_saml.svg
-[debug] [2025-09-02T14:12:19.136Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.136Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_saml.svg
-[debug] [2025-09-02T14:12:19.137Z] [unzip] Entry: client/assets/provider-icons/auth_service_phone.svg (compressed_size=261 bytes, uncompressed_size=414 bytes)
-[debug] [2025-09-02T14:12:19.137Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_phone.svg
-[debug] [2025-09-02T14:12:19.137Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.137Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_phone.svg
-[debug] [2025-09-02T14:12:19.137Z] [unzip] Entry: client/assets/provider-icons/auth_service_facebook.svg (compressed_size=289 bytes, uncompressed_size=457 bytes)
-[debug] [2025-09-02T14:12:19.137Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_facebook.svg
-[debug] [2025-09-02T14:12:19.137Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.137Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_facebook.svg
-[debug] [2025-09-02T14:12:19.138Z] [unzip] Entry: client/assets/provider-icons/auth_service_game_center.svg (compressed_size=991 bytes, uncompressed_size=3921 bytes)
-[debug] [2025-09-02T14:12:19.138Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_game_center.svg
-[debug] [2025-09-02T14:12:19.138Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.138Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_game_center.svg
-[debug] [2025-09-02T14:12:19.138Z] [unzip] Entry: client/assets/provider-icons/auth_service_apple.svg (compressed_size=230 bytes, uncompressed_size=334 bytes)
-[debug] [2025-09-02T14:12:19.138Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_apple.svg
-[debug] [2025-09-02T14:12:19.138Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.138Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_apple.svg
-[debug] [2025-09-02T14:12:19.139Z] [unzip] Entry: client/assets/provider-icons/auth_service_github.svg (compressed_size=466 bytes, uncompressed_size=838 bytes)
-[debug] [2025-09-02T14:12:19.139Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_github.svg
-[debug] [2025-09-02T14:12:19.139Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.139Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_github.svg
-[debug] [2025-09-02T14:12:19.139Z] [unzip] Entry: client/assets/provider-icons/auth_service_mslive.svg (compressed_size=203 bytes, uncompressed_size=378 bytes)
-[debug] [2025-09-02T14:12:19.139Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_mslive.svg
-[debug] [2025-09-02T14:12:19.139Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.139Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_mslive.svg
-[debug] [2025-09-02T14:12:19.140Z] [unzip] Entry: client/assets/provider-icons/auth_service_yahoo.svg (compressed_size=577 bytes, uncompressed_size=1182 bytes)
-[debug] [2025-09-02T14:12:19.140Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_yahoo.svg
-[debug] [2025-09-02T14:12:19.140Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.140Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_yahoo.svg
-[debug] [2025-09-02T14:12:19.140Z] [unzip] Entry: client/assets/provider-icons/auth_service_twitter.svg (compressed_size=444 bytes, uncompressed_size=751 bytes)
-[debug] [2025-09-02T14:12:19.140Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_twitter.svg
-[debug] [2025-09-02T14:12:19.140Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.140Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_twitter.svg
-[debug] [2025-09-02T14:12:19.141Z] [unzip] Entry: client/assets/provider-icons/auth_service_play_games.svg (compressed_size=565 bytes, uncompressed_size=1173 bytes)
-[debug] [2025-09-02T14:12:19.141Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_play_games.svg
-[debug] [2025-09-02T14:12:19.141Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.141Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_play_games.svg
-[debug] [2025-09-02T14:12:19.141Z] [unzip] Entry: client/assets/provider-icons/auth_service_email.svg (compressed_size=228 bytes, uncompressed_size=326 bytes)
-[debug] [2025-09-02T14:12:19.141Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_email.svg
-[debug] [2025-09-02T14:12:19.141Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.141Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_email.svg
-[debug] [2025-09-02T14:12:19.141Z] [unzip] Entry: client/assets/provider-icons/auth_service_google.svg (compressed_size=409 bytes, uncompressed_size=720 bytes)
-[debug] [2025-09-02T14:12:19.141Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_google.svg
-[debug] [2025-09-02T14:12:19.141Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.141Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_google.svg
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Entry: client/assets/provider-icons/auth_service_oidc.svg (compressed_size=414 bytes, uncompressed_size=858 bytes)
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Processing entry: client/assets/provider-icons/auth_service_oidc.svg
-[debug] [2025-09-02T14:12:19.142Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons
-[debug] [2025-09-02T14:12:19.142Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/assets/provider-icons/auth_service_oidc.svg
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Entry: client/browserconfig.xml (compressed_size=491 bytes, uncompressed_size=822 bytes)
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Processing entry: client/browserconfig.xml
-[debug] [2025-09-02T14:12:19.142Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.142Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/browserconfig.xml
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Entry: client/favicon-32x32.png (compressed_size=475 bytes, uncompressed_size=475 bytes)
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Processing entry: client/favicon-32x32.png
-[debug] [2025-09-02T14:12:19.142Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Writing file: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/client/favicon-32x32.png
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Entry: server/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Processing entry: server/
-[debug] [2025-09-02T14:12:19.142Z] [unzip] mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/server/
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Entry: server/server.mjs.map (compressed_size=217845 bytes, uncompressed_size=944978 bytes)
-[debug] [2025-09-02T14:12:19.142Z] [unzip] Processing entry: server/server.mjs.map
-[debug] [2025-09-02T14:12:19.142Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/server
-[debug] [2025-09-02T14:12:19.143Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/server/server.mjs.map
-[debug] [2025-09-02T14:12:19.145Z] [unzip] Entry: server/server.mjs (compressed_size=276407 bytes, uncompressed_size=933701 bytes)
-[debug] [2025-09-02T14:12:19.145Z] [unzip] Processing entry: server/server.mjs
-[debug] [2025-09-02T14:12:19.145Z] [unzip] else mkdir: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/server
-[debug] [2025-09-02T14:12:19.145Z] [unzip] deflating: /Users/geovanelopes/.cache/firebase/emulators/ui-v1.15.0/server/server.mjs
-[info] i  functions: Watching "/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions\" for Cloud Functions..."}}
-[debug] [2025-09-02T14:12:19.167Z] Validating nodejs source
-[debug] [2025-09-02T14:12:19.804Z] > [functions] package.json contents: {
+[debug] [2025-09-07T15:34:24.034Z] Checked if tokens are valid: true, expires at: 1757262283991
+[debug] [2025-09-07T15:34:24.034Z] Checked if tokens are valid: true, expires at: 1757262283991
+[debug] [2025-09-07T15:34:24.034Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/kanban-gobuyer/adminSdkConfig [none]
+[debug] [2025-09-07T15:34:24.534Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/kanban-gobuyer/adminSdkConfig 200
+[debug] [2025-09-07T15:34:24.534Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/kanban-gobuyer/adminSdkConfig {"projectId":"kanban-gobuyer","storageBucket":"kanban-gobuyer.firebasestorage.app"}
+[debug] [2025-09-07T15:34:24.551Z] [functions] Watching "/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions" for Cloud Functions...
+[debug] [2025-09-07T15:34:24.554Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-09-07T15:34:25.356Z] > [functions] package.json contents: {
   "name": "functions",
   "version": "1.0.0",
   "main": "index.js",
@@ -193,42 +50,32 @@
   "license": "ISC",
   "description": "",
   "engines": {
-    "node": "18"
+    "node": "20"
   },
   "dependencies": {
     "firebase-functions": "^5.1.1",
-    "firebase-admin": "^12.8.0",
+    "firebase-admin": "^12.0.0",
     "nodemailer": "^6.9.16",
     "cors": "^2.8.5"
   }
 }
-[debug] [2025-09-02T14:12:19.805Z] Building nodejs source
-[debug] [2025-09-02T14:12:19.805Z] Failed to find version of module node: reached end of search path /Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules
-[warn] ⚠  functions: Your requested "node" version "18" doesn't match your global version "20". Using node@20 from host. 
-[debug] [2025-09-02T14:12:19.807Z] Could not find functions.yaml. Must use http discovery
-[debug] [2025-09-02T14:12:19.811Z] Found firebase-functions binary at '/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/.bin/firebase-functions'
-[info] Serving at port 8854
+[debug] [2025-09-07T15:34:25.356Z] Building nodejs source
+[debug] [2025-09-07T15:34:25.357Z] Failed to find version of module node: reached end of search path /Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules
+[info] ✔  functions: Using node@20 from host. 
+[debug] [2025-09-07T15:34:25.359Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-09-07T15:34:25.366Z] Found firebase-functions binary at '/Users/geovanelopes/Documents/GitHub/kanban-angular-saas/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8161
 
-[debug] [2025-09-02T14:12:20.146Z] Got response from /__/functions.yaml {"endpoints":{"sendEmail":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"sendEmail"},"sendEmailCallable":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"sendEmailCallable"},"testSmtpConfig":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"testSmtpConfig"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
-[info] ✔  functions: Loaded functions definitions from source: sendEmail, sendEmailCallable, testSmtpConfig. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: sendEmail, sendEmailCallable, testSmtpConfig."}}
-[info] ✔  functions[us-central1-sendEmail]: http function initialized (http://127.0.0.1:5001/ordem-pro/us-central1/sendEmail). {"metadata":{"emulator":{"name":"functions"},"message":"http function initialized (http://127.0.0.1:5001/ordem-pro/us-central1/sendEmail)."}}
-[info] ✔  functions[us-central1-sendEmailCallable]: http function initialized (http://127.0.0.1:5001/ordem-pro/us-central1/sendEmailCallable). {"metadata":{"emulator":{"name":"functions"},"message":"http function initialized (http://127.0.0.1:5001/ordem-pro/us-central1/sendEmailCallable)."}}
-[info] ✔  functions[us-central1-testSmtpConfig]: http function initialized (http://127.0.0.1:5001/ordem-pro/us-central1/testSmtpConfig). {"metadata":{"emulator":{"name":"functions"},"message":"http function initialized (http://127.0.0.1:5001/ordem-pro/us-central1/testSmtpConfig)."}}
-[debug] [2025-09-02T14:12:24.201Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
-[info] 
-┌─────────────────────────────────────────────────────────────┐
-│ ✔  All emulators ready! It is now safe to connect your app. │
-│ i  View Emulator UI at http://127.0.0.1:4000/               │
-└─────────────────────────────────────────────────────────────┘
-
-┌───────────┬────────────────┬─────────────────────────────────┐
-│ Emulator  │ Host:Port      │ View in Emulator UI             │
-├───────────┼────────────────┼─────────────────────────────────┤
-│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
-└───────────┴────────────────┴─────────────────────────────────┘
-  Emulator Hub host: 127.0.0.1 port: 4400
-  Other reserved ports: 4500
-
-Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
- 
-[debug] [2025-09-02T14:21:11.406Z] Functions emulator received unknown request at path /kanban-gobuyer/us-central1/sendEmailCallable
+[debug] [2025-09-07T15:34:26.025Z] Got response from /__/functions.yaml {"endpoints":{"sendEmail":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"sendEmail"},"leadIntakeHttp":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"leadIntakeHttp"},"checkCompanyMembership":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"checkCompanyMembership"},"sendEmailHttp":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"sendEmailHttp"},"sendEmailCallable":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"sendEmailCallable"},"testSmtpConfig":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"testSmtpConfig"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[debug] [2025-09-07T15:34:30.054Z] [functions] Loaded functions definitions from source: sendEmail, leadIntakeHttp, checkCompanyMembership, sendEmailHttp, sendEmailCallable, testSmtpConfig.
+[debug] [2025-09-07T15:34:30.055Z] [functions[us-central1-sendEmail]] http function initialized (http://127.0.0.1:5002/kanban-gobuyer/us-central1/sendEmail).
+[debug] [2025-09-07T15:34:30.055Z] [functions[us-central1-leadIntakeHttp]] http function initialized (http://127.0.0.1:5002/kanban-gobuyer/us-central1/leadIntakeHttp).
+[debug] [2025-09-07T15:34:30.055Z] [functions[us-central1-checkCompanyMembership]] http function initialized (http://127.0.0.1:5002/kanban-gobuyer/us-central1/checkCompanyMembership).
+[debug] [2025-09-07T15:34:30.055Z] [functions[us-central1-sendEmailHttp]] http function initialized (http://127.0.0.1:5002/kanban-gobuyer/us-central1/sendEmailHttp).
+[debug] [2025-09-07T15:34:30.055Z] [functions[us-central1-sendEmailCallable]] http function initialized (http://127.0.0.1:5002/kanban-gobuyer/us-central1/sendEmailCallable).
+[debug] [2025-09-07T15:34:30.055Z] [functions[us-central1-testSmtpConfig]] http function initialized (http://127.0.0.1:5002/kanban-gobuyer/us-central1/testSmtpConfig).
+[info] i  functions: Loaded functions: sendEmail, leadIntakeHttp, checkCompanyMembership, sendEmailHttp, sendEmailCallable, testSmtpConfig 
+[info] i  functions: Connected to running firestore emulator at 127.0.0.1:8080, calls to this service will affect the emulator 
+[info] i  functions: Connected to running eventarc emulator at 127.0.0.1:9299, calls to this service will affect the emulator 
+[info] i  functions: Connected to running tasks emulator at 127.0.0.1:9499, calls to this service will affect the emulator 
+[warn] ⚠  functions: The following emulators are not running, calls to these services will affect production: database, pubsub, storage 

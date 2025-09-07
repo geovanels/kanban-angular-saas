@@ -18,9 +18,10 @@ export class StorageService {
     }
   }
 
-  async uploadLeadAttachment(userId: string, boardId: string, leadId: string, file: File): Promise<{ name: string, url: string }> {
+  async uploadLeadAttachment(userId: string, boardId: string, leadId: string, file: File, companyId?: string): Promise<{ name: string, url: string }> {
     const timestamp = Date.now();
-    const path = `users/${userId}/boards/${boardId}/leads/${leadId}/attachments/${timestamp}_${file.name}`;
+    const storageBase = companyId ? `companies/${companyId}` : `users/${userId}`;
+    const path = `${storageBase}/boards/${boardId}/leads/${leadId}/attachments/${timestamp}_${file.name}`;
     
     try {
       const url = await this.uploadFile(file, path);

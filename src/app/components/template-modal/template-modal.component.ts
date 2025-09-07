@@ -1,13 +1,14 @@
 import { Component, inject, Input, Output, EventEmitter, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-// import { CKEditorModule } from '@ckeditor/ckeditor5-angular';
+import { CKEditorModule } from '@ckeditor/ckeditor5-angular';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { FirestoreService } from '../../services/firestore.service';
 
 @Component({
   selector: 'app-template-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, CKEditorModule],
   templateUrl: './template-modal.component.html',
   styleUrls: ['./template-modal.component.scss']
 })
@@ -23,16 +24,54 @@ export class TemplateModalComponent implements AfterViewInit {
 
   // Editor HTML nativo
   @ViewChild('visualEditor', { static: false }) visualEditor!: ElementRef;
-  @ViewChild('htmlEditor', { static: false }) htmlEditor!: ElementRef;
 
   isVisible = false;
   isEditing = false;
   isLoading = false;
   errorMessage = '';
   currentTemplate: any = null;
+  // Toggle leve para HTML plano (sem plugin custom do CKEditor)
   showHtmlMode = false;
   
   public editorContent = '';
+  
+  // CKEditor configuration
+  public Editor: any = ClassicEditor;
+  public editorConfig = {
+    toolbar: {
+      items: [
+        'heading', '|',
+        'bold', 'italic', 'underline', 'strikethrough', '|',
+        'link', 'bulletedList', 'numberedList', '|',
+        'outdent', 'indent', '|',
+        'insertTable', 'blockQuote', '|',
+        'fontSize', 'fontColor', 'fontBackgroundColor', '|',
+        'alignment', '|',
+        'undo', 'redo'
+      ]
+    },
+    shouldNotGroupWhenFull: true,
+    placeholder: 'Digite o conteúdo do seu template de email aqui...',
+    fontSize: {
+      options: [9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36]
+    },
+    fontColor: {
+      colors: [
+        { color: '#000000', label: 'Black' },
+        { color: '#4d4d4d', label: 'Dim grey' },
+        { color: '#999999', label: 'Grey' },
+        { color: '#e6e6e6', label: 'Light grey' },
+        { color: '#ffffff', label: 'White', hasBorder: true },
+        { color: '#e64545', label: 'Red' },
+        { color: '#ff9500', label: 'Orange' },
+        { color: '#ffff00', label: 'Yellow' },
+        { color: '#00ff00', label: 'Light green' },
+        { color: '#00ffff', label: 'Cyan' },
+        { color: '#0080ff', label: 'Light blue' },
+        { color: '#8000ff', label: 'Purple' }
+      ]
+    }
+  };
 
   templateForm: FormGroup = this.fb.group({
     name: ['', [Validators.required]],
@@ -41,18 +80,7 @@ export class TemplateModalComponent implements AfterViewInit {
     body: ['', [Validators.required]]
   });
 
-  variables = [
-    { name: 'Nome da Empresa', value: '{{companyName}}' },
-    { name: 'CNPJ', value: '{{cnpj}}' },
-    { name: 'Nome do Contato', value: '{{contactName}}' },
-    { name: 'Email do Contato', value: '{{contactEmail}}' },
-    { name: 'Telefone do Contato', value: '{{contactPhone}}' },
-    { name: 'Nome do Responsável', value: '{{nomeResponsavel}}' },
-    { name: 'Email do Responsável', value: '{{emailResponsavel}}' },
-    { name: 'Nome da Fase Atual', value: '{{currentPhaseName}}' },
-    { name: 'Data Atual', value: '{{currentDate}}' },
-    { name: 'Link do Lead', value: '{{leadLink}}' }
-  ];
+  variables: { name: string; value: string }[] = [];
 
   ngAfterViewInit() {
     console.log('Template modal inicializado');
@@ -69,14 +97,15 @@ export class TemplateModalComponent implements AfterViewInit {
     }
   }
 
-  onVisualEditorChange(event: any) {
-    this.editorContent = event.target.innerHTML;
-    console.log('Visual editor changed:', this.editorContent);
-  }
+  // Legacy handlers removidos
 
-  onHtmlEditorChange(content: string) {
-    this.editorContent = content;
-    console.log('HTML editor changed:', this.editorContent);
+  // CKEditor is bound via formControl; no manual syncing to avoid loops
+
+  // Método para inserir variáveis no CKEditor (concat na posição final)
+  insertVariable(variable: string) {
+    const currentContent = this.templateForm.get('body')?.value || '';
+    const newContent = currentContent + ' ' + variable;
+    this.templateForm.patchValue({ body: newContent });
   }
 
   showCreateModal() {
@@ -84,6 +113,7 @@ export class TemplateModalComponent implements AfterViewInit {
     this.currentTemplate = null;
     this.isVisible = true;
     this.resetForm();
+    this.loadDynamicVariables();
   }
 
   showEditModal(template: any) {
@@ -91,6 +121,7 @@ export class TemplateModalComponent implements AfterViewInit {
     this.currentTemplate = template;
     this.isVisible = true;
     this.populateForm(template);
+    this.loadDynamicVariables();
   }
 
   hide() {
@@ -124,7 +155,8 @@ export class TemplateModalComponent implements AfterViewInit {
     this.editorContent = template.body || '';
     console.log('Conteúdo do editor definido:', this.editorContent);
     
-    // Aguardar o próximo tick do Angular e definir o conteúdo no editor visual
+    // CKEditor será preenchido automaticamente através do modelo do formulário
+    // Aguardar o próximo tick do Angular e definir o conteúdo no editor visual (fallback)
     setTimeout(() => {
       if (this.visualEditor && this.editorContent) {
         this.visualEditor.nativeElement.innerHTML = this.editorContent;
@@ -132,52 +164,55 @@ export class TemplateModalComponent implements AfterViewInit {
     }, 100);
   }
 
-  toggleHtmlMode() {
-    this.showHtmlMode = !this.showHtmlMode;
-    
-    if (this.showHtmlMode) {
-      // Indo para modo HTML
-      setTimeout(() => {
-        if (this.htmlEditor) {
-          this.htmlEditor.nativeElement.value = this.editorContent;
-        }
-      }, 100);
-    } else {
-      // Voltando para modo visual
-      if (this.htmlEditor) {
-        this.editorContent = this.htmlEditor.nativeElement.value;
-        setTimeout(() => {
-          if (this.visualEditor) {
-            this.visualEditor.nativeElement.innerHTML = this.editorContent;
-          }
-        }, 100);
+  private async loadDynamicVariables() {
+    try {
+      // Começa com variáveis padrão do sistema
+      const base: { name: string; value: string }[] = [
+        { name: 'Nome do Responsável', value: '{{nomeResponsavel}}' },
+        { name: 'Email do Responsável', value: '{{emailResponsavel}}' },
+        { name: 'Nome da Fase Atual', value: '{{currentPhaseName}}' },
+        { name: 'Data Atual', value: '{{currentDate}}' },
+        { name: 'Link do Registro', value: '{{leadLink}}' }
+      ];
+
+      // Tenta carregar campos do formulário inicial para gerar variáveis dinâmicas
+      const initial = await this.firestoreService.getInitialFormConfig(this.boardId);
+      const dynamic: { name: string; value: string }[] = [];
+      const pushField = (f: any) => {
+        const key = f.apiFieldName?.trim() || f.name?.trim();
+        if (!key) return;
+        dynamic.push({ name: f.label || key, value: `{{${key}}}` });
+      };
+      if (initial?.fields && Array.isArray(initial.fields)) {
+        initial.fields.forEach(pushField);
       }
+
+      // Fallback: alguns campos comuns
+      if (dynamic.length === 0) {
+        dynamic.push(
+          { name: 'Nome', value: '{{name}}' },
+          { name: 'Email', value: '{{email}}' },
+          { name: 'Telefone', value: '{{phone}}' }
+        );
+      }
+
+      this.variables = [...dynamic, ...base];
+    } catch {
+      this.variables = [
+        { name: 'Nome', value: '{{name}}' },
+        { name: 'Email', value: '{{email}}' },
+        { name: 'Telefone', value: '{{phone}}' },
+        { name: 'Data Atual', value: '{{currentDate}}' }
+      ];
     }
   }
 
-  insertVariable(variable: string) {
-    if (this.showHtmlMode && this.htmlEditor) {
-      const textarea = this.htmlEditor.nativeElement;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = textarea.value;
-      const newText = text.substring(0, start) + variable + text.substring(end);
-      textarea.value = newText;
-      textarea.selectionStart = textarea.selectionEnd = start + variable.length;
-      this.editorContent = newText;
-    } else if (!this.showHtmlMode && this.visualEditor) {
-      this.editorContent += variable;
-      this.visualEditor.nativeElement.innerHTML = this.editorContent;
-    }
+  toggleHtmlMode() {
+    // sincroniza editorContent com o form antes de alternar
+    this.editorContent = this.templateForm.get('body')?.value || '';
+    this.showHtmlMode = !this.showHtmlMode;
   }
 
-  onVisualEditorInput(event: any) {
-    this.editorContent = event.target.innerHTML;
-  }
-
-  onHtmlEditorInput(event: any) {
-    this.editorContent = event.target.value;
-  }
 
 
   async saveTemplate() {

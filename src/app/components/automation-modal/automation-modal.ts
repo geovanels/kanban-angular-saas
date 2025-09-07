@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
   selector: 'app-automation-modal',
   imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './automation-modal.html',
-  styleUrl: './automation-modal.scss'
+  styleUrls: ['./automation-modal.scss']
 })
 export class AutomationModal implements OnInit {
   @Input() isVisible = false;
@@ -14,6 +14,8 @@ export class AutomationModal implements OnInit {
   @Input() phases: any[] = [];
   @Input() emailTemplates: any[] = [];
   @Input() users: any[] = [];
+  @Input() allowedTriggerTypes: string[] | null = null; // se null, usa padrão
+  @Input() fixedPhaseId: string | null = null;
   @Output() closeModalEvent = new EventEmitter<void>();
   @Output() saveAutomation = new EventEmitter<any>();
 
@@ -33,12 +35,17 @@ export class AutomationModal implements OnInit {
       this.modalTitle = 'Editar Automação';
       this.loadAutomationData();
     }
+    // Se veio atrelado a uma fase fixa, predefinir a fase
+    if (this.fixedPhaseId) {
+      this.automationForm.get('triggerPhase')?.setValue(this.fixedPhaseId);
+    }
   }
 
   createForm(): FormGroup {
     return this.fb.group({
       id: [''],
-      name: ['', Validators.required],
+      // Nome opcional (gera automático no submit caso vazio)
+      name: [''],
       triggerType: ['new-lead-created', Validators.required],
       triggerPhase: [''],
       triggerDays: [1],
@@ -78,13 +85,27 @@ export class AutomationModal implements OnInit {
     
     this.showTriggerTime = triggerType === 'card-in-phase-for-time';
 
-    if (!this.showTriggerPhase) {
-      this.automationForm.get('triggerPhase')?.setValue('');
+    const triggerPhaseCtrl = this.automationForm.get('triggerPhase');
+    const triggerDaysCtrl = this.automationForm.get('triggerDays');
+
+    if (this.showTriggerPhase) {
+      triggerPhaseCtrl?.setValidators([Validators.required]);
+      if (this.fixedPhaseId) {
+        triggerPhaseCtrl?.setValue(this.fixedPhaseId);
+      }
+    } else {
+      triggerPhaseCtrl?.clearValidators();
+      triggerPhaseCtrl?.setValue('');
     }
+    triggerPhaseCtrl?.updateValueAndValidity({ emitEvent: false });
     
-    if (!this.showTriggerTime) {
-      this.automationForm.get('triggerDays')?.setValue(1);
+    if (this.showTriggerTime) {
+      triggerDaysCtrl?.setValidators([Validators.required, Validators.min(1)]);
+    } else {
+      triggerDaysCtrl?.clearValidators();
+      triggerDaysCtrl?.setValue(1);
     }
+    triggerDaysCtrl?.updateValueAndValidity({ emitEvent: false });
   }
 
   get actionsFormArray(): FormArray {
@@ -137,12 +158,19 @@ export class AutomationModal implements OnInit {
     }
   }
 
+  canSubmit(): boolean {
+    if (!this.automationForm.valid) return false;
+    // Exigir ao menos 1 ação válida
+    const actions = (this.actionsFormArray?.value || []) as any[];
+    return actions.some(a => this.isValidAction(a));
+  }
+
   getAutomationTypeName(triggerType: string): string {
     const types: { [key: string]: string } = {
-      'new-lead-created': 'Novo Registro',
-      'card-enters-phase': 'Entrada em Fase',
-      'card-in-phase-for-time': 'Tempo em Fase',
-      'form-not-answered': 'Formulário Pendente',
+      'new-lead-created': 'Criar novo registro (apenas fase inicial)',
+      'card-enters-phase': 'Um card entrou na fase',
+      'card-in-phase-for-time': 'Um card está na fase por um tempo',
+      'form-not-answered': 'Formulário da fase não respondido',
       'sla-overdue': 'SLA Vencido'
     };
     return types[triggerType] || 'Sem Nome';

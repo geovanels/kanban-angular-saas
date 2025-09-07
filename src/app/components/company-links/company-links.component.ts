@@ -467,7 +467,8 @@ export class CompanyLinksComponent implements OnInit {
 
   getLeadIntakeUrl(): string {
     try {
-      return this.apiService.getLeadIntakeUrl();
+      const companyId = this.currentCompany()?.id || '{COMPANY_ID}';
+      return this.apiService.getLeadIntakeUrl(companyId);
     } catch (error) {
       return 'Erro: empresa não configurada';
     }

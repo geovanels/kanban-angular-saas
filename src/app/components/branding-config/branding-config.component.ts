@@ -389,12 +389,34 @@ export class BrandingConfigComponent implements OnInit {
     { name: 'Rosa', primary: '#EC4899', secondary: '#6B7280' }
   ];
 
-  ngOnInit() {
-    this.loadCurrentBranding();
+  async ngOnInit() {
+    await this.loadCurrentBranding();
   }
 
-  loadCurrentBranding() {
-    const company = this.subdomainService.getCurrentCompany();
+  async loadCurrentBranding() {
+    let company = this.subdomainService.getCurrentCompany();
+    
+    // Se não há empresa no contexto, tenta recarregar do subdomínio
+    if (!company) {
+      try {
+        company = await this.subdomainService.initializeFromSubdomain();
+      } catch (error) {
+        // Fallback: buscar empresa pelo ID do usuário
+        const currentUser = this.authService.getCurrentUser();
+        if (currentUser?.uid) {
+          try {
+            const companies = await this.companyService.getCompaniesByOwner(currentUser.uid);
+            if (companies.length > 0) {
+              company = companies[0];
+              this.subdomainService.setCurrentCompany(company);
+            }
+          } catch (error) {
+            console.error('Erro ao buscar empresas do usuário:', error);
+          }
+        }
+      }
+    }
+    
     if (company) {
       this.currentCompany.set(company);
       this.primaryColor.set(company.brandingConfig?.primaryColor || '#3B82F6');
@@ -405,7 +427,33 @@ export class BrandingConfigComponent implements OnInit {
   }
 
   async saveConfiguration() {
-    const company = this.currentCompany();
+    let company = this.currentCompany();
+    if (!company) {
+      try {
+        const sub = this.companyService.getCompanySubdomain();
+        if (sub) {
+          const fetched = await this.companyService.getCompanyBySubdomain(sub);
+          if (fetched) {
+            this.subdomainService.setCurrentCompany(fetched);
+            this.currentCompany.set(fetched);
+            company = fetched;
+          }
+        }
+      } catch {}
+    }
+    if (!company) {
+      try {
+        const currentUser = this.authService.getCurrentUser();
+        if (currentUser?.email) {
+          const byEmail = await this.companyService.getCompanyByUserEmail(currentUser.email);
+          if (byEmail) {
+            this.subdomainService.setCurrentCompany(byEmail);
+            this.currentCompany.set(byEmail);
+            company = byEmail;
+          }
+        }
+      } catch {}
+    }
     if (!company) {
       this.showError('Empresa não encontrada');
       return;

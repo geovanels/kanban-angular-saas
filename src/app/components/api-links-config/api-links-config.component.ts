@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { ApiService } from '../../services/api.service';
 import { Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
@@ -97,7 +98,8 @@ interface CompanyLink {
                       <i class="fas fa-copy"></i>
                     </button>
                   </div>
-                  <p class="text-xs text-gray-500 mt-1">URL para envio de leads via API</p>
+                  <p class="text-xs text-gray-500 mt-1" *ngIf="getCurrentBoardId()">URL para envio de leads neste quadro ({{ getCurrentBoardId() }})</p>
+                  <p class="text-xs text-gray-500 mt-1" *ngIf="!getCurrentBoardId()">URL base para envio de leads. Adicione /{{ '{' }}boardId{{ '}' }} ao final para especificar o quadro</p>
                 </div>
               </div>
 
@@ -165,6 +167,7 @@ interface CompanyLink {
 export class ApiLinksConfigComponent implements OnInit {
   private companyService = inject(CompanyService);
   private subdomainService = inject(SubdomainService);
+  private apiService = inject(ApiService);
 
   currentCompany = signal<Company | null>(null);
   apiEnabled = signal(false);
@@ -243,14 +246,41 @@ export class ApiLinksConfigComponent implements OnInit {
   }
 
   getLeadIntakeUrl(): string {
-    const company = this.currentCompany();
-    if (!company) return '';
+    try {
+      const boardId = this.getCurrentBoardId();
+      // Usar ApiService que já tem toda a lógica de detecção de porta
+      const companyId = this.currentCompany()?.id || '{COMPANY_ID}';
+      return this.apiService.getLeadIntakeUrl(companyId, boardId);
+    } catch (error) {
+      return 'Erro: empresa não configurada';
+    }
+  }
+
+  getCurrentBoardId(): string | undefined {
+    // 1. Buscar o boardId da URL atual
+    const url = window.location.pathname;
     
-    if (this.subdomainService.isDevelopment()) {
-      return `http://localhost:5000/api/v1/companies/${company.id}/leads`;
+    // Padrão: /kanban/BOARD_ID ou /board/BOARD_ID
+    const boardMatch = url.match(/\/(?:kanban|board)\/([^\/\?]+)/);
+    if (boardMatch) {
+      return boardMatch[1];
     }
     
-    return `https://api.taskboard.com.br/v1/companies/${company.id}/leads`;
+    // 2. Buscar nos parâmetros da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const boardIdParam = urlParams.get('boardId');
+    if (boardIdParam) {
+      return boardIdParam;
+    }
+    
+    // 3. Buscar no localStorage (último quadro acessado)
+    const lastBoardId = localStorage.getItem('lastBoardId');
+    if (lastBoardId) {
+      return lastBoardId;
+    }
+    
+    // 4. Se não encontrar, retornar undefined (usará configuração padrão)
+    return undefined;
   }
 
   companyLinks = signal<CompanyLink[]>([]);

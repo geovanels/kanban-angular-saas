@@ -2,11 +2,12 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { GlobalHeaderComponent } from '../global-header/global-header.component';
 import { GlobalFooterComponent } from '../global-footer/global-footer.component';
+import { ToastContainerComponent } from '../toast/toast-container.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, GlobalHeaderComponent, GlobalFooterComponent],
+  imports: [CommonModule, GlobalHeaderComponent, GlobalFooterComponent, ToastContainerComponent],
   template: `
     <div class="min-h-screen flex flex-col">
       <!-- Global Header -->
@@ -19,6 +20,9 @@ import { GlobalFooterComponent } from '../global-footer/global-footer.component'
       
       <!-- Global Footer -->
       <app-global-footer></app-global-footer>
+
+      <!-- Toast Container -->
+      <app-toast-container></app-toast-container>
     </div>
   `,
   styles: [`

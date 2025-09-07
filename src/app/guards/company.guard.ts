@@ -47,15 +47,7 @@ export class CompanyGuard implements CanActivate {
               // Verificando URL atual
               
               if (currentUrl === '/login' || currentUrl === '/' || currentUrl.startsWith('/login?') || currentUrl.startsWith('/form')) {
-                // Se é login e há parâmetro subdomain=gobuyer, tentar criar empresa
-                const urlParams = new URLSearchParams(window.location.search);
-                const subdomain = urlParams.get('subdomain');
-                
-                if (subdomain === 'gobuyer') {
-                  // Subdomain Gobuyer detectado
-                  // Permitir acesso - a empresa será criada no login
-                }
-                
+                // Permitir acesso a rotas públicas mesmo sem empresa
                 observer.next(true);
               } else {
                 this.handleNoCompany();
