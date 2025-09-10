@@ -37,7 +37,16 @@ export class BrandingService {
   constructor() {
     // Inicializar com branding da empresa atual
     this.initializeBranding();
-    
+
+    // Reagir a mudanças de empresa (ex.: após F5 quando SubdomainService carrega versão completa)
+    try {
+      this.subdomainService.currentCompany$.subscribe((company) => {
+        if (company) {
+          this.applyCompanyBranding(company);
+        }
+      });
+    } catch {}
+
     // Aplicar branding após inicialização
     setTimeout(() => {
       this.applyStoredBranding();
@@ -312,8 +321,9 @@ export class BrandingService {
       // Bootstrap override
       root.style.setProperty('--bs-primary', colors.primaryColor);
       
-      // Tailwind overrides
+      // Tailwind/CSS variables overrides
       root.style.setProperty('--primary-color', colors.primaryColor);
+      root.style.setProperty('--tw-ring-color', colors.primaryColor + '66');
     }
 
     if (colors.secondaryColor) {

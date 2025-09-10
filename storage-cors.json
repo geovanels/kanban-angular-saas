@@ -1,0 +1,21 @@
+[
+  {
+    "origin": [
+      "http://localhost:4200",
+      "https://kanban-gobuyer.web.app",
+      "https://kanban-gobuyer.firebaseapp.com",
+      "https://*.taskboard.com.br"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "x-goog-resumable",
+      "X-Goog-Upload-Protocol",
+      "X-Goog-Upload-Command",
+      "X-Goog-Upload-Header-Content-Length",
+      "X-Goog-Upload-Header-Content-Type"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

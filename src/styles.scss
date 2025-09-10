@@ -9,3 +9,20 @@ body {
     font-family: 'Inter', sans-serif;
     background-color: #f0f2f5;
 }
+
+/* Global brand variables injected by BrandingService */
+:root {
+  --primary-color: #3B82F6;
+  --secondary-color: #6B7280;
+}
+
+/* Generic button tokens honoring brand colors */
+.btn-primary {
+  background-color: var(--primary-color);
+  color: #fff;
+}
+.btn-primary:hover { filter: brightness(0.9); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary { background-color: #f1f5f9; color: #334155; }
+.btn-primary-outline { border: 1px solid var(--primary-color); color: var(--primary-color); }

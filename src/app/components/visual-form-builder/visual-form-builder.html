@@ -100,6 +100,17 @@
           <div class="text-xs text-gray-500 mt-1">Uma opção por linha</div>
         </div>
 
+        <!-- Informação sobre campo Responsável -->
+        <div *ngIf="selectedFieldType === 'responsavel'" class="p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div class="flex items-start">
+            <i class="fas fa-info-circle text-blue-500 mr-2 mt-0.5"></i>
+            <div class="text-sm text-blue-700">
+              <strong>Campo Responsável:</strong><br>
+              Exibe uma lista com os usuários da empresa para seleção do responsável pelo registro.
+            </div>
+          </div>
+        </div>
+
         <!-- Informação sobre campo temperatura -->
         <div *ngIf="selectedFieldType === 'temperatura'" class="p-3 bg-blue-50 border border-blue-200 rounded-md">
           <div class="flex items-start">
@@ -150,6 +161,24 @@
               formControlName="showInCard"
               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
             <span class="text-sm text-gray-700">Exibir no card do registro</span>
+          </label>
+
+          <!-- Obrigatório para avançar de fase -->
+          <label class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              formControlName="requiredToAdvance"
+              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="text-sm text-gray-700">Obrigatório para avançar de fase</span>
+          </label>
+
+          <!-- Exibir em todas as fases -->
+          <label class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              formControlName="showInAllPhases"
+              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+            <span class="text-sm text-gray-700">Exibir em todas as fases</span>
           </label>
           
           <!-- Nome do campo na API -->
@@ -246,7 +275,7 @@
                 <i class="fas fa-edit"></i>
               </button>
               <button
-                (click)="removeField(i)"
+                (click)="openRemoveField(i)"
                 class="p-1 text-gray-400 hover:text-red-500"
                 title="Remover">
                 <i class="fas fa-trash"></i>
@@ -372,6 +401,18 @@
             </div>
           </form>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmação de remoção de campo -->
+  <div *ngIf="showDeleteConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" (click)="cancelRemoveField()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" (click)="$event.stopPropagation()">
+      <h3 class="text-lg font-bold text-gray-900 mb-2">Remover campo</h3>
+      <p class="text-sm text-gray-600 mb-6">Tem certeza que deseja remover este campo do formulário?</p>
+      <div class="flex justify-end gap-3">
+        <button class="px-4 py-2 rounded-lg border border-gray-300" (click)="cancelRemoveField()">Cancelar</button>
+        <button class="px-4 py-2 rounded-lg bg-red-600 text-white" (click)="confirmRemoveField()">Remover</button>
       </div>
     </div>
   </div>

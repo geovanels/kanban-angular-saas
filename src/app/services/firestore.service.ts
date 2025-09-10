@@ -55,6 +55,9 @@ export interface Lead {
   responsibleUserEmail?: string;
   phaseHistory?: { [key: string]: any };
   executedAutomations?: { [key: string]: any };
+  // UI derived counts (not persisted necessarily)
+  historyCommentsCount?: number;
+  attachmentsCount?: number;
   // Multi-empresa
   companyId: string;
   boardId: string;
@@ -453,12 +456,21 @@ export class FirestoreService {
       }
 
       const leadsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads'));
+      const nowTs = serverTimestamp();
+      const initialPhaseHistory = {
+        [lead.columnId]: {
+          phaseId: lead.columnId,
+          enteredAt: nowTs
+        }
+      } as any;
       const newLead = {
         ...lead,
         companyId: this.currentCompanyId,
         boardId: boardId,
-        createdAt: serverTimestamp(),
-        movedToCurrentColumnAt: serverTimestamp()
+        createdAt: nowTs,
+        movedToCurrentColumnAt: nowTs,
+        phaseHistory: (lead as any).phaseHistory && Object.keys((lead as any).phaseHistory).length ? (lead as any).phaseHistory : initialPhaseHistory,
+        executedAutomations: (lead as any).executedAutomations || {}
       };
       return await runInInjectionContext(this.injector, () => addDoc(leadsRef, newLead));
     } catch (error) {
@@ -482,6 +494,24 @@ export class FirestoreService {
     } catch (error) {
       console.error('Erro ao atualizar lead:', error);
       throw error;
+    }
+  }
+
+  async getLead(userId: string, boardId: string, leadId: string): Promise<Lead | null> {
+    try {
+      if (!this.currentCompanyId) {
+        await this.initializeCompanyContext();
+      }
+      if (!this.currentCompanyId) return null;
+
+      const leadRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads', leadId));
+      const snap = await runInInjectionContext(this.injector, () => getDoc(leadRef));
+      if (!snap.exists()) return null;
+      const data = snap.data() as any;
+      return { id: leadId, ...data, companyId: this.currentCompanyId, boardId } as Lead;
+    } catch (error) {
+      console.error('Erro ao buscar lead por id:', error);
+      return null;
     }
   }
 
@@ -694,6 +724,28 @@ export class FirestoreService {
     }
   }
 
+  // Subscribe real-time to lead history
+  subscribeToLeadHistory(userId: string, boardId: string, leadId: string, callback: (items: any[]) => void) {
+    if (!this.currentCompanyId) {
+      // try initialize context lazily; if still unavailable, return noop and empty list
+      this.initializeCompanyContext().then(() => {}).catch(() => {});
+    }
+    if (!this.currentCompanyId) {
+      callback([]);
+      return () => {};
+    }
+
+    const historyRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId, 'history');
+    const qHist = query(historyRef, orderBy('timestamp', 'desc'));
+    return runInInjectionContext(this.injector, () => onSnapshot(qHist, (snapshot) => {
+      const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      callback(items);
+    }, (err) => {
+      console.error('Erro na subscrição do histórico do lead:', err);
+      callback([]);
+    }));
+  }
+
   // PHASE FORM CONFIGURATIONS
   // INITIAL FORM CONFIG (one per board)
   async getInitialFormConfig(boardId: string): Promise<any | null> {
@@ -769,13 +821,25 @@ export class FirestoreService {
     if (!this.currentCompanyId) return null;
 
     const formConfigsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/phaseFormConfigs`);
-    const q = query(formConfigsRef, where('columnId', '==', columnId));
-    const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
-    
-    if (!snapshot.empty) {
-      const docSnap = snapshot.docs[0];
+    const q1 = query(formConfigsRef, where('columnId', '==', columnId));
+    const snapshot1 = await runInInjectionContext(this.injector, () => getDocs(q1));
+
+    if (!snapshot1.empty) {
+      const docSnap = snapshot1.docs[0];
       return { id: docSnap.id, ...docSnap.data() };
     }
+
+    // Fallback: estrutura alternativa sem prefixo de empresa
+    try {
+      const altRef = collection(this.firestore, `boards/${boardId}/phaseFormConfigs`);
+      const q2 = query(altRef, where('columnId', '==', columnId));
+      const snapshot2 = await runInInjectionContext(this.injector, () => getDocs(q2));
+      if (!snapshot2.empty) {
+        const docSnap = snapshot2.docs[0];
+        return { id: docSnap.id, ...docSnap.data() } as any;
+      }
+    } catch {}
+
     return null;
   }
 
@@ -868,8 +932,7 @@ export class FirestoreService {
     const q = query(emailsRef, orderBy('createdAt', 'desc'));
     const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
     return snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((item: any) => item.to);
+      .map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
   async createOutboxEmail(userId: string, boardId: string, emailData: any) {
@@ -907,6 +970,37 @@ export class FirestoreService {
     return await updateDoc(emailRef, updatedEmail);
   }
 
+  // Buscar outbox recente para evitar duplicatas (mesmo lead/automação/assunto em curto intervalo)
+  async findRecentOutboxEmail(userId: string, boardId: string, criteria: { automationId?: string; leadId?: string; subject?: string; withinMs?: number }): Promise<string | null> {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return null;
+
+    const withinMs = criteria.withinMs ?? 2 * 60 * 1000; // 2 minutos por padrão
+    try {
+      const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
+      let qBase: any = emailsRef;
+      if (criteria.automationId) qBase = query(qBase, where('automationId', '==', criteria.automationId));
+      if (criteria.leadId) qBase = query(qBase, where('leadId', '==', criteria.leadId));
+      qBase = query(qBase, orderBy('createdAt', 'desc'), limit(5));
+      const snap = await runInInjectionContext(this.injector, () => getDocs(qBase));
+      const now = Date.now();
+      for (const d of snap.docs) {
+        const data: any = d.data();
+        const created = data?.createdAt?.toDate ? data.createdAt.toDate().getTime() : (data?.createdAt ? new Date(data.createdAt).getTime() : 0);
+        if (created && now - created <= withinMs) {
+          if (!criteria.subject || criteria.subject === data.subject) {
+            return d.id;
+          }
+        }
+      }
+    } catch (e) {
+      // silencioso
+    }
+    return null;
+  }
+
   async deleteOutboxEmail(userId: string, boardId: string, emailId: string) {
     if (!this.currentCompanyId) {
       await this.initializeCompanyContext();
@@ -931,8 +1025,7 @@ export class FirestoreService {
     return runInInjectionContext(this.injector, () => 
       onSnapshot(q, snapshot => {
         const emails = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((item: any) => item.to);
+          .map(doc => ({ id: doc.id, ...doc.data() }));
         callback(emails);
       })
     );

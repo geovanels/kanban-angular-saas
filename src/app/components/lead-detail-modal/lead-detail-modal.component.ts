@@ -57,6 +57,7 @@ export class LeadDetailModalComponent {
   isSaving = false;
   errorMessage = '';
   currentLead: Lead | null = null;
+  formReady = false;
   leadHistory: LeadHistory[] = [];
   phaseHistory: PhaseHistory = {};
   // Fluxo de transições (permitidas)
@@ -70,9 +71,12 @@ export class LeadDetailModalComponent {
   selectedFile: File | null = null;
   attachmentPreview = '';
   isUploadingComment = false;
+  isUploadingAttachment = false;
+  showDeleteConfirm = false;
 
   // Link público
   publicLink = '';
+  private unsubscribeHistory: (() => void) | null = null;
   // Configuração do formulário inicial (somente leitura)
   initialFormConfig: any | null = null;
 
@@ -81,11 +85,33 @@ export class LeadDetailModalComponent {
     this.isVisible = true;
     this.resetForm();
     await this.loadLeadData();
+    // Repopular o formulário com os dados salvos do lead
+    try {
+      const values: any = {};
+      (this.currentFormFields || []).forEach((f: any) => {
+        const key = f.apiFieldName || f.name;
+        values[f.name] = this.getFieldValue(key) ?? '';
+      });
+      if (Object.keys(values).length) {
+        this.leadForm.patchValue(values, { emitEvent: false });
+      }
+    } catch {}
+    // Subscribir histórico em tempo real
+    try {
+      if (this.unsubscribeHistory) { this.unsubscribeHistory(); this.unsubscribeHistory = null; }
+      this.unsubscribeHistory = this.firestoreService.subscribeToLeadHistory(
+        this.ownerId,
+        this.boardId,
+        this.currentLead.id!,
+        (items) => { this.leadHistory = items as any; }
+      ) as any;
+    } catch {}
   }
 
   hide() {
     this.isVisible = false;
     this.resetForm();
+    if (this.unsubscribeHistory) { this.unsubscribeHistory(); this.unsubscribeHistory = null; }
     this.closeModal.emit();
   }
 
@@ -98,12 +124,21 @@ export class LeadDetailModalComponent {
     this.publicLink = '';
     this.leadHistory = [];
     this.phaseHistory = {};
+    this.formReady = false;
   }
 
   private async loadLeadData() {
     if (!this.currentLead) return;
 
     try {
+      // Buscar versão mais recente do lead para garantir phaseHistory atualizado
+      try {
+        const latest = await this.firestoreService.getLead(this.ownerId, this.boardId, this.currentLead.id!);
+        if (latest) {
+          this.currentLead = latest;
+        }
+      } catch {}
+
       // Carregar histórico do lead
       const history = await this.firestoreService.getLeadHistory(
         this.ownerId,
@@ -122,8 +157,9 @@ export class LeadDetailModalComponent {
       try {
         const phaseCfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, this.currentLead.columnId);
         this.currentFormFields = (phaseCfg as any)?.fields || [];
-      } catch {
-        this.currentFormFields = [];
+      } catch (e) {
+        console.warn('Sem configuração da fase atual, tentando formulário inicial como fallback.', e);
+        this.currentFormFields = (this.initialFormConfig?.fields || []).map((f: any) => ({ ...f }));
       }
 
       // Carregar fluxo de transições para validar movimentos e listas
@@ -136,6 +172,7 @@ export class LeadDetailModalComponent {
 
       // Construir formulário dinâmico baseado na fase atual
       await this.buildDynamicForm();
+      this.formReady = true;
 
       // Gerar link público
       this.generatePublicLink();
@@ -150,14 +187,35 @@ export class LeadDetailModalComponent {
     if (!this.currentLead) return;
 
     const formConfig: any = {};
+    this.formReady = false;
     
     // Adicionar campos dinâmicos da fase (se configurados)
-    this.currentFormFields.forEach((field: any) => {
-      const currentValue = this.currentLead!.fields?.[field.name] || '';
-      formConfig[field.name] = [currentValue];
+    (this.currentFormFields || []).forEach((field: any) => {
+      const key = field.apiFieldName || field.name;
+      let currentValue = this.getFieldValue(key);
+      if (currentValue === undefined || currentValue === null || (typeof currentValue === 'string' && currentValue.trim() === '')) {
+        currentValue = this.getFieldValue(field.name);
+      }
+      // Temperatura: normalizar para uma das opções
+      if (field.type === 'temperatura') {
+        const options = field.options && field.options.length ? field.options : ['Quente','Morno','Frio'];
+        if (typeof currentValue === 'string') {
+          const match = options.find((o: string) => o.toLowerCase() === currentValue.toLowerCase());
+          currentValue = match || '';
+        }
+      }
+      // Campo Responsável: armazenar uid do usuário se houver mapeamento nos campos do lead
+      if (field.type === 'responsavel') {
+        // tentar ler do lead o responsibleUserId
+        const responsibleId = this.currentLead?.responsibleUserId || currentValue;
+        formConfig[field.name] = [responsibleId ?? ''];
+      } else {
+        formConfig[field.name] = [currentValue ?? ''];
+      }
     });
 
     this.leadForm = this.fb.group(formConfig);
+    this.formReady = true;
   }
 
   getCurrentColumn(): Column | null {
@@ -172,32 +230,27 @@ export class LeadDetailModalComponent {
   getInitialFields(): any[] {
     // Se houver configuração de formulário inicial, usar esses campos na ordem definida
     if (this.initialFormConfig?.fields?.length) {
-      return this.initialFormConfig.fields
-        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-        .map((f: any) => ({
-          name: f.name,
-          label: f.label || f.name,
-          value: this.currentLead?.fields?.[f.name] || 'Não informado'
-        }));
+      const sorted = this.initialFormConfig.fields
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+      return sorted.map((f: any) => ({
+        name: f.apiFieldName || f.name,
+        label: f.label || f.name || f.apiFieldName,
+        value: this.getFieldValue(f.apiFieldName || f.name) ?? this.getFieldValue(f.name) ?? 'Não informado'
+      }));
     }
 
-    // Fallback: campos básicos do lead
-    const fields = [
-      { name: 'companyName', label: 'Empresa' },
-      { name: 'cnpj', label: 'CNPJ' },
-      { name: 'contactName', label: 'Contato' },
-      { name: 'contactEmail', label: 'Email' },
-      { name: 'contactPhone', label: 'Telefone' },
-      { name: 'temperature', label: 'Temperatura' }
-    ];
-
-    return fields.map(field => ({
-      ...field,
-      value: this.currentLead?.fields?.[field.name] || 'Não informado'
-    }));
+    // Fallback dinâmico com deduplicação por grupos de sinônimos
+    return this.buildDedupedDisplayFields();
   }
 
   currentFormFields: any[] = [];
+
+  hasRequiredToAdvance(): boolean {
+    try {
+      return Array.isArray(this.currentFormFields) && this.currentFormFields.some((f: any) => !!f?.requiredToAdvance);
+    } catch { return false; }
+  }
 
 
   getPhaseHistoryItems(): any[] {
@@ -229,6 +282,25 @@ export class LeadDetailModalComponent {
         });
       }
     });
+
+    // Fallback: se não houver históricos registrados, exibir fase atual como entrada
+    if (items.length === 0 && this.currentLead) {
+      const currentColumn = this.getCurrentColumn();
+      if (currentColumn) {
+        const enteredAt = (this.currentLead.movedToCurrentColumnAt?.toDate && this.currentLead.movedToCurrentColumnAt.toDate())
+          || this.currentLead.movedToCurrentColumnAt
+          || (this.currentLead.createdAt?.toDate && this.currentLead.createdAt.toDate())
+          || this.currentLead.createdAt
+          || new Date();
+        items.push({
+          phaseName: currentColumn.name,
+          phaseColor: currentColumn.color,
+          enteredAt: (enteredAt instanceof Date ? enteredAt : new Date(enteredAt)).toLocaleString('pt-BR'),
+          exitedAt: 'Atual',
+          duration: 'Em andamento'
+        });
+      }
+    }
 
     return items.sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
   }
@@ -264,6 +336,18 @@ export class LeadDetailModalComponent {
       return [];
     }
 
+    // Validar: todos os campos marcados como requiredToAdvance devem estar preenchidos
+    const missing = (this.currentFormFields || []).filter((f: any) => {
+      if (!f.requiredToAdvance) return false;
+      const key = f.apiFieldName || f.name;
+      const val = this.leadForm.get(f.name)?.value ?? this.getFieldValue(key);
+      return val === undefined || val === null || `${val}`.trim() === '';
+    });
+    if (missing.length) {
+      // Se há pendências, impedir avanço exibindo somente mensagem informativa no UI (mantemos retorno vazio)
+      return [];
+    }
+
     // Restringir por fluxo (se houver regra definida para a fase atual)
     const allowed = this.flowConfig.allowed[currentColumn.id!] || [];
     // Agora: exige aresta explícita no fluxo
@@ -296,6 +380,14 @@ export class LeadDetailModalComponent {
 
     try {
       const formData = this.leadForm.value;
+      // Mapear apiFieldName -> name para persistir com a chave correta usada na API quando existir
+      const mapped: any = { ...formData };
+      (this.currentFormFields || []).forEach((f: any) => {
+        if (f.apiFieldName && f.apiFieldName !== f.name && mapped.hasOwnProperty(f.name)) {
+          mapped[f.apiFieldName] = mapped[f.name];
+          delete mapped[f.name];
+        }
+      });
       const currentUser = this.authService.getCurrentUser();
       
       if (!currentUser) {
@@ -306,14 +398,18 @@ export class LeadDetailModalComponent {
       const updateData: Partial<Lead> = {
         fields: {
           ...this.currentLead.fields,
-          ...formData
+          ...mapped
         }
       };
 
       // Atualizar responsável se mudou
-      if (formData.responsibleUserId !== this.currentLead.responsibleUserId) {
-        const selectedUser = this.users.find(u => u.uid === formData.responsibleUserId);
-        updateData.responsibleUserId = formData.responsibleUserId;
+      // Atualizar responsável via campo do formulário caso exista tipo 'responsavel'
+      const respFieldDef = (this.currentFormFields || []).find((f: any) => f.type === 'responsavel');
+      const respFieldName = respFieldDef?.name;
+      const newRespId = respFieldName ? formData[respFieldName] : formData.responsibleUserId;
+      if (newRespId && newRespId !== this.currentLead.responsibleUserId) {
+        const selectedUser = this.users.find(u => u.uid === newRespId);
+        updateData.responsibleUserId = newRespId;
         updateData.responsibleUserName = selectedUser?.displayName || '';
         updateData.responsibleUserEmail = selectedUser?.email || '';
 
@@ -330,6 +426,38 @@ export class LeadDetailModalComponent {
         );
       }
 
+      // Registrar diffs de campos (histórico) — incluindo campos do formulário da fase
+      try {
+        const beforeFields = (this.currentLead.fields || {}) as any;
+        const changedKeys = Object.keys(mapped).filter(k => `${beforeFields[k] ?? ''}` !== `${mapped[k] ?? ''}`);
+        if (changedKeys.length) {
+          const changesList = changedKeys.map(k => {
+            const label = (this.currentFormFields || []).find((f: any) => (f.apiFieldName || f.name) === k)?.label || this.humanizeKey(k);
+            let beforeVal = beforeFields[k] ?? '';
+            let afterVal = mapped[k] ?? '';
+            // Se o campo representa responsável, mostrar nome do usuário
+            const isResp = (this.currentFormFields || []).some((f: any) => (f.apiFieldName === k || f.name === k) && (f.type === 'responsavel' || f.originalType === 'responsavel'));
+            if (isResp) {
+              const beforeUser = this.users.find(u => u.uid === beforeVal || u.email === beforeVal);
+              const afterUser = this.users.find(u => u.uid === afterVal || u.email === afterVal);
+              beforeVal = beforeUser?.displayName || beforeVal;
+              afterVal = afterUser?.displayName || afterVal;
+            }
+            return `<li><strong>${label}:</strong> "${beforeVal}" → "${afterVal}"</li>`;
+          }).join('');
+          await this.firestoreService.addLeadHistory(
+            this.ownerId,
+            this.boardId,
+            this.currentLead.id!,
+            {
+              type: 'update',
+              text: `Formulário da fase salvo:<ul class="list-disc ml-4">${changesList}</ul>`,
+              user: currentUser.displayName || currentUser.email
+            }
+          );
+        }
+      } catch {}
+
       // Salvar alterações
       await this.firestoreService.updateLead(
         this.ownerId,
@@ -338,10 +466,20 @@ export class LeadDetailModalComponent {
         updateData
       );
 
+      // Atualizar estado local e manter valores selecionados no form
+      this.currentLead.fields = {
+        ...(this.currentLead.fields || {}),
+        ...mapped
+      } as any;
+      const afterValues: any = {};
+      (this.currentFormFields || []).forEach((f: any) => {
+        const key = f.apiFieldName || f.name;
+        afterValues[f.name] = mapped.hasOwnProperty(key) ? mapped[key] : (this.getFieldValue(key) ?? '');
+      });
+      if (Object.keys(afterValues).length) {
+        this.leadForm.patchValue(afterValues, { emitEvent: false });
+      }
       this.leadUpdated.emit();
-      
-      // Recarregar dados
-      await this.loadLeadData();
 
     } catch (error: any) {
       console.error('Erro ao salvar alterações:', error);
@@ -540,6 +678,44 @@ export class LeadDetailModalComponent {
     }
   }
 
+  async uploadAttachment() {
+    if (!this.currentLead || !this.selectedFile) return;
+    this.isUploadingAttachment = true;
+    this.errorMessage = '';
+    try {
+      const currentUser = this.authService.getCurrentUser();
+      if (!currentUser) throw new Error('Usuário não autenticado');
+
+      const filePath = `leads/${this.currentLead.id}/attachments/${Date.now()}_${this.selectedFile.name}`;
+      const downloadURL = await this.storageService.uploadFile(this.selectedFile, filePath);
+
+      await this.firestoreService.addLeadHistory(
+        this.ownerId,
+        this.boardId,
+        this.currentLead.id!,
+        {
+          type: 'comment',
+          text: 'Anexou um arquivo',
+          user: currentUser.displayName || currentUser.email,
+          timestamp: new Date(),
+          attachment: {
+            name: this.selectedFile.name,
+            url: downloadURL,
+            type: this.selectedFile.type,
+            size: this.selectedFile.size
+          }
+        }
+      );
+
+      this.clearAttachment();
+      await this.loadLeadData();
+    } catch (e: any) {
+      this.errorMessage = e.message || 'Erro ao anexar arquivo';
+    } finally {
+      this.isUploadingAttachment = false;
+    }
+  }
+
   private generatePublicLink() {
     if (!this.currentLead) return;
 
@@ -554,10 +730,10 @@ export class LeadDetailModalComponent {
       if (isDev) {
         // Em desenvolvimento: /form?subdomain=X&outros_params
         const baseUrl = this.subdomainService.getBaseUrl();
-        this.publicLink = `${baseUrl}/form?subdomain=${company.subdomain}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
+        this.publicLink = `${baseUrl}/form?subdomain=${company.subdomain}&companyId=${company.id}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
       } else {
         // Em produção: https://subdomain.taskboard.com.br/form?params
-        this.publicLink = `https://${company.subdomain}.taskboard.com.br/form?userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
+        this.publicLink = `https://${company.subdomain}.taskboard.com.br/form?companyId=${company.id}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
       }
     }
   }
@@ -571,10 +747,7 @@ export class LeadDetailModalComponent {
 
   async deleteLead() {
     if (!this.currentLead) return;
-
-    const confirmed = confirm('Tem certeza que deseja apagar este lead? Esta ação não pode ser desfeita.');
-    if (!confirmed) return;
-
+    // Confirmação será exibida via modal estilizado
     this.isLoading = true;
 
     try {
@@ -595,6 +768,19 @@ export class LeadDetailModalComponent {
     }
   }
 
+  openDeleteConfirm() {
+    this.showDeleteConfirm = true;
+  }
+
+  cancelDelete() {
+    this.showDeleteConfirm = false;
+  }
+
+  async confirmDelete() {
+    await this.deleteLead();
+    this.showDeleteConfirm = false;
+  }
+
   onBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) {
       this.hide();
@@ -613,5 +799,217 @@ export class LeadDetailModalComponent {
       case 'update': return 'fas fa-edit';
       default: return 'fas fa-info-circle';
     }
+  }
+
+  copyLeadId() {
+    if (this.currentLead?.id) {
+      navigator.clipboard.writeText(this.currentLead.id);
+    }
+  }
+
+  
+
+  private isPlainObject(value: any): boolean {
+    return value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private flattenObject(source: any, maxDepth: number = 3): Record<string, any> {
+    const out: Record<string, any> = {};
+    if (!this.isPlainObject(source) || maxDepth < 0) return out;
+    for (const [key, val] of Object.entries(source)) {
+      if (this.isPlainObject(val) && maxDepth > 0) {
+        // Pull up nested primitives one level deeper as loose fields as well
+        const nested = this.flattenObject(val, maxDepth - 1);
+        for (const [nk, nv] of Object.entries(nested)) {
+          if (out[nk] === undefined) out[nk] = nv;
+        }
+      } else if (val !== undefined && val !== null) {
+        out[key] = val as any;
+      }
+    }
+    return out;
+  }
+
+  private collectLeadFields(): Record<string, any> {
+    // Accept various shapes produced by different API versions
+    // Examples: { fields: {...} }, { fields: { fields: {...} } }, { fields: { leadData: {...} } }, etc.
+    const base = (this.currentLead?.fields || {}) as any;
+    const containers = ['fields', 'leadData', 'data', 'payload'];
+
+    // Merge shallow base, known containers and a generic recursive flatten (limited depth)
+    const merged: Record<string, any> = {};
+    const candidates: any[] = [base];
+    containers.forEach(k => {
+      if (this.isPlainObject(base[k])) candidates.push(base[k]);
+    });
+    // Common double nesting like fields.fields
+    if (this.isPlainObject(base.fields?.fields)) candidates.push(base.fields.fields);
+
+    for (const obj of candidates) {
+      for (const [k, v] of Object.entries(obj)) {
+        if (merged[k] === undefined && v !== undefined && v !== null && `${v}`.trim?.() !== '') {
+          merged[k] = v;
+        }
+      }
+    }
+
+    // Fallback: recursive pick of primitives inside nested objects
+    const deep = this.flattenObject(base, 3);
+    for (const [k, v] of Object.entries(deep)) {
+      if (merged[k] === undefined && v !== undefined && v !== null && `${v}`.trim?.() !== '') {
+        merged[k] = v;
+      }
+    }
+
+    return merged;
+  }
+
+  private getFieldValue(requestedName: string): any {
+    const fields = this.collectLeadFields();
+    if (!requestedName) return undefined;
+
+    const synonyms: { [canonical: string]: string[] } = {
+      companyName: ['companyName', 'empresa', 'nomeEmpresa', 'nameCompany', 'company', 'company_name', 'empresa_nome', 'nameComapny'],
+      cnpj: ['cnpj', 'cnpjCompany'],
+      contactName: ['contactName', 'name', 'nome', 'nomeLead', 'nameLead', 'leadName'],
+      contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail', 'leadEmail'],
+      contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead', 'telefoneContato'],
+      temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature']
+    };
+
+    const lowerMap: { [k: string]: string } = Object.keys(fields).reduce((acc: any, k: string) => {
+      acc[k.toLowerCase()] = k;
+      return acc;
+    }, {});
+
+    const req = requestedName.toLowerCase();
+
+    // Construir lista de candidatos: pedido, seus sinônimos e canônicos equivalentes
+    const candidates: string[] = [requestedName];
+
+    // Adicionar sinônimos se o requestedName já for canônico
+    if (synonyms[requestedName]) {
+      candidates.push(...synonyms[requestedName]);
+    }
+
+    // Se requestedName é um alias, adicionar o canônico correspondente e os aliases dele
+    for (const [canonical, aliases] of Object.entries(synonyms)) {
+      if (canonical.toLowerCase() === req || aliases.some(a => a.toLowerCase() === req)) {
+        candidates.push(canonical, ...aliases);
+      }
+    }
+
+    // Remover duplicados preservando ordem
+    const visited = new Set<string>();
+    for (const c of candidates) {
+      const key = c.toLowerCase();
+      if (visited.has(key)) continue;
+      visited.add(key);
+      const original = lowerMap[key];
+      if (original !== undefined) {
+        const val = fields[original];
+        if (val !== undefined && val !== null && (typeof val !== 'string' || val.trim() !== '')) {
+          return val;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private humanizeKey(key: string): string {
+    // Converte camelCase/snake_case para Título com espaços
+    const withSpaces = key
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+  }
+
+  private getLabelForOriginalKey(originalKey: string, canonicalKey: string): string {
+    // 1) Se houver configuração de formulário inicial, tente achar o label pelo nome original ou canônico
+    const fieldsCfg = (this.initialFormConfig?.fields || []) as any[];
+    if (Array.isArray(fieldsCfg) && fieldsCfg.length) {
+      const found = fieldsCfg.find(f => {
+        const apiName = (f.apiFieldName || '').toString();
+        const name = (f.name || '').toString();
+        return apiName === originalKey || name === originalKey || apiName === canonicalKey || name === canonicalKey;
+      });
+      if (found?.label) return found.label;
+    }
+    // 2) Preferir humanizar a chave original (ex.: nameLead → Name Lead)
+    const humanOriginal = this.humanizeKey(originalKey);
+    if (humanOriginal) return humanOriginal;
+    // 3) Fallback: humanizar canônico
+    return this.humanizeKey(canonicalKey);
+  }
+
+  private buildDedupedDisplayFields(): Array<{ name: string; label: string; value: any }> {
+    const raw = this.collectLeadFields();
+
+    const groups: Record<string, string[]> = {
+      companyName: ['companyName', 'empresa', 'nomeEmpresa', 'nameCompany', 'company', 'company_name', 'empresa_nome', 'nameComapny'],
+      cnpj: ['cnpj', 'cnpjCompany'],
+      contactName: ['contactName', 'name', 'nome', 'nomeLead', 'nameLead', 'leadName'],
+      contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail', 'leadEmail'],
+      contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead', 'telefoneContato'],
+      temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature']
+    };
+
+    const labelMap: Record<string, string> = {
+      companyName: 'Nome da empresa',
+      cnpj: 'CNPJ da empresa',
+      contactName: 'Nome do contato',
+      contactEmail: 'E-mail de contato',
+      contactPhone: 'Telefone',
+      temperature: 'Temperatura'
+    };
+
+    const lowerMap: Record<string, string> = Object.keys(raw).reduce((acc: any, k: string) => {
+      acc[k.toLowerCase()] = k; return acc;
+    }, {});
+
+    const usedOriginalKeys = new Set<string>();
+    const out: Array<{ name: string; label: string; value: any; order: number }> = [];
+
+    const pickFromAliases = (aliases: string[]) => {
+      for (const a of aliases) {
+        const orig = lowerMap[a.toLowerCase()];
+        if (orig && raw[orig] !== undefined && raw[orig] !== null && `${raw[orig]}`.trim() !== '') {
+          usedOriginalKeys.add(orig);
+          return { key: orig, value: raw[orig] };
+        }
+      }
+      return null;
+    };
+
+    const orderMap: Record<string, number> = { companyName: 1, cnpj: 2, contactName: 3, contactEmail: 4, contactPhone: 5, temperature: 6 };
+
+    // Inserir grupos canônicos sem duplicar
+    for (const canonical of Object.keys(groups)) {
+      const found = pickFromAliases(groups[canonical]);
+      if (found) {
+        const label = this.getLabelForOriginalKey(found.key, canonical) || labelMap[canonical] || this.humanizeKey(canonical);
+        out.push({ name: canonical, label, value: found.value, order: orderMap[canonical] || 999 });
+      }
+    }
+
+    // Conjunto com todas as chaves-aliás para filtrar duplicados
+    const aliasLowerSet = new Set<string>(
+      Object.values(groups).flat().map(k => k.toLowerCase())
+    );
+
+    // Incluir quaisquer outros campos não cobertos pelos grupos (e não-aliás)
+    Object.keys(raw).forEach(orig => {
+      const isAlias = aliasLowerSet.has(orig.toLowerCase());
+      if (!usedOriginalKeys.has(orig) && !isAlias) {
+        out.push({ name: orig, label: this.humanizeKey(orig), value: raw[orig], order: 999 });
+      }
+    });
+
+    return out
+      .filter(item => item.value !== undefined && item.value !== null && `${item.value}`.trim() !== '')
+      .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
+      .map(({ order, ...rest }) => rest);
   }
 }

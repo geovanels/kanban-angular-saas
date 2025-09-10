@@ -145,6 +145,12 @@ export class SubdomainService {
       if (basic?.id && basic?.subdomain) {
         const company: Company = { id: basic.id, subdomain: basic.subdomain, name: basic.name } as any;
         this.currentCompanySubject.next(company);
+        // Carregar versão completa em background para restaurar branding/SMTP/etc.
+        this.companyService.getCompany(basic.id).then(full => {
+          if (full) {
+            this.currentCompanySubject.next(full);
+          }
+        }).catch(() => {});
         return company;
       }
       return null;

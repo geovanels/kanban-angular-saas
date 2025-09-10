@@ -26,8 +26,8 @@ import {
   ɵɵdirectiveInject,
   ɵɵtemplate
 } from "./chunk-IIZBPFY5.js";
-import "./chunk-XYFQ7QOX.js";
 import "./chunk-BZLT2HVW.js";
+import "./chunk-XYFQ7QOX.js";
 import {
   first
 } from "./chunk-QJQPERGE.js";

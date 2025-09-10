@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/components/hostinger-setup/hostinger-setup.component.ts"],
-  "sourcesContent": ["\n    .hostinger-setup-container {\n      max-width: 1000px;\n      margin: 0 auto;\n      padding: 20px;\n    }\n    \n    .card-header h3 {\n      margin: 0;\n      color: #495057;\n    }\n    \n    .alert {\n      border-radius: 8px;\n      border: none;\n      display: flex;\n      align-items: center;\n      gap: 10px;\n    }\n  "],
-  "mappings": ";AACI,CAAA;AACE,aAAA;AACA,UAAA,EAAA;AACA,WAAA;;AAGF,CAAA,YAAA;AACE,UAAA;AACA,SAAA;;AAGF,CAAA;AACE,iBAAA;AACA,UAAA;AACA,WAAA;AACA,eAAA;AACA,OAAA;;",
-  "names": []
-}

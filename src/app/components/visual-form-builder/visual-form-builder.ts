@@ -15,6 +15,8 @@ interface FormField {
   includeInApi?: boolean; // Flag para indicar se o campo deve ser incluído na API
   apiFieldName?: string; // Nome do campo na API (se diferente do nome)
   showInCard?: boolean; // Flag para indicar se o campo deve ser exibido no card
+  requiredToAdvance?: boolean; // Obrigatório para avançar de fase
+  showInAllPhases?: boolean; // Exibir em todas as fases
 }
 
 @Component({
@@ -36,6 +38,9 @@ export class VisualFormBuilderComponent implements OnInit {
   editingIndex: number = -1;
   selectedFieldType: string = '';
   selectedField: FormField | null = null;
+  // Delete confirmation state
+  showDeleteConfirm: boolean = false;
+  fieldPendingDeleteIndex: number = -1;
   
   fieldTypes = [
     { value: 'text', label: 'Texto' },
@@ -45,6 +50,7 @@ export class VisualFormBuilderComponent implements OnInit {
     { value: 'cnpj', label: 'CNPJ' },
     { value: 'cpf', label: 'CPF' },
     { value: 'temperatura', label: 'Temperatura' },
+    { value: 'responsavel', label: 'Responsável' },
     { value: 'textarea', label: 'Área de Texto' },
     { value: 'select', label: 'Lista Suspensa' },
     { value: 'checkbox', label: 'Checkbox' },
@@ -64,7 +70,9 @@ export class VisualFormBuilderComponent implements OnInit {
       options: [''],
       includeInApi: [true], // Por padrão, incluir na API
       apiFieldName: [''], // Nome personalizado na API
-      showInCard: [false] // Por padrão, não exibir no card
+      showInCard: [false], // Por padrão, não exibir no card
+      requiredToAdvance: [false],
+      showInAllPhases: [false]
     });
   }
 
@@ -75,16 +83,32 @@ export class VisualFormBuilderComponent implements OnInit {
     }
   }
 
+  // Open styled confirm modal
+  openRemoveField(index: number) {
+    this.fieldPendingDeleteIndex = index;
+    this.showDeleteConfirm = true;
+  }
+
+  cancelRemoveField() {
+    this.showDeleteConfirm = false;
+    this.fieldPendingDeleteIndex = -1;
+  }
+
+  confirmRemoveField() {
+    if (this.fieldPendingDeleteIndex < 0) return;
+    this.removeField(this.fieldPendingDeleteIndex);
+    this.cancelRemoveField();
+  }
+
+  // Perform removal (no prompt)
   removeField(index: number) {
-    if (confirm('Tem certeza que deseja remover este campo?')) {
-      this.fields.splice(index, 1);
-      // Reset selection if removing selected field
-      if (this.selectedField === this.fields[index]) {
-        this.selectedField = null;
-        this.selectedFieldType = '';
-      }
-      this.emitFieldsChange();
+    this.fields.splice(index, 1);
+    // Reset selection if removing selected field
+    if (this.selectedField === this.fields[index]) {
+      this.selectedField = null;
+      this.selectedFieldType = '';
     }
+    this.emitFieldsChange();
   }
 
   moveFieldUp(index: number) {
@@ -162,6 +186,7 @@ export class VisualFormBuilderComponent implements OnInit {
       'cnpj': 'fas fa-building',
       'cpf': 'fas fa-id-card',
       'temperatura': 'fas fa-thermometer-half',
+      'responsavel': 'fas fa-user',
       'textarea': 'fas fa-align-left',
       'select': 'fas fa-list',
       'checkbox': 'fas fa-check-square',
@@ -182,6 +207,7 @@ export class VisualFormBuilderComponent implements OnInit {
       'cnpj': 'CNPJ com máscara e validação',
       'cpf': 'CPF com máscara e validação',
       'temperatura': 'Lista suspensa (Quente, Morno, Frio)',
+      'responsavel': 'Lista de usuários da empresa',
       'textarea': 'Área de texto multilinha',
       'select': 'Lista suspensa',
       'checkbox': 'Caixa de seleção',
@@ -215,6 +241,8 @@ export class VisualFormBuilderComponent implements OnInit {
       order: this.editingIndex >= 0 ? this.fields[this.editingIndex].order : this.fields.length,
       includeInApi: formValue.includeInApi !== false, // Default true
       showInCard: formValue.showInCard || false, // Default false
+      requiredToAdvance: formValue.requiredToAdvance || false,
+      showInAllPhases: formValue.showInAllPhases || false,
       // Só incluir propriedades que não sejam undefined
       ...(formValue.placeholder && formValue.placeholder.trim() && { placeholder: formValue.placeholder.trim() }),
       ...(formValue.apiFieldName && formValue.apiFieldName.trim() && { apiFieldName: formValue.apiFieldName.trim() })
@@ -263,7 +291,9 @@ export class VisualFormBuilderComponent implements OnInit {
       options: field.options ? field.options.join('\n') : '',
       includeInApi: field.includeInApi !== false, // Default true se não especificado
       apiFieldName: field.apiFieldName || '',
-      showInCard: field.showInCard || false // Default false se não especificado
+      showInCard: field.showInCard || false, // Default false se não especificado
+      requiredToAdvance: field.requiredToAdvance || false,
+      showInAllPhases: field.showInAllPhases || false
     });
   }
 
@@ -326,6 +356,7 @@ export class VisualFormBuilderComponent implements OnInit {
       'cnpj': 'cnpj',
       'cpf': 'cpf',
       'temperatura': 'enum',
+      'responsavel': 'string',
       'textarea': 'text',
       'select': 'enum',
       'checkbox': 'boolean',
