@@ -1,19 +1,22 @@
 .kanban-board {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(280px, 1fr);
-  gap: 12px;
-  padding: 16px;
+  display: flex;            /* impede quebra para nova linha */
+  flex-direction: row;
+  gap: 12px;               /* mais espaço entre fases como solicitado */
+  padding: 12px;
   overflow-x: auto;
   min-height: calc(100vh - 80px);
   scroll-snap-type: x mandatory;
+  position: relative;
+  justify-content: flex-start;
+  align-items: stretch;
 }
 
 /* Hide mobile layout by default (desktop first) */
 .mobile-board { display: none; }
 
 .kanban-column {
-  min-width: 280px;
+  flex: 0 0 340px;        /* largura fixa e não quebra para baixo */
+  min-width: 340px;
   max-width: 380px;
   background-color: #f8fafc;
   border-radius: 12px;
@@ -38,16 +41,16 @@
 
 .kanban-cards {
   flex-grow: 1;
-  padding: 8px 12px 12px;
+  padding: 6px 10px 8px;
   overflow-y: auto;
-  min-height: 200px;
+  min-height: calc(100vh - 220px); /* cresce para perto do botão flutuante */
 }
 
 .kanban-card {
   background-color: white;
   border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 12px;
+  padding: 8px;
+  margin-bottom: 10px;
   cursor: pointer;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   transition: box-shadow 0.2s, transform 0.2s;
@@ -82,6 +85,74 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Flow tab: horizontal scroller always visible with subtle styling */
+.flow-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  min-height: 1px;
+  border-bottom: 0;
+  -ms-overflow-style: none;   /* IE/Edge */
+  scrollbar-width: none;      /* Firefox - oculta barra nativa */
+}
+
+.flow-scroll::-webkit-scrollbar { /* Chrome/Safari - oculta barra nativa */
+  height: 0px;
+  background: transparent;
+}
+
+.flow-row {
+  min-width: calc(100% + 2px);       /* pequeno overflow para forçar barra */
+}
+
+.flow-scroll::-webkit-scrollbar {
+  height: 10px;                       /* always visible */
+}
+
+.flow-scroll::-webkit-scrollbar-track {
+  background: #e5e7eb;                /* slate-200 */
+  border-radius: 8px;
+}
+
+.flow-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;                /* slate-300 */
+  border-radius: 8px;
+}
+
+/* Flow tab: phase card clean color accent */
+.flow-phase-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;          /* slate-200 */
+  border-top-width: 4px;
+  border-top-color: var(--phase-color, #94a3b8); /* slate-400 as fallback */
+  border-radius: 12px;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.02);
+}
+
+/* Barra de rolagem personalizada fixa logo abaixo das fases */
+.flow-custombar {
+  height: 8px;
+  background: #e5e7eb;       /* slate-200 */
+  border-radius: 6px;
+  position: relative;
+  margin: 6px 12px 0 12px;
+  cursor: pointer;
+}
+
+.flow-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #9ca3af;       /* slate-400 */
+  border-radius: 6px;
+}
+
+.flow-phase-card:hover {
+  box-shadow: 0 6px 20px -10px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
 }
 
 // Drag and drop styles

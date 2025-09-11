@@ -77,6 +77,11 @@ service cloud.firestore {
         // Board leads subcollection (direto sob board)
         match /leads/{leadId} {
           allow read, write: if isCompanyUser(companyId);
+
+          // Lead history (comentários, movimentos, atualizações)
+          match /history/{historyId} {
+            allow read, write: if isCompanyUser(companyId);
+          }
         }
 
         // Board columns subcollection
@@ -116,6 +121,11 @@ service cloud.firestore {
 
         // Board initial form configuration
         match /initialForm/{docId} {
+          allow read, write: if isCompanyUser(companyId);
+        }
+
+        // Board flow configuration
+        match /flow/{docId} {
           allow read, write: if isCompanyUser(companyId);
         }
       }

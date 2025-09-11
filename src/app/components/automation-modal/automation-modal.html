@@ -34,14 +34,18 @@
           </ng-container>
           <ng-template #fixedPhase>
             <div class="mt-1 p-2 bg-gray-50 border rounded text-sm">
-              {{ (phases | json) && (phases.find(p => p.id === fixedPhaseId)?.name || 'Fase selecionada') }}
+              {{ getFixedPhaseName() }}
             </div>
           </ng-template>
         </div>
         
         <div [class.hidden]="!showTriggerTime" class="mt-2">
-          <label for="triggerDays" class="text-sm font-medium text-gray-700">Por (dias úteis):</label>
+          <label for="triggerDays" class="text-sm font-medium text-gray-700" *ngIf="automationForm.get('triggerType')?.value === 'card-in-phase-for-time'">Por (dias):</label>
+          <label for="triggerDays" class="text-sm font-medium text-gray-700" *ngIf="automationForm.get('triggerType')?.value === 'form-not-answered'">Aguardar (dias):</label>
           <input type="number" formControlName="triggerDays" min="1" class="w-full p-2 border rounded-md mt-1" placeholder="Ex: 3">
+          <div class="text-xs text-gray-500 mt-1" *ngIf="automationForm.get('triggerType')?.value === 'form-not-answered'">
+            Se, após esse prazo, nenhum campo do formulário da fase tiver sido preenchido, a automação será executada.
+          </div>
         </div>
       </div>
 
@@ -70,15 +74,13 @@
               </div>
               
               <div *ngSwitchCase="'move-to-phase'">
-                <ng-container *ngIf="!fixedPhaseId; else fixedActionPhase">
-                  <select [(ngModel)]="action.phaseId" [ngModelOptions]="{standalone: true}" class="w-full p-2 border rounded-md bg-white">
-                    <option value="">Selecione uma fase</option>
-                    <option *ngFor="let phase of phases" [value]="phase.id">{{ phase.name }}</option>
-                  </select>
-                </ng-container>
-                <ng-template #fixedActionPhase>
-                  <div class="text-sm text-gray-600">Ações usam a fase atual por padrão.</div>
-                </ng-template>
+                <select [(ngModel)]="action.phaseId" [ngModelOptions]="{standalone: true}" class="w-full p-2 border rounded-md bg-white">
+                  <option value="">Selecione a fase de destino</option>
+                  <option *ngFor="let phase of getAllowedPhasesForMoveAction()" [value]="phase.id">{{ phase.name }}</option>
+                </select>
+                <div class="text-xs text-gray-500 mt-1" *ngIf="fixedPhaseId || automationForm.get('triggerPhase')?.value">
+                  Origem: {{ getFixedPhaseName() }}
+                </div>
               </div>
               
               <div *ngSwitchCase="'assign-user'">

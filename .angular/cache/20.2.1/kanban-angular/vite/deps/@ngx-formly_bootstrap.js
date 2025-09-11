@@ -4,7 +4,8 @@ import {
   FormlyModule,
   LegacyFormlyAttributes,
   LegacyFormlyValidationMessage
-} from "./chunk-ND7T35CF.js";
+} from "./chunk-AHDOP7O4.js";
+import "./chunk-26FJHHR5.js";
 import {
   CheckboxControlValueAccessor,
   DefaultValueAccessor,
@@ -19,7 +20,6 @@ import {
   UntypedFormControl,
   ɵNgSelectMultipleOption
 } from "./chunk-FHXGGGSE.js";
-import "./chunk-26FJHHR5.js";
 import "./chunk-ZUTL3ZMS.js";
 import {
   AsyncPipe,
@@ -80,8 +80,8 @@ import {
   ɵɵtextInterpolate1,
   ɵɵviewQuery
 } from "./chunk-IIZBPFY5.js";
-import "./chunk-XYFQ7QOX.js";
 import "./chunk-BZLT2HVW.js";
+import "./chunk-XYFQ7QOX.js";
 import {
   BehaviorSubject,
   Observable,

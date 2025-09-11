@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError, from } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { SubdomainService } from './subdomain.service';
+import { CompanyService } from './company.service';
+import { AuthService } from './auth.service';
 import { Company } from '../models/company.model';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 
@@ -35,50 +37,91 @@ export class SmtpService {
   private http = inject(HttpClient);
   private subdomainService = inject(SubdomainService);
   private functions = inject(Functions);
+  private companyService = inject(CompanyService);
+  private authService = inject(AuthService);
+
+  private async resolveCompanyWithSmtp(): Promise<Company | null> {
+    // 1) Empresa atual no contexto
+    let company = this.subdomainService.getCurrentCompany();
+    if (company?.smtpConfig && this.validateSmtpConfig(company)) return company;
+
+    // 2) Buscar por subdomínio
+    try {
+      const sub = this.companyService.getCompanySubdomain();
+      if (sub) {
+        const bySub = await this.companyService.getCompanyBySubdomain(sub);
+        if (bySub?.id) {
+          this.subdomainService.setCurrentCompany(bySub);
+          company = bySub;
+          if (company?.smtpConfig && this.validateSmtpConfig(company)) return company;
+        }
+      }
+    } catch {}
+
+    // 3) Buscar por email do usuário autenticado
+    try {
+      const currentUser = this.authService.getCurrentUser();
+      if (currentUser?.email) {
+        const byEmail = await this.companyService.getCompanyByUserEmail(currentUser.email);
+        if (byEmail?.id) {
+          this.subdomainService.setCurrentCompany(byEmail);
+          company = byEmail;
+          if (company?.smtpConfig && this.validateSmtpConfig(company)) return company;
+        }
+      }
+    } catch {}
+
+    return company || null;
+  }
 
   // Enviar email usando HTTP Firebase Function (melhor controle de CORS)
   sendEmail(emailData: EmailData): Observable<EmailResponse> {
-    const company = this.subdomainService.getCurrentCompany();
-    
-    if (!company) {
-      console.error('❌ Contexto da empresa não inicializado');
-      return throwError(() => new Error('Contexto da empresa não inicializado'));
-    }
+    return from(this.resolveCompanyWithSmtp()).pipe(
+      switchMap((company) => {
+        if (!company) {
+          console.error('❌ Contexto da empresa não inicializado');
+          return throwError(() => new Error('Contexto da empresa não inicializado'));
+        }
 
-    if (!this.validateSmtpConfig(company)) {
-      const missingFields = this.getSmtpValidationErrors(company);
-      console.error('❌ Configuração SMTP da empresa está incompleta:', company.smtpConfig, 'Campos faltantes:', missingFields);
-      return throwError(() => new Error(`Configuração SMTP incompleta. Campos faltantes: ${missingFields.join(', ')}`));
-    }
+        console.log('📧 Preparando envio de email via HTTP Firebase Functions:', {
+          to: emailData.to,
+          subject: emailData.subject,
+          fromEmail: company.smtpConfig?.fromEmail,
+          fromName: company.smtpConfig?.fromName
+        });
 
-    console.log('📧 Preparando envio de email via HTTP Firebase Functions:', {
-      to: emailData.to,
-      subject: emailData.subject,
-      fromEmail: company.smtpConfig.fromEmail,
-      fromName: company.smtpConfig.fromName
-    });
+        // Usar HTTP Function para melhor controle de CORS
+        const httpFunctionUrl = 'https://us-central1-kanban-gobuyer.cloudfunctions.net/sendEmailHttp';
+        
+        const payload = {
+          emailData: {
+            to: emailData.to,
+            subject: emailData.subject,
+            html: emailData.html,
+            text: emailData.text,
+            cc: emailData.cc,
+            bcc: emailData.bcc
+          },
+          companyId: company.id, // Cloud Function pode resolver via companyId
+          // Enviar smtpConfig também, para compatibilidade retro
+          smtpConfig: {
+            host: company.smtpConfig?.host,
+            port: company.smtpConfig?.port,
+            secure: company.smtpConfig?.secure,
+            user: company.smtpConfig?.user,
+            password: company.smtpConfig?.password,
+            fromName: company.smtpConfig?.fromName,
+            fromEmail: company.smtpConfig?.fromEmail
+          }
+        };
 
-    // Usar HTTP Function para melhor controle de CORS
-    const httpFunctionUrl = 'https://us-central1-kanban-gobuyer.cloudfunctions.net/sendEmailHttp';
-    
-    const payload = {
-      emailData: {
-        to: emailData.to,
-        subject: emailData.subject,
-        html: emailData.html,
-        text: emailData.text,
-        cc: emailData.cc,
-        bcc: emailData.bcc
-      },
-      companyId: company.id // Usar companyId ao invés de passar SMTP config diretamente
-    };
+        console.log('📤 Enviando para HTTP Firebase Function:', {
+          url: httpFunctionUrl,
+          payload: { ...payload }
+        });
 
-    console.log('📤 Enviando para HTTP Firebase Function:', {
-      url: httpFunctionUrl,
-      payload: { ...payload }
-    });
-
-    return this.http.post<EmailResponse>(httpFunctionUrl, payload).pipe(
+        return this.http.post<EmailResponse>(httpFunctionUrl, payload);
+      }),
       map((result: any) => {
         console.log('✅ Email enviado com sucesso via HTTP Function:', result);
         return {

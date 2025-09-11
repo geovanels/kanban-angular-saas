@@ -2,9 +2,9 @@ import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChang
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
-import { provideAuth, getAuth } from '@angular/fire/auth';
+import { provideAuth, getAuth, connectAuthEmulator } from '@angular/fire/auth';
 import { provideFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
-import { provideStorage, getStorage } from '@angular/fire/storage';
+import { provideStorage, getStorage, connectStorageEmulator } from '@angular/fire/storage';
 import { provideFunctions, getFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormlyModule } from '@ngx-formly/core';
@@ -45,6 +45,16 @@ function initializeBranding(brandingService: BrandingService, subdomainService: 
   };
 }
 
+function shouldUseEmulators(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    const flag = (window.localStorage?.getItem('useEmulators') || '').toLowerCase();
+    return flag === '1' || flag === 'true' || flag === 'yes';
+  } catch {
+    return false;
+  }
+}
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -52,10 +62,34 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(),
     provideFirebaseApp(() => initializeApp(environment.firebase)),
-    provideAuth(() => getAuth()),
-    provideFirestore(() => getFirestore()),
-    provideStorage(() => getStorage()),
-    provideFunctions(() => getFunctions()),
+    provideAuth(() => {
+      const auth = getAuth();
+      if (shouldUseEmulators()) {
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true } as any);
+      }
+      return auth;
+    }),
+    provideFirestore(() => {
+      const db = getFirestore();
+      if (shouldUseEmulators()) {
+        connectFirestoreEmulator(db, '127.0.0.1', 8080);
+      }
+      return db;
+    }),
+    provideStorage(() => {
+      const storage = getStorage();
+      if (shouldUseEmulators()) {
+        connectStorageEmulator(storage, '127.0.0.1', 9199);
+      }
+      return storage;
+    }),
+    provideFunctions(() => {
+      const fn = getFunctions();
+      if (shouldUseEmulators()) {
+        connectFunctionsEmulator(fn, '127.0.0.1', 5001);
+      }
+      return fn;
+    }),
     // Inicializador de branding
     {
       provide: APP_INITIALIZER,

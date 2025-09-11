@@ -171,6 +171,31 @@ exports.leadIntakeHttp = onRequest({
     const incoming = leadData ?? rawBody;
     const baseFields = (incoming && incoming.fields) ? incoming.fields : (incoming || {});
 
+    // Dicionário de sinônimos conhecidos (usado sempre)
+    const synonyms = {
+      companyName: ['companyName', 'empresa', 'nomeEmpresa', 'nameCompany', 'company', 'empresa_nome', 'company_name'],
+      cnpj: ['cnpj', 'cnpjCompany'],
+      contactName: ['contactName', 'name', 'nome', 'nomeLead', 'nameLead', 'leadName'],
+      contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail', 'leadEmail'],
+      contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead', 'telefoneContato'],
+      temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature']
+    };
+
+    const lowerKeyMap = Object.keys(baseFields || {}).reduce((acc, k) => {
+      acc[k.toLowerCase()] = k; // mapa para chave original
+      return acc;
+    }, {});
+
+    const pickFirst = (candidates) => {
+      for (const c of candidates) {
+        const original = lowerKeyMap[c.toLowerCase()];
+        if (original && baseFields[original] !== undefined && baseFields[original] !== null) {
+          return baseFields[original];
+        }
+      }
+      return undefined;
+    };
+
     // Carregar configuração do formulário inicial para mapear campos
     let processedFields = { ...baseFields };
     try {
@@ -182,30 +207,6 @@ exports.leadIntakeHttp = onRequest({
       if (cfgSnap.exists) {
         const cfg = cfgSnap.data() || {};
         const formFields = Array.isArray(cfg.fields) ? cfg.fields : [];
-
-        // Dicionário de sinônimos conhecidos
-        const synonyms = {
-          companyName: ['companyName', 'empresa', 'nomeEmpresa', 'nameCompany', 'company', 'nameComapny'],
-          cnpj: ['cnpj', 'cnpjCompany'],
-          contactName: ['contactName', 'name', 'nome', 'nomeLead', 'nameLead'],
-          contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail'],
-          contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead']
-        };
-
-        const lowerKeyMap = Object.keys(baseFields).reduce((acc, k) => {
-          acc[k.toLowerCase()] = k; // mapa para chave original
-          return acc;
-        }, {});
-
-        const pickFirst = (candidates) => {
-          for (const c of candidates) {
-            const original = lowerKeyMap[c.toLowerCase()];
-            if (original && baseFields[original] !== undefined && baseFields[original] !== null) {
-              return baseFields[original];
-            }
-          }
-          return undefined;
-        };
 
         const mapped = {};
         for (const f of formFields) {
@@ -227,6 +228,18 @@ exports.leadIntakeHttp = onRequest({
     } catch (e) {
       // Se falhar o mapeamento, prosseguir com baseFields
     }
+
+    // Aplicar mapeamento canônico por sinônimos mesmo sem configuração de formulário
+    const canonicalKeys = ['companyName', 'cnpj', 'contactName', 'contactEmail', 'contactPhone', 'temperature'];
+    canonicalKeys.forEach((key) => {
+      const current = processedFields[key];
+      if (current === undefined || current === null || (typeof current === 'string' && current.trim() === '')) {
+        const value = synonyms[key] ? pickFirst(synonyms[key]) : undefined;
+        if (value !== undefined) {
+          processedFields[key] = value;
+        }
+      }
+    });
 
     const normalized = { fields: processedFields };
 

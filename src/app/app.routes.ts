@@ -9,6 +9,10 @@ export const routes: Routes = [
     pathMatch: 'full'
   },
   {
+    path: 'form',
+    loadComponent: () => import('./components/public-form/public-form.component').then(m => m.PublicFormComponent)
+  },
+  {
     path: 'login',
     loadComponent: () => import('./components/login/login.component').then(m => m.LoginComponent),
     canActivate: [CompanyGuard] // Verificar empresa antes do login

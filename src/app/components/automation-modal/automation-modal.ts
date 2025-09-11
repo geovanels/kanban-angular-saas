@@ -16,6 +16,7 @@ export class AutomationModal implements OnInit {
   @Input() users: any[] = [];
   @Input() allowedTriggerTypes: string[] | null = null; // se null, usa padrão
   @Input() fixedPhaseId: string | null = null;
+  @Input() allowedTransitions: Record<string, string[]> = {};
   @Output() closeModalEvent = new EventEmitter<void>();
   @Output() saveAutomation = new EventEmitter<any>();
 
@@ -27,6 +28,12 @@ export class AutomationModal implements OnInit {
 
   constructor(private fb: FormBuilder) {
     this.automationForm = this.createForm();
+  }
+
+  getFixedPhaseName(): string {
+    if (!this.fixedPhaseId || !Array.isArray(this.phases)) return 'Fase selecionada';
+    const found = this.phases.find((p: any) => p && p.id === this.fixedPhaseId);
+    return (found && found.name) ? found.name : 'Fase selecionada';
   }
 
   ngOnInit() {
@@ -53,6 +60,20 @@ export class AutomationModal implements OnInit {
     });
   }
 
+  private createActionGroup(existing?: any): FormGroup {
+    const group = this.fb.group({
+      type: ['send-email'],
+      templateId: [''],
+      phaseId: [''],
+      userId: [''],
+      note: ['']
+    });
+    if (existing) {
+      group.patchValue(existing);
+    }
+    return group;
+  }
+
   loadAutomationData() {
     if (this.automation) {
       this.automationForm.patchValue({
@@ -68,7 +89,7 @@ export class AutomationModal implements OnInit {
       
       if (this.automation.actions) {
         this.automation.actions.forEach((action: any) => {
-          actionsArray.push(this.fb.group(action));
+          actionsArray.push(this.createActionGroup(action));
         });
       }
 
@@ -81,18 +102,19 @@ export class AutomationModal implements OnInit {
     
     this.showTriggerPhase = triggerType === 'card-enters-phase' || 
                            triggerType === 'card-in-phase-for-time' || 
-                           triggerType === 'form-not-answered';
+                           triggerType === 'form-not-answered' ||
+                           triggerType === 'sla-overdue';
     
-    this.showTriggerTime = triggerType === 'card-in-phase-for-time';
+    this.showTriggerTime = triggerType === 'card-in-phase-for-time' || triggerType === 'form-not-answered';
 
     const triggerPhaseCtrl = this.automationForm.get('triggerPhase');
     const triggerDaysCtrl = this.automationForm.get('triggerDays');
 
     if (this.showTriggerPhase) {
       triggerPhaseCtrl?.setValidators([Validators.required]);
-      if (this.fixedPhaseId) {
-        triggerPhaseCtrl?.setValue(this.fixedPhaseId);
-      }
+      const currentVal = triggerPhaseCtrl?.value;
+      const desired = this.fixedPhaseId || currentVal || (this.phases && this.phases[0]?.id) || '';
+      if (desired) triggerPhaseCtrl?.setValue(desired);
     } else {
       triggerPhaseCtrl?.clearValidators();
       triggerPhaseCtrl?.setValue('');
@@ -108,20 +130,31 @@ export class AutomationModal implements OnInit {
     triggerDaysCtrl?.updateValueAndValidity({ emitEvent: false });
   }
 
+  // Lista de fases permitidas para a ação "mover para fase"
+  getAllowedPhasesForMoveAction(): any[] {
+    try {
+      const fromPhaseId = this.fixedPhaseId || this.automationForm.get('triggerPhase')?.value || '';
+      if (!fromPhaseId) {
+        // Sem fase definida ainda, não listar nada para evitar confusão
+        return [];
+      }
+      const allowedIds = (this.allowedTransitions && this.allowedTransitions[fromPhaseId]) || [];
+      if (Array.isArray(allowedIds) && allowedIds.length > 0) {
+        return (this.phases || []).filter((p: any) => allowedIds.includes(p.id));
+      }
+      // Fallback: sem configuração de fluxo, listar todas exceto a própria fase
+      return (this.phases || []).filter((p: any) => p.id !== fromPhaseId);
+    } catch {
+      return (this.phases || []);
+    }
+  }
+
   get actionsFormArray(): FormArray {
     return this.automationForm.get('actions') as FormArray;
   }
 
   addAction() {
-    const actionGroup = this.fb.group({
-      type: ['send-email'],
-      templateId: [''],
-      phaseId: [''],
-      userId: [''],
-      note: ['']
-    });
-    
-    this.actionsFormArray.push(actionGroup);
+    this.actionsFormArray.push(this.createActionGroup());
   }
 
   removeAction(index: number) {

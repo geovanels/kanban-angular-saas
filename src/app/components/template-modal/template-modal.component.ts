@@ -211,6 +211,14 @@ export class TemplateModalComponent implements AfterViewInit {
     // sincroniza editorContent com o form antes de alternar
     this.editorContent = this.templateForm.get('body')?.value || '';
     this.showHtmlMode = !this.showHtmlMode;
+    // Ao entrar no modo HTML, auto-formatar para facilitar edição
+    if (this.showHtmlMode) {
+      try {
+        const formatted = this.autoFormatHtml(this.editorContent);
+        this.templateForm.patchValue({ body: formatted });
+        this.editorContent = formatted;
+      } catch {}
+    }
   }
 
 
@@ -227,13 +235,13 @@ export class TemplateModalComponent implements AfterViewInit {
     try {
       const formData = this.templateForm.value;
       
-      // Usar o conteúdo do CKEditor
-      const body = this.editorContent || '';
-      console.log('Salvando template, conteúdo:', body);
+      // Capturar conteúdo diretamente do form control (fonte da verdade)
+      // Auto-formatar o HTML antes de salvar
+      const rawBody: string = this.templateForm.get('body')?.value || '';
+      const body: string = this.autoFormatHtml(rawBody);
+      console.log('Salvando template com body final (form control):', body);
       
-      console.log('Salvando template com body final:', body);
-      
-      // Atualizar o form control com o conteúdo do editor
+      // Garantir que o form control esteja sincronizado (no-op se já estiver)
       this.templateForm.patchValue({ body });
 
       const templateData = {
@@ -276,3 +284,92 @@ export class TemplateModalComponent implements AfterViewInit {
     }
   }
 }
+
+// Helpers de formatação
+// Nota: Implementação leve para identar HTML no cliente sem dependências
+// Regras: quebra entre tags, identação por nível, trata fechamento/auto-fechamento
+export function isSelfClosing(tag: string): boolean {
+  return /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)(\s|\/|>)/i.test(tag);
+}
+
+export function isClosingTag(line: string): boolean {
+  return /^\s*<\//.test(line);
+}
+
+export function isOpeningTag(line: string): boolean {
+  return /^\s*<([a-zA-Z]+)([^>]*)>\s*$/.test(line) && !isSelfClosing(line) && !/^\s*<\//.test(line);
+}
+
+export function compactHtml(html: string): string {
+  // Remove espaços extras entre tags para melhorar a quebra
+  return html
+    .replace(/\r\n|\r/g, '\n')
+    .replace(/>\s+</g, '><')
+    .replace(/\n+/g, '\n')
+    .trim();
+}
+
+export function prettyPrintHtml(html: string): string {
+  const compact = compactHtml(html);
+  const withBreaks = compact.replace(/></g, '>\n<');
+  const lines = withBreaks.split('\n');
+  const result: string[] = [];
+  let indent = 0;
+  const indentUnit = '  ';
+
+  for (let raw of lines) {
+    let line = raw.trim();
+    if (!line) continue;
+
+    const close = isClosingTag(line);
+    const open = isOpeningTag(line);
+    const selfClosing = isSelfClosing(line) || /\/>\s*$/.test(line);
+
+    if (close) {
+      indent = Math.max(0, indent - 1);
+    }
+
+    result.push(indentUnit.repeat(indent) + line);
+
+    if (open && !selfClosing) {
+      indent += 1;
+    }
+  }
+
+  return result.join('\n');
+}
+
+export function normalizeNewlines(s: string): string {
+  return s.replace(/\r\n|\r/g, '\n');
+}
+
+export function ensureTrailingNewline(s: string): string {
+  return /\n$/.test(s) ? s : s + '\n';
+}
+
+export function minifyWhitespaceInsideTextNodes(s: string): string {
+  // Mantém espaços únicos entre textos para evitar esticar linhas no HTML cru
+  return s.replace(/([^>\s])\s+([^<\s])/g, '$1 $2');
+}
+
+// Método principal: formata, normaliza quebras de linha e espaços
+export function autoFormatHtmlCore(html: string): string {
+  const pretty = prettyPrintHtml(html);
+  const normalized = normalizeNewlines(pretty);
+  const trimmed = normalized.trim();
+  const minimized = minifyWhitespaceInsideTextNodes(trimmed);
+  return ensureTrailingNewline(minimized);
+}
+
+// Instância método da classe para uso interno
+// (Anexa ao prototype implicitamente por estar no mesmo arquivo)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export interface TemplateModalComponent { autoFormatHtml: (html: string) => string; }
+TemplateModalComponent.prototype.autoFormatHtml = function(html: string): string {
+  try {
+    return autoFormatHtmlCore(html || '');
+  } catch {
+    // Se algo falhar, retorna o original
+    return html || '';
+  }
+};

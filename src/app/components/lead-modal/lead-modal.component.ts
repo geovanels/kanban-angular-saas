@@ -269,6 +269,8 @@ export class LeadModalComponent {
         }
         if (!initialColumn) throw new Error('Nenhuma coluna inicial encontrada');
 
+        // Normalizar fase inicial também no histórico de fases
+        const now = new Date();
         const newLead: Omit<Lead, 'id'> = {
           fields: formData,
           columnId: initialColumn.id!,
@@ -279,11 +281,21 @@ export class LeadModalComponent {
           responsibleUserId: currentUser.uid,
           responsibleUserName: currentUser.displayName || '',
           responsibleUserEmail: currentUser.email || '',
-          phaseHistory: {},
+          phaseHistory: { [initialColumn.id!]: { phaseId: initialColumn.id!, enteredAt: now } },
           executedAutomations: {}
         };
 
         const leadRef = await this.firestoreService.createLead(this.ownerId, this.boardId, newLead);
+
+        // Garantir phaseHistory persistido no documento (caso create normalize timestamps)
+        try {
+          const createdLead = await this.firestoreService.getLead(this.ownerId, this.boardId, leadRef.id);
+          if (createdLead && (!createdLead.phaseHistory || !createdLead.phaseHistory[initialColumn.id!])) {
+            await this.firestoreService.updateLead(this.ownerId, this.boardId, leadRef.id, {
+              phaseHistory: { [initialColumn.id!]: { phaseId: initialColumn.id!, enteredAt: new Date() } }
+            } as any);
+          }
+        } catch {}
 
         // Adicionar ao histórico
         await this.firestoreService.addLeadHistory(

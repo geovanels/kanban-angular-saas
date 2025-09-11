@@ -91,6 +91,8 @@ export class PhaseFormModalComponent {
             ...field,
             includeInApi: field.includeInApi !== false, // Default to true
             showInCard: field.showInCard || false, // Default to false
+            requiredToAdvance: !!field.requiredToAdvance,
+            showInAllPhases: !!field.showInAllPhases,
             order: field.order || 0
           };
         })
@@ -126,7 +128,9 @@ export class PhaseFormModalComponent {
             required: field.required || false,
             order: index,
             includeInApi: field.includeInApi !== false,
-            showInCard: field.showInCard || false
+            showInCard: field.showInCard || false,
+            requiredToAdvance: !!field.requiredToAdvance,
+            showInAllPhases: !!field.showInAllPhases
           };
 
           // Só adicionar se não for undefined ou string vazia

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ViewChild, HostListener } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ViewChild, HostListener, ElementRef, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -36,6 +36,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private ngZone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef);
 
   @ViewChild(LeadModalComponent) leadModal!: LeadModalComponent;
   @ViewChild(ColumnModalComponent) columnModal!: ColumnModalComponent;
@@ -43,6 +45,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
   @ViewChild(LeadDetailModalComponent) leadDetailModal!: LeadDetailModalComponent;
   @ViewChild(TemplateModalComponent) templateModal!: TemplateModalComponent;
   @ViewChild(AutomationModal) automationModal!: AutomationModal;
+  @ViewChild('flowScroller') flowScrollerRef!: ElementRef<HTMLDivElement>;
+  flowThumbPercent = 10;
+  flowThumbLeftPercent = 0;
+  private isDraggingFlowBar = false;
 
   board: Board | null = null;
   columns: Column[] = [];
@@ -57,6 +63,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   currentUser: any = null;
   boardId: string = '';
   ownerId: string = '';
+  // Campos configurados para exibir no card por fase
+  phaseCardFields: Record<string, any[]> = {};
   
   private subscriptions: Subscription[] = [];
   isLoading = true;
@@ -70,13 +78,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
     { id: 'reports', name: 'Relatórios', icon: 'fa-chart-bar' },
     { id: 'outbox', name: 'Caixa de Saída', icon: 'fa-paper-plane' },
     { id: 'templates', name: 'Templates', icon: 'fa-envelope' },
-    { id: 'automations', name: 'Automações', icon: 'fa-cogs' },
     { id: 'api', name: 'API', icon: 'fa-code' }
   ];
 
   // API Configuration
   apiEndpoint = '';
   apiToken = 'KzB47@p!qR9$tW2m&e*J';
+
+  private timeAutomationIntervalId: any = null;
 
   ngOnInit() {
     this.currentUser = this.authService.getCurrentUser();
@@ -103,6 +112,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.loadInitialForm();
       // Carregar fluxo de transições
       this.loadFlowConfig();
+      // Agendador periódico para automações de tempo (a cada 60s)
+      try {
+        this.timeAutomationIntervalId = setInterval(async () => {
+          try {
+            await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
+          } catch {}
+        }, 60000);
+      } catch {}
     } else {
       console.error('Parâmetros faltando:', { currentUser: !!this.currentUser, boardId: this.boardId, ownerId: this.ownerId });
     }
@@ -110,6 +127,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
+    if (this.timeAutomationIntervalId) {
+      try { clearInterval(this.timeAutomationIntervalId); } catch {}
+      this.timeAutomationIntervalId = null;
+    }
   }
 
   private initializeApiEndpoint() {
@@ -266,6 +287,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
       (columns) => {
         console.log('Colunas recebidas:', columns);
         this.columns = columns;
+        this.loadCardFieldConfigs();
+        // Sincronizar editor de fluxo: garantir que novas fases entrem na ordem
+        try { this.syncFlowOrderWithColumns(); } catch {}
       }
     );
     this.subscriptions.push({ unsubscribe: columnsUnsub } as Subscription);
@@ -274,9 +298,61 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const leadsUnsub = this.firestoreService.subscribeToLeads(
       this.ownerId,
       this.boardId,
-      (leads) => {
+      async (leads) => {
         console.log('Leads recebidos:', leads);
-        this.leads = leads;
+        // Detectar novos leads e mudanças de fase para acionar automações
+        const currentById: Record<string, Lead> = Object.create(null);
+        for (const l of leads as any) currentById[l.id!] = l as any;
+
+        if (!this._leadsStreamInitialized) {
+          // Primeira carga: somente inicializa o snapshot anterior
+          this._lastLeadsById = currentById;
+          this._leadsStreamInitialized = true;
+        } else {
+          // Novos leads
+          const newLeads: Lead[] = [];
+          // Movidos de fase
+          const moved: Array<{ lead: Lead; from: string; to: string }> = [];
+
+          const prev = this._lastLeadsById || {};
+          // Detect additions and moves
+          for (const [id, lead] of Object.entries(currentById)) {
+            const prevLead = prev[id];
+            if (!prevLead) {
+              newLeads.push(lead as Lead);
+            } else if (prevLead.columnId !== (lead as Lead).columnId) {
+              moved.push({ lead: lead as Lead, from: prevLead.columnId, to: (lead as Lead).columnId });
+            }
+          }
+
+          // Atualizar snapshot anterior antes de executar para evitar reentrância
+          this._lastLeadsById = currentById;
+
+          try {
+            // Processar automações fora do ciclo de render
+            for (const nl of newLeads) {
+              try {
+                await this.automationService.processNewLeadAutomations(nl, this.boardId, this.ownerId);
+              } catch (e) { console.warn('Falha ao processar automação de novo lead:', e); }
+            }
+            for (const mv of moved) {
+              try {
+                await this.automationService.processPhaseChangeAutomations(mv.lead, mv.to, mv.from, this.boardId, this.ownerId);
+              } catch (e) { console.warn('Falha ao processar automação de mudança de fase:', e); }
+            }
+          } catch {}
+        }
+
+        // Enriquecer contadores simples com base no histórico (se disponível em cache ou structure) — placeholder 0
+        this.leads = (leads as any).map((l: any) => ({
+          ...l,
+          historyCommentsCount: l.historyCommentsCount ?? 0,
+          attachmentsCount: l.attachmentsCount ?? 0
+        }));
+        // Processar automações baseadas em tempo sempre que os leads mudarem
+        try {
+          await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
+        } catch (e) { console.warn('Falha ao processar automações por tempo:', e); }
         this.isLoading = false;
         this.ensureLeadOrderLoaded();
         this.rebuildDisplayedLeads();
@@ -343,6 +419,176 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.subscriptions.push({ unsubscribe: automationsUnsub } as Subscription);
   }
 
+  private async loadCardFieldConfigs() {
+    try {
+      const map: Record<string, any[]> = {};
+      for (const col of this.columns) {
+        try {
+          const cfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, col.id!);
+          const fields = (cfg as any)?.fields || [];
+          map[col.id!] = fields.filter((f: any) => !!f?.showInCard).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+        } catch {
+          map[col.id!] = [];
+        }
+      }
+      this.phaseCardFields = map;
+    } catch {
+      this.phaseCardFields = {};
+    }
+  }
+
+  private isPlainObject(value: any): boolean {
+    return value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private flattenObject(source: any, maxDepth: number = 3): Record<string, any> {
+    const out: Record<string, any> = {};
+    if (!this.isPlainObject(source) || maxDepth < 0) return out;
+    for (const [key, val] of Object.entries(source)) {
+      if (this.isPlainObject(val) && maxDepth > 0) {
+        const nested = this.flattenObject(val, maxDepth - 1);
+        for (const [nk, nv] of Object.entries(nested)) {
+          if (out[nk] === undefined) out[nk] = nv;
+        }
+      } else if (val !== undefined && val !== null) {
+        out[key] = val as any;
+      }
+    }
+    return out;
+  }
+
+  private collectLeadFields(lead: Lead): Record<string, any> {
+    const base = ((lead as any).fields || {}) as any;
+    const containers = ['fields', 'leadData', 'data', 'payload'];
+    const merged: Record<string, any> = {};
+    const candidates: any[] = [base];
+    containers.forEach(k => { if (this.isPlainObject(base[k])) candidates.push(base[k]); });
+    if (this.isPlainObject(base.fields?.fields)) candidates.push(base.fields.fields);
+    for (const obj of candidates) {
+      for (const [k, v] of Object.entries(obj)) {
+        if (merged[k] === undefined && v !== undefined && v !== null && `${v}`.trim?.() !== '') merged[k] = v;
+      }
+    }
+    const deep = this.flattenObject(base, 3);
+    for (const [k, v] of Object.entries(deep)) {
+      if (merged[k] === undefined && v !== undefined && v !== null && `${v}`.trim?.() !== '') merged[k] = v;
+    }
+    return merged;
+  }
+
+  private readFieldValue(lead: Lead, key: string, labelHint?: string): any {
+    const fields: any = this.collectLeadFields(lead);
+    if (!key && !labelHint) return undefined;
+    const candidates: string[] = [];
+    if (key) candidates.push(key);
+    const synonymsGroup: Record<string, string[]> = {
+      companyName: ['companyName','empresa','nomeEmpresa','nameCompany','company','company_name','empresa_nome','nameComapny'],
+      contactName: ['contactName','name','nome','nomeLead','nameLead','leadName'],
+      contactEmail: ['contactEmail','email','emailLead','contatoEmail','leadEmail'],
+      contactPhone: ['contactPhone','phone','telefone','celular','phoneLead','telefoneContato'],
+      cnpj: ['cnpj','cnpjCompany','cnpjEmpresa','companyCnpj']
+    };
+    const keyLower = (key || '').toLowerCase();
+    // If key is a canonical or one of its synonyms, include the whole group (both directions)
+    Object.values(synonymsGroup).forEach(group => {
+      if (group.some(g => g.toLowerCase() === keyLower)) {
+        group.forEach(k => { if (!candidates.includes(k)) candidates.push(k); });
+      }
+    });
+    // If label hints the semantic, include the corresponding group
+    const hint = (labelHint || '').toLowerCase();
+    const labelMapHints: Array<{ words: string[]; groupKey: keyof typeof synonymsGroup }> = [
+      { words: ['empresa'], groupKey: 'companyName' },
+      { words: ['contato','nome do contato','responsável','responsavel'], groupKey: 'contactName' },
+      { words: ['email','e-mail'], groupKey: 'contactEmail' },
+      { words: ['telefone','celular','whatsapp','whats'], groupKey: 'contactPhone' },
+      { words: ['cnpj'], groupKey: 'cnpj' }
+    ];
+    for (const m of labelMapHints) {
+      if (m.words.some(w => hint.includes(w))) {
+        synonymsGroup[m.groupKey].forEach(k => { if (!candidates.includes(k)) candidates.push(k); });
+      }
+    }
+    const lowerMap: Record<string, string> = Object.keys(fields).reduce((acc: any, k: string) => { acc[k.toLowerCase()] = k; return acc; }, {});
+    // Normalized map (remove non-alphanumerics) for fuzzy matching
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedMap: Record<string, string> = Object.keys(fields).reduce((acc: any, k: string) => { acc[normalize(k)] = k; return acc; }, {});
+    const visited = new Set<string>();
+    for (const k of candidates) {
+      const lk = k.toLowerCase();
+      if (visited.has(lk)) continue; visited.add(lk);
+      const original = lowerMap[lk] || normalizedMap[normalize(k)] || k;
+      const v = fields[original];
+      if (v !== undefined && v !== null && `${v}`.trim?.() !== '') return v;
+    }
+    return undefined;
+  }
+
+  getCardFieldsForLead(lead: Lead): Array<{ label: string; value: any; type?: string }> {
+    // Unir configuração da fase com fallback do formulário inicial (sem duplicar)
+    const phaseList = this.phaseCardFields[lead.columnId] || [];
+    const fallbackInitial = (this.initialFormFields || [])
+      .filter((f: any) => !!f?.showInCard)
+      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+    const merged: any[] = [...phaseList];
+    const seen = new Set<string>();
+    const keyOf = (f: any) => (f.apiFieldName && f.apiFieldName.trim()) || (f.name && f.name.trim()) || (f.label && f.label.trim()) || '';
+    for (const f of merged) seen.add(keyOf(f).toLowerCase());
+    for (const f of fallbackInitial) {
+      const k = keyOf(f).toLowerCase();
+      if (!seen.has(k)) { merged.push(f); seen.add(k); }
+    }
+
+    const out: Array<{ label: string; value: any; type?: string }> = [];
+    const isTitleField = (f: any): boolean => {
+      const key = (f.apiFieldName || f.name || '').toLowerCase();
+      const lbl = (f.label || f.name || '').toLowerCase();
+      const norm = (s: string) => s.replace(/[^a-z0-9]/g, '');
+      const companyGroup = ['companyname','empresa','nomeempresa','namecompany','company','company_name','empresa_nome','namecomapny'];
+      const cnpjGroup = ['cnpj','cnpjcompany','cnpjempresa','companycnpj'];
+      const k = norm(key); const l = norm(lbl);
+      return companyGroup.includes(k) || companyGroup.includes(l) || cnpjGroup.includes(k) || cnpjGroup.includes(l);
+    };
+    for (const f of merged) {
+      if (isTitleField(f)) continue;
+      const value = this.readFieldValue(lead, f.apiFieldName || f.name, f.label || f.name);
+      if (value !== undefined && value !== null && `${value}`.trim() !== '') {
+        out.push({ label: f.label || f.name || f.apiFieldName, value, type: (f.type || '').toLowerCase() });
+      }
+    }
+    return out;
+  }
+
+  // Exibir temperatura em todas as fases quando marcada em qualquer config
+  getTemperatureGlobalItem(lead: Lead): { label: string; value: any } | null {
+    try {
+      // procurar um campo com type temperatura no form inicial
+      const sources = [
+        ...(this.phaseCardFields[lead.columnId] || []),
+        ...(this.initialFormFields || [])
+      ];
+      const tempField = (sources as any[]).find(f => (f.type || '').toLowerCase() === 'temperatura' && f.showInCard);
+      if (!tempField) return null;
+      const val = this.readFieldValue(lead, tempField.apiFieldName || tempField.name, tempField.label || tempField.name);
+      if (val === undefined || val === null || `${val}`.trim() === '') return null;
+      return { label: tempField.label || 'Temperatura', value: val };
+    } catch {
+      return null;
+    }
+  }
+
+  // Recupera o item de temperatura apenas se estiver marcado para exibir no card
+  getTemperatureCardItem(lead: Lead): { label: string; value: any } | null {
+    try {
+      const items = this.getCardFieldsForLead(lead);
+      const temp = (items as any[]).find(i => (i.type || '').toLowerCase() === 'temperatura');
+      return temp ? { label: temp.label, value: temp.value } : null;
+    } catch {
+      return null;
+    }
+  }
+
   getLeadsForColumn(columnId: string): Lead[] {
     // método legado – manter compatibilidade, mas preferimos displayedLeadsByColumn no template
     const all = this.leads.filter(lead => lead.columnId === columnId);
@@ -383,6 +629,21 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
       // Buscar dados completos do lead
       const lead = this.leads.find(l => l.id === leadId);
+      // Validar campos obrigatórios para avançar (da fase de origem)
+      try {
+        const missing = await this.getRequiredToAdvanceMissing(lead as Lead, previousColumnId);
+        if (missing.length > 0) {
+          // Reverter visualmente
+          transferArrayItem(
+            event.container.data,
+            event.previousContainer.data,
+            event.currentIndex,
+            event.previousIndex
+          );
+          this.toast.error(`Preencha os campos obrigatórios para avançar: ${missing.join(', ')}`);
+          return;
+        }
+      } catch {}
       
       // Validar fluxo de transição
       const allowedFrom = this.flowConfig.allowed[previousColumnId] || [];
@@ -421,31 +682,52 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.leadOrderByColumn[targetColumnId] = [...targetVisibleIds, ...targetRemaining];
         this.saveLeadOrder();
 
-        // Processar automações para mudança de fase
-        if (lead) {
-          console.log('🔄 Processando automações para mudança de fase:', {
-            leadId: lead.id,
-            oldColumn: previousColumnId,
-            newColumn: targetColumnId
-          });
-          
-          try {
-            await this.automationService.processPhaseChangeAutomations(
-              lead,
-              targetColumnId,
-              previousColumnId,
-              this.boardId,
-              this.ownerId
-            );
-          } catch (automationError) {
-            console.error('Erro ao processar automações de mudança de fase:', automationError);
+        // Atualizar histórico de fases do lead (para exibição no detalhe)
+        try {
+          if (lead) {
+            const now = new Date();
+            const phaseHistory: any = { ...(lead as any).phaseHistory || {} };
+            // finalizar fase anterior
+            if (phaseHistory[previousColumnId]) {
+              const enteredAt = (phaseHistory[previousColumnId].enteredAt?.toDate && phaseHistory[previousColumnId].enteredAt.toDate()) || new Date(phaseHistory[previousColumnId].enteredAt || now);
+              phaseHistory[previousColumnId].exitedAt = now;
+              phaseHistory[previousColumnId].duration = now.getTime() - enteredAt.getTime();
+            }
+            // iniciar nova fase
+            phaseHistory[targetColumnId] = {
+              phaseId: targetColumnId,
+              enteredAt: now,
+              exitedAt: undefined,
+              duration: undefined
+            };
+            await this.firestoreService.updateLead(this.ownerId, this.boardId, lead.id!, { phaseHistory } as any);
           }
-        }
+        } catch {}
       } catch (error) {
         console.error('Erro ao mover lead:', error);
         // Reverter a mudança visual se houver erro
         this.subscribeToRealtimeUpdates();
       }
+    }
+  }
+
+  // Verifica campos requiredToAdvance não preenchidos da fase sourceColumnId do lead
+  private async getRequiredToAdvanceMissing(lead: Lead, sourceColumnId?: string): Promise<string[]> {
+    try {
+      const colId = sourceColumnId || lead.columnId;
+      const cfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, colId);
+      const fields = (cfg as any)?.fields || [];
+      const required = fields.filter((f: any) => !!f?.requiredToAdvance);
+      const missing: string[] = [];
+      for (const f of required) {
+        const key = f.apiFieldName || f.name;
+        const value = this.readFieldValue(lead, key, f.label || f.name);
+        const empty = value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+        if (empty) missing.push(f.label || f.name || key);
+      }
+      return missing;
+    } catch {
+      return [];
     }
   }
 
@@ -523,6 +805,38 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Data e hora (pt-BR) – aceita Timestamp do Firestore, Date, string ou number
+  formatDateTime(timestamp: any): string {
+    if (!timestamp) {
+      return '—';
+    }
+    try {
+      // Firestore Timestamp com seconds
+      if (timestamp.seconds) {
+        return new Date(timestamp.seconds * 1000).toLocaleString('pt-BR');
+      }
+      // serverTimestamp / Timestamp com toDate
+      if (timestamp.toDate) {
+        return timestamp.toDate().toLocaleString('pt-BR');
+      }
+      // Date
+      if (timestamp instanceof Date) {
+        return timestamp.toLocaleString('pt-BR');
+      }
+      // String/number
+      return new Date(timestamp).toLocaleString('pt-BR');
+    } catch {
+      return '—';
+    }
+  }
+
+  // Para a Caixa de Saída: priorizar hora de envio (delivery.endTime) e cair para createdAt
+  getEmailDisplayDate(email: any): any {
+    const sent = email?.delivery?.endTime;
+    if (sent) return sent;
+    return email?.createdAt || null;
+  }
+
   getColumnBorderColor(column: Column): string {
     return column.color || '#e5e7eb';
   }
@@ -537,6 +851,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
   getLeadInitials(lead: Lead): string {
     const name = lead.fields?.['companyName'] || lead.fields?.['contactName'] || '';
     return name.split(' ').map(word => word.charAt(0)).join('').substring(0, 2).toUpperCase();
+  }
+
+  getCompanyName(lead: Lead): string {
+    const val = this.readFieldValue(lead, 'companyName');
+    return (val !== undefined && val !== null && `${val}`.trim() !== '') ? `${val}` : 'Empresa não informada';
+  }
+
+  getCnpj(lead: Lead): string | null {
+    const val = this.readFieldValue(lead, 'cnpj', 'CNPJ');
+    if (val === undefined || val === null) return null;
+    const s = `${val}`.trim();
+    return s ? s : null;
   }
 
   showCreateLeadModal() {
@@ -584,20 +910,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
   async onLeadCreated() {
     // Os leads serão atualizados automaticamente via real-time subscription
     console.log('Novo lead criado!');
-    
-    // Processar automações para novo lead
-    // Aguardar um pouco para garantir que o lead foi persistido
-    setTimeout(async () => {
-      try {
-        await this.automationService.processNewLeadAutomations(
-          this.leads[this.leads.length - 1], // Último lead criado
-          this.boardId,
-          this.ownerId
-        );
-      } catch (error) {
-        console.error('Erro ao processar automações de novo lead:', error);
-      }
-    }, 1000);
   }
 
   onLeadUpdated() {
@@ -636,6 +948,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   // Propriedades para Automações
   automations: any[] = [];
+  private _leadsStreamInitialized = false;
+  private _lastLeadsById: Record<string, Lead> = {};
 
   // Formulário inicial (aba nova)
   initialFormFields: any[] = [];
@@ -643,57 +957,72 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   // Fluxo (transitions) config
   flowConfig: { allowed: Record<string, string[]> } = { allowed: {} };
-  // Fluxo - nós e arestas para canvas
-  flowNodes: Array<{ id: string; name: string; x: number; y: number; color?: string }>= [];
-  flowEdges: Array<{ fromId: string; toId: string }>= [];
-  isConnecting = false;
-  connectFromId: string | null = null;
-  flowMouse = { x: 0, y: 0 };
-  // drag
-  draggingNodeId: string | null = null;
-  dragOffset = { x: 0, y: 0 };
-  flowMoveEnabled = false;
+  // Novo layout do fluxo: ordem horizontal e toggles adjacentes
+  flowOrder: string[] = [];
+  flowTogglesByPhase: Record<string, { allowNext: boolean; allowPrev: boolean }> = {};
+  // Editor manual de conexões
+  flowEdges: Array<{ fromId: string; toId: string }> = [];
+  connectMode = false;
+  pendingFromId: string | null = null;
 
   private async loadFlowConfig() {
     try {
       const cfg = await this.firestoreService.getFlowConfig(this.boardId);
       this.flowConfig = (cfg as any) || { allowed: {} };
-      this.buildFlowEdgesFromConfig();
-      // Se houver posições salvas, restaurar
-      const nodes = (cfg as any)?.nodes as any[];
-      if (Array.isArray(nodes) && nodes.length) {
-        this.flowNodes = this.columns.map((c, idx) => {
-          const saved = nodes.find(n => n.id === c.id);
-          return {
-            id: c.id!,
-            name: c.name,
-            x: saved?.x ?? 60 + idx * 200,
-            y: saved?.y ?? 160,
-            color: c.color
-          };
-        });
-      } else {
-        this.layoutFlowNodes();
+      // Inicializar ordem com a order das colunas
+      this.flowOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+      // Inicializar toggles a partir do allowed atual
+      this.flowTogglesByPhase = {};
+      for (let i = 0; i < this.flowOrder.length; i++) {
+        const id = this.flowOrder[i];
+        const prevId = this.flowOrder[i-1];
+        const nextId = this.flowOrder[i+1];
+        const allowedFrom = this.flowConfig.allowed[id] || [];
+        this.flowTogglesByPhase[id] = {
+          allowNext: !!(nextId && allowedFrom.includes(nextId)),
+          allowPrev: !!(prevId && allowedFrom.includes(prevId))
+        };
       }
+      // Converter allowed -> edges para exibir
+      const edges: Array<{ fromId: string; toId: string }> = [];
+      const allowed = this.flowConfig.allowed || {};
+      Object.keys(allowed).forEach(fromId => {
+        (allowed[fromId] || []).forEach(toId => edges.push({ fromId, toId }));
+      });
+      this.flowEdges = edges;
     } catch {
       this.flowConfig = { allowed: {} };
+      this.flowOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
     }
   }
 
   async saveFlowConfig() {
     try {
-      // Persistir com base nas arestas atuais
+      // Construir allowed com base nas conexões manuais, sanitizando IDs
+      const normalizeId = (v: any) => (typeof v === 'string' ? v.trim() : String(v || '').trim());
       const allowed: Record<string, string[]> = {};
-      for (const edge of this.flowEdges) {
-        if (!allowed[edge.fromId]) allowed[edge.fromId] = [];
-        if (!allowed[edge.fromId].includes(edge.toId)) allowed[edge.fromId].push(edge.toId);
+      for (const edge of (this.flowEdges || [])) {
+        const fromId = normalizeId(edge.fromId);
+        const toId = normalizeId(edge.toId);
+        if (!fromId || !toId) continue;
+        if (!allowed[fromId]) allowed[fromId] = [];
+        if (!allowed[fromId].includes(toId)) allowed[fromId].push(toId);
       }
+      // Manter apenas IDs existentes
+      const validIds = new Set(this.columns.map(c => c.id));
+      Object.keys(allowed).forEach(fromId => {
+        if (!validIds.has(fromId)) delete allowed[fromId];
+        else allowed[fromId] = (allowed[fromId] || []).filter(toId => validIds.has(toId));
+      });
+      const orderClean = (this.flowOrder || []).map(normalizeId).filter(id => validIds.has(id));
+
       this.flowConfig = { allowed };
-      const nodes = this.flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
-      await this.firestoreService.saveFlowConfig(this.boardId, { allowed, nodes });
+      await this.firestoreService.saveFlowConfig(this.boardId, { allowed, order: orderClean });
       this.toast.success('Fluxo salvo.');
-    } catch {
-      this.toast.error('Erro ao salvar fluxo.');
+    } catch (error: any) {
+      console.error('Erro ao salvar fluxo', { error });
+      const message = error?.message || 'Erro ao salvar fluxo.';
+      this.toast.error(message);
     }
   }
 
@@ -720,86 +1049,161 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.flowConfig.allowed[fromId] = list.filter(id => id !== dropped.id);
   }
 
-  // --- Canvas style flow ---
-  private layoutFlowNodes() {
-    const paddingX = 200;
-    const startX = 60;
-    const y = 160;
-    this.flowNodes = this.columns.map((c, idx) => ({
-      id: c.id!,
-      name: c.name,
-      x: startX + idx * paddingX,
-      y,
-      color: c.color
-    }));
+  // Reordenação horizontal dos cartões de fases no editor de fluxo
+  onFlowReorder(event: CdkDragDrop<string[]>) {
+    if (event.previousIndex === event.currentIndex) return;
+    moveItemInArray(this.flowOrder, event.previousIndex, event.currentIndex);
   }
 
-  private buildFlowEdgesFromConfig() {
-    const edges: Array<{ fromId: string; toId: string }> = [];
-    const allowed = this.flowConfig.allowed || {};
-    Object.keys(allowed).forEach(fromId => {
-      (allowed[fromId] || []).forEach(toId => edges.push({ fromId, toId }));
-    });
-    this.flowEdges = edges;
-  }
-
-  onFlowMouseMove(evt: MouseEvent) {
-    const target = evt.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    this.flowMouse = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
-    // se estiver arrastando
-    if (this.draggingNodeId) {
-      const node = this.flowNodes.find(n => n.id === this.draggingNodeId);
-      if (node) {
-        const grid = 20;
-        const nextX = this.flowMouse.x - this.dragOffset.x;
-        const nextY = this.flowMouse.y - this.dragOffset.y;
-        node.x = Math.round(nextX / grid) * grid;
-        node.y = Math.round(nextY / grid) * grid;
-      }
+  private syncFlowOrderWithColumns() {
+    const sortedIds = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+    if (!Array.isArray(this.flowOrder) || this.flowOrder.length === 0) {
+      this.flowOrder = sortedIds;
+      return;
     }
+    // Inserir novas fases que não estão na ordem ainda
+    const existing = new Set(this.flowOrder);
+    for (const id of sortedIds) {
+      if (!existing.has(id)) this.flowOrder.push(id);
+    }
+    // Remover fases que foram apagadas
+    this.flowOrder = this.flowOrder.filter(id => sortedIds.includes(id));
   }
 
-  startConnect(fromId: string, evt: MouseEvent) {
+  // Fluxo: scroll helpers
+  scrollFlowBy(delta: number) {
+    try {
+      const el = this.flowScrollerRef?.nativeElement;
+      if (el) el.scrollBy({ left: delta, behavior: 'smooth' });
+    } catch {}
+  }
+
+  // Atualiza o tamanho e posição do thumb customizado
+  private updateFlowThumb() {
+    try {
+      const el = this.flowScrollerRef?.nativeElement;
+      if (!el) return;
+      const total = el.scrollWidth;
+      const viewport = el.clientWidth;
+      const scrollLeft = el.scrollLeft;
+      const percent = Math.max(5, Math.min(100, (viewport / total) * 100));
+      const left = Math.max(0, Math.min(100 - percent, (scrollLeft / (total - viewport)) * 100));
+      this.flowThumbPercent = percent;
+      this.flowThumbLeftPercent = isFinite(left) ? left : 0;
+      this.cdr.markForCheck();
+    } catch {}
+  }
+
+  @HostListener('window:resize')
+  onWindowResizeFlow() { this.updateFlowThumb(); }
+
+  ngAfterViewInit() {
+    // Atualizar thumb quando a view estiver pronta
+    setTimeout(() => this.updateFlowThumb(), 0);
+    try {
+      const el = this.flowScrollerRef?.nativeElement;
+      if (el) {
+        this.ngZone.runOutsideAngular(() => {
+          el.addEventListener('scroll', () => {
+            this.ngZone.run(() => this.updateFlowThumb());
+          }, { passive: true });
+        });
+      }
+    } catch {}
+  }
+
+  // Click/drag na barra personalizada
+  onFlowBarPointerDown(evt: MouseEvent) {
     evt.preventDefault();
-    evt.stopPropagation();
-    this.isConnecting = true;
-    this.connectFromId = fromId;
-    const target = evt.currentTarget as HTMLElement;
-    const container = (target.closest('.relative') as HTMLElement) || document.body;
-    const rect = container.getBoundingClientRect();
-    this.flowMouse = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    const el = this.flowScrollerRef?.nativeElement;
+    const bar = (evt.currentTarget as HTMLElement);
+    if (!el || !bar) return;
+    const rect = bar.getBoundingClientRect();
+    const moveTo = (clientX: number) => {
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) * ratio;
+      this.updateFlowThumb();
+    };
+    moveTo(evt.clientX);
+    this.isDraggingFlowBar = true;
+    const onMove = (e: MouseEvent) => moveTo(e.clientX);
+    const onUp = () => {
+      this.isDraggingFlowBar = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    this.ngZone.runOutsideAngular(() => {
+      window.addEventListener('mousemove', onMove, { passive: true });
+      window.addEventListener('mouseup', onUp, { once: true });
+    });
   }
 
-  endConnect(toId: string, evt: MouseEvent) {
-    evt.stopPropagation();
-    if (!this.isConnecting || !this.connectFromId) return;
-    if (this.connectFromId !== toId) {
-      const exists = this.flowEdges.some(e => e.fromId === this.connectFromId && e.toId === toId);
-      if (!exists) {
-        this.flowEdges.push({ fromId: this.connectFromId, toId });
-      }
+  onFlowBarTouchStart(evt: TouchEvent) {
+    const el = this.flowScrollerRef?.nativeElement;
+    const bar = (evt.currentTarget as HTMLElement);
+    if (!el || !bar || evt.touches.length === 0) return;
+    const rect = bar.getBoundingClientRect();
+    const moveTo = (clientX: number) => {
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) * ratio;
+      this.updateFlowThumb();
+    };
+    moveTo(evt.touches[0].clientX);
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) moveTo(e.touches[0].clientX);
+    };
+    const onEnd = () => {
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+    this.ngZone.runOutsideAngular(() => {
+      window.addEventListener('touchmove', onMove, { passive: true });
+      window.addEventListener('touchend', onEnd, { once: true });
+    });
+  }
+
+  toggleConnectMode() { this.connectMode = !this.connectMode; this.pendingFromId = null; }
+  beginEdge(fromId: string) {
+    // Conectores sempre ativos: iniciar conexão sem depender de modo
+    this.pendingFromId = fromId;
+  }
+  completeEdge(toId: string) {
+    if (!this.pendingFromId) return;
+    const fromId = this.pendingFromId;
+    if (fromId !== toId && !this.flowEdges.some(e => e.fromId === fromId && e.toId === toId)) {
+      this.flowEdges.push({ fromId, toId });
     }
-    this.isConnecting = false;
-    this.connectFromId = null;
-    // Sincronizar com config em memória para refletir listas
-    const allowed = this.flowConfig.allowed[this.connectFromId || ''] || [];
-    // no-op, manter somente edges -> config ao salvar
+    this.pendingFromId = null;
   }
-
-  cancelConnect() {
-    this.isConnecting = false;
-    this.connectFromId = null;
-    this.draggingNodeId = null;
-  }
-
   removeEdge(edge: { fromId: string; toId: string }) {
     this.flowEdges = this.flowEdges.filter(e => !(e.fromId === edge.fromId && e.toId === edge.toId));
   }
 
-  getNodeById(id: string) {
-    return this.flowNodes.find(n => n.id === id)!;
+  // Helpers para template (evitam funções inline no HTML)
+  hasOutgoingConnections(phaseId: string): boolean {
+    return Array.isArray(this.flowEdges) && this.flowEdges.some(e => e.fromId === phaseId);
   }
+  getOutgoingConnections(phaseId: string): Array<{ fromId: string; toId: string }> {
+    return (this.flowEdges || []).filter(e => e.fromId === phaseId);
+  }
+
+  getEdgeArrow(edge: { fromId: string; toId: string }): string {
+    const from = this.columns.find(c => c.id === edge.fromId);
+    const to = this.columns.find(c => c.id === edge.toId);
+    if (!from || !to) return '→';
+    return (to.order > from.order) ? '→' : '←';
+  }
+
+  // legacy handlers removed (no-op to satisfy template references if any remain)
+  onFlowMouseMove(evt: MouseEvent) { /* no-op */ }
+
+  startConnect(fromId: string, evt: MouseEvent) { /* no-op */ }
+
+  endConnect(toId: string, evt: MouseEvent) { /* no-op */ }
+
+  cancelConnect() { /* no-op */ }
+
+  getNodeById(id: string) { return { id, name: '', x: 0, y: 0 } as any; }
 
   buildCurvePath(fromId: string, toId: string): string {
     const a = this.getNodeById(fromId);
@@ -815,19 +1219,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return `M ${startX},${startY} C ${c1x},${c1y} ${c2x},${c2y} ${endX},${endY}`;
   }
 
-  buildTempCurve(): string {
-    if (!this.isConnecting || !this.connectFromId) return '';
-    const a = this.getNodeById(this.connectFromId);
-    if (!a) return '';
-    const startX = a.x + 120;
-    const startY = a.y + 30;
-    const endX = this.flowMouse.x;
-    const endY = this.flowMouse.y;
-    const dx = Math.max(40, Math.abs(endX - startX) * 0.5);
-    const c1x = startX + dx, c1y = startY;
-    const c2x = endX - dx, c2y = endY;
-    return `M ${startX},${startY} C ${c1x},${c1y} ${c2x},${c2y} ${endX},${endY}`;
-  }
+  buildTempCurve(): string { return ''; }
 
   getEdgeColor(fromId: string, toId: string): string {
     // verde para avanço (order cresce), laranja para retrocesso
@@ -844,79 +1236,61 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return (to.order > from.order) ? 'url(#arrow-green)' : 'url(#arrow-orange)';
   }
 
-  onNodeDragStart(node: { id: string; x: number; y: number }, evt: MouseEvent) {
-    if (!this.flowMoveEnabled) return;
-    if (evt.button !== 0) return; // apenas botão esquerdo
-    evt.preventDefault();
-    // evitar conflito com conexão: se botão roxo foi clicado, ele já chama startConnect com stopPropagation
-    this.draggingNodeId = node.id;
-    const target = evt.currentTarget as HTMLElement;
-    const container = (target.closest('.relative') as HTMLElement) || document.body;
-    const rect = container.getBoundingClientRect();
-    const mouseX = evt.clientX - rect.left;
-    const mouseY = evt.clientY - rect.top;
-    this.dragOffset = { x: mouseX - node.x, y: mouseY - node.y };
-  }
+  onNodeDragStart(node: { id: string; x: number; y: number }, evt: MouseEvent) { /* no-op */ }
 
-  onFlowMouseUp(evt: MouseEvent) {
-    // finalizar drag e conexão
-    const wasDragging = !!this.draggingNodeId;
-    this.draggingNodeId = null;
-    if (this.isConnecting) {
-      this.isConnecting = false;
-      this.connectFromId = null;
-    }
-    // auto-desabilitar mover após soltar
-    if (wasDragging) {
-      this.flowMoveEnabled = false;
-    }
-  }
+  onFlowMouseUp(evt: MouseEvent) { /* no-op */ }
 
   @HostListener('window:mouseup', ['$event'])
-  onWindowMouseUp(evt: MouseEvent) {
-    // Garante término do drag/conexão mesmo fora da área
-    this.onFlowMouseUp(evt);
-    this.flowMoveEnabled = false; // desativa mover até novo hover
-  }
+  onWindowMouseUp(evt: MouseEvent) { /* no-op */ }
 
   @HostListener('window:touchend', ['$event'])
-  onWindowTouchEnd(evt: TouchEvent) {
-    const wasDragging = !!this.draggingNodeId;
-    this.draggingNodeId = null;
-    this.isConnecting = false;
-    this.connectFromId = null;
-    if (wasDragging) {
-      this.flowMoveEnabled = false;
-    }
-    this.flowMoveEnabled = false;
-  }
+  onWindowTouchEnd(evt: TouchEvent) { /* no-op */ }
 
-  onNodeMouseEnter(node: { id: string }) {
-    // Ativa mover apenas quando o mouse está sobre o card do nó (se não estiver conectando)
-    if (!this.isConnecting) {
-      this.flowMoveEnabled = true;
-    }
-  }
+  onNodeMouseEnter(node: { id: string }) { /* no-op */ }
 
-  onNodeMouseLeave(node: { id: string }) {
-    // Desativa mover ao sair do card, se não estiver arrastando ou conectando
-    if (!this.draggingNodeId && !this.isConnecting) {
-      this.flowMoveEnabled = false;
-    }
-  }
+  onNodeMouseLeave(node: { id: string }) { /* no-op */ }
 
-  autoAlignFlow() {
-    this.layoutFlowNodes();
-    this.toast.success('Fluxo alinhado');
-  }
+  autoAlignFlow() { this.toast.success('Fluxo alinhado'); }
 
-  toggleFlowMove() {
-    this.flowMoveEnabled = !this.flowMoveEnabled;
-    if (!this.flowMoveEnabled) this.draggingNodeId = null;
-  }
+  toggleFlowMove() { /* no-op */ }
 
   getColumnById(columnId: string): Column | undefined {
     return this.columns.find(c => c.id === columnId);
+  }
+
+  // Quantidade de automações ativas associadas a uma fase
+  getAutomationCount(columnId: string): number {
+    try {
+      const isInitial = this.isInitialPhaseId(columnId);
+      return (this.automations || []).filter((a: any) => {
+        const active = a?.active !== false;
+        if (!active) return false;
+        const trigger = a?.trigger || {};
+        const type = a?.triggerType ?? trigger.type;
+        const phase = a?.triggerPhase ?? trigger.phase;
+        if (type === 'new-lead-created') {
+          // Se não tem fase vinculada, considerar como da fase inicial
+          if (!phase) return isInitial;
+          return phase === columnId;
+        }
+        return phase === columnId;
+      }).length;
+    } catch {
+      return 0;
+    }
+  }
+
+  isInitialPhaseId(phaseId: string): boolean {
+    const col = this.getColumnById(phaseId);
+    if (!col) return false;
+    // considerar flag explícita ou menor ordem como inicial
+    const minOrder = Math.min(...this.columns.map(c => c.order || 0));
+    return !!col.isInitialPhase || (col.order || 0) === minOrder;
+  }
+
+  getAllowedTriggerTypesForPhase(phaseId: string): string[] {
+    const base = ['new-lead-created', 'card-enters-phase', 'card-in-phase-for-time', 'form-not-answered', 'sla-overdue'];
+    return base;
   }
 
   // Automações por fase (na aba Fluxo)
@@ -926,15 +1300,29 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
   closePhaseAutomations() { this.selectedPhaseIdForAutomations = null; }
   getAutomationsForPhase(phaseId: string) {
-    return (this.automations || []).filter(a => a?.trigger?.phase === phaseId);
+    return (this.automations || []).filter(a => {
+      const trigger = a?.trigger || {};
+      const type = a?.triggerType ?? trigger.type;
+      const phase = a?.triggerPhase ?? trigger.phase;
+      if (type === 'new-lead-created') {
+        // Se a automação não estiver vinculada a uma fase específica,
+        // exibir na fase inicial; se estiver, exibir na fase vinculada
+        if (!phase) return this.isInitialPhaseId(phaseId);
+        return phase === phaseId;
+      }
+      return phase === phaseId;
+    });
   }
   createAutomationForPhase(phaseId: string) {
+    const defaultType = this.isInitialPhaseId(phaseId) ? 'new-lead-created' : 'card-enters-phase';
     this.selectedAutomation = {
       name: 'Automação da fase',
       active: true,
-      trigger: { type: 'card-enters-phase', phase: phaseId },
+      trigger: { type: defaultType, phase: phaseId },
+      triggerType: defaultType,
+      triggerPhase: phaseId,
       actions: []
-    };
+    } as any;
     this.showAutomationModal = true;
   }
 
@@ -1138,21 +1526,40 @@ export class KanbanComponent implements OnInit, OnDestroy {
         }
       );
       console.log('Email reagendado para reenvio');
+      try { this.toast.success('Email reagendado para reenvio.'); } catch {}
     } catch (error) {
       console.error('Erro ao reenviar email:', error);
-      alert('Erro ao reenviar email. Tente novamente.');
+      try { this.toast.error('Erro ao reenviar email. Tente novamente.'); } catch {}
     }
   }
 
-  async deleteEmail(email: any) {
-    if (confirm('Tem certeza que deseja excluir este email?')) {
-      try {
-        await this.firestoreService.deleteOutboxEmail(this.ownerId, this.boardId, email.id);
-        console.log('Email excluído com sucesso');
-      } catch (error) {
-        console.error('Erro ao excluir email:', error);
-        alert('Erro ao excluir email. Tente novamente.');
-      }
+  // Outbox delete confirmation modal
+  showOutboxDeleteConfirm = false;
+  emailPendingDelete: any = null;
+
+  openOutboxDeleteConfirm(email: any, event?: Event) {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    this.emailPendingDelete = email;
+    this.showOutboxDeleteConfirm = true;
+  }
+
+  cancelOutboxDelete() {
+    this.showOutboxDeleteConfirm = false;
+    this.emailPendingDelete = null;
+  }
+
+  async confirmOutboxDelete() {
+    if (!this.emailPendingDelete) return;
+    try {
+      const email = this.emailPendingDelete;
+      await this.firestoreService.deleteOutboxEmail(this.ownerId, this.boardId, email.id);
+      console.log('Email excluído com sucesso');
+      try { this.toast.success('Mensagem excluída.'); } catch {}
+    } catch (error) {
+      console.error('Erro ao excluir email:', error);
+      try { this.toast.error('Erro ao excluir mensagem. Tente novamente.'); } catch {}
+    } finally {
+      this.cancelOutboxDelete();
     }
   }
 
@@ -1164,6 +1571,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   editColumn(column: Column) {
     this.columnModal.showEditModal(column);
+  }
+
+  onPhaseCardClick(phaseId: string, evt?: MouseEvent) {
+    // Abrir edição da fase ao clicar no card do fluxo
+    const col = this.getColumnById(phaseId);
+    if (col) {
+      this.editColumn(col);
+    }
   }
 
 
@@ -1189,6 +1604,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   onColumnDeleted() {
     console.log('Fase excluída!');
+    // Após exclusão, sincronizar ordem do fluxo para refletir a mudança
+    try { this.syncFlowOrderWithColumns(); this.updateFlowThumb(); } catch {}
   }
 
   async showColumnForm(column: Column) {
@@ -1202,7 +1619,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   onPhaseFormConfigSaved() {
-    console.log('Configuração de formulário salva!');
+    console.log('Configuração de formulário salva! Recarregando campos de card por fase...');
+    this.loadCardFieldConfigs();
+    try { this.toast.success('Configuração salva. Cards atualizados.'); } catch {}
   }
 
 
@@ -1260,6 +1679,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return 'bg-blue-100 text-blue-800';
   }
 
+  // Cor do ícone de temperatura para valores dinâmicos (ex.: 'Quente', 'Morno', 'Frio')
+  getTemperatureColorClass(value: any): string {
+    const norm = (v: string) => v
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const s = norm(String(value || ''));
+    if (s.includes('quente') || s.includes('hot')) return 'text-red-600';
+    if (s.includes('morno') || s.includes('morna') || s.includes('warm')) return 'text-yellow-600';
+    if (s.includes('frio') || s.includes('fria') || s.includes('cold')) return 'text-blue-600';
+    return 'text-blue-600';
+  }
+
   // Helpers para layout mobile
   getDaysSince(dateLike: any): number {
     if (!dateLike) return 0;
@@ -1288,9 +1720,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   // Métodos para Templates e Automações
-  getTriggerDescription(trigger: any): string {
-    if (!trigger) return 'Não especificado';
-    
+  getTriggerDescription(automationOrTrigger: any): string {
+    if (!automationOrTrigger) return 'Não especificado';
+
+    // Aceita tanto o objeto automação completo quanto apenas o trigger
+    const trigger = automationOrTrigger.trigger ? automationOrTrigger.trigger : automationOrTrigger;
+
     const descriptions: any = {
       'new-lead-created': 'Quando um novo lead é criado',
       'card-enters-phase': 'Quando lead entra em uma fase',
@@ -1299,18 +1734,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
       'sla-overdue': 'Quando SLA da fase vence'
     };
 
-    let description = descriptions[trigger.type] || trigger.type;
-    
-    if (trigger.phase && this.columns.length > 0) {
-      const column = this.columns.find(col => col.id === trigger.phase);
-      if (column) {
-        description += ` (${column.name})`;
-      }
+    const type = trigger.type || automationOrTrigger.triggerType;
+    let description = descriptions[type] || type || 'Não especificado';
+
+    const phaseId = trigger.phase || automationOrTrigger.triggerPhase;
+    if (phaseId && this.columns.length > 0) {
+      const column = this.columns.find(col => col.id === phaseId);
+      if (column) description += ` (${column.name})`;
     }
 
-    if (trigger.days) {
-      description += ` (${trigger.days} dias)`;
-    }
+    const days = trigger.days || automationOrTrigger.triggerDays;
+    if (days) description += ` (${days} dias)`;
 
     return description;
   }
@@ -1329,14 +1763,38 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
   }
 
-  async deleteAutomation(automation: any) {
-    if (confirm('Tem certeza que deseja excluir esta automação?')) {
-      try {
-        await this.firestoreService.deleteAutomation(this.ownerId, this.boardId, automation.id);
-        console.log('Automação excluída:', automation.id);
-      } catch (error) {
-        console.error('Erro ao excluir automação:', error);
+  // Modal de exclusão de automação
+  showAutomationDeleteConfirm = false;
+  automationPendingDelete: any = null;
+
+  openDeleteAutomationConfirm(automation: any, event?: Event) {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    this.automationPendingDelete = automation;
+    this.showAutomationDeleteConfirm = true;
+  }
+
+  cancelDeleteAutomation() {
+    this.showAutomationDeleteConfirm = false;
+    this.automationPendingDelete = null;
+  }
+
+  async confirmDeleteAutomation() {
+    if (!this.automationPendingDelete) return;
+    try {
+      const pending = this.automationPendingDelete as any;
+      const autoId = pending?.id || pending?.docId || (pending?.path ? String(pending.path).split('/').pop() : null);
+      if (!autoId) {
+        console.error('Automação sem id para exclusão:', pending);
+        this.toast.error('Não foi possível identificar esta automação. Atualize a página e tente novamente.');
+        return;
       }
+      await this.firestoreService.deleteAutomation(this.ownerId, this.boardId, autoId);
+      this.toast.success('Automação excluída.');
+    } catch (error) {
+      console.error('Erro ao excluir automação:', error);
+      this.toast.error('Erro ao excluir automação.');
+    } finally {
+      this.cancelDeleteAutomation();
     }
   }
 
@@ -1435,7 +1893,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
     console.log('=== EDITAR AUTOMAÇÃO ===', automation);
     
-    this.selectedAutomation = automation;
+    // Passar cópia profunda para evitar duplicação/efeitos colaterais no array
+    this.selectedAutomation = JSON.parse(JSON.stringify(automation));
     this.showAutomationModal = true;
   }
 
@@ -1446,18 +1905,35 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   async onSaveAutomation(automationData: any) {
     try {
+      // Sanitizar payload: remover id e campos undefined
+      const sanitize = (obj: any) => {
+        const out: any = {};
+        Object.keys(obj || {}).forEach(k => {
+          const v = (obj as any)[k];
+          if (v !== undefined) out[k] = v;
+        });
+        return out;
+      };
+      const payload: any = sanitize({ ...automationData });
+      delete payload.id;
+      if (Array.isArray(payload.actions)) {
+        payload.actions = payload.actions.map((a: any) => sanitize(a));
+      }
+
       if (automationData.id) {
         // Editando automação existente
-        await this.firestoreService.updateAutomation(this.ownerId, this.boardId, automationData.id, automationData);
+        await this.firestoreService.updateAutomation(this.ownerId, this.boardId, automationData.id, payload);
         console.log('Automação atualizada com sucesso:', automationData.name);
       } else {
         // Criando nova automação
-        await this.firestoreService.createAutomation(this.ownerId, this.boardId, automationData);
+        await this.firestoreService.createAutomation(this.ownerId, this.boardId, payload);
         console.log('Automação criada com sucesso:', automationData.name);
       }
+      this.toast.success('Automação salva com sucesso.');
+      this.onCloseAutomationModal();
     } catch (error) {
       console.error('Erro ao salvar automação:', error);
-      alert('Erro ao salvar automação. Verifique o console para detalhes.');
+      this.toast.error('Erro ao salvar automação. Tente novamente.');
     }
   }
 
@@ -1501,3 +1977,4 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
   }
 }
+

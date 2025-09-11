@@ -6,6 +6,7 @@ import { SubdomainService } from '../../services/subdomain.service';
 import { SmtpService } from '../../services/smtp.service';
 import { Company } from '../../models/company.model';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../toast/toast.service';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
@@ -288,6 +289,7 @@ export class SmtpConfigComponent implements OnInit {
   private subdomainService = inject(SubdomainService);
   private smtpService = inject(SmtpService);
   private authService = inject(AuthService);
+  private toast = inject(ToastService);
 
   smtpForm: FormGroup;
   currentCompany = signal<Company | null>(null);
@@ -310,35 +312,49 @@ export class SmtpConfigComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.loadCurrentConfiguration();
+    this.loadCurrentConfiguration(true);
   }
 
-  loadCurrentConfiguration() {
-    const company = this.subdomainService.getCurrentCompany();
-    if (company) {
+  loadCurrentConfiguration(forceFetch: boolean = false) {
+    const existing = this.subdomainService.getCurrentCompany();
+    const hydrateForm = (company: Company) => {
       this.currentCompany.set(company);
-      
-      if (company.smtpConfig) {
+      if (company?.smtpConfig) {
         this.smtpForm.patchValue({
-          host: company.smtpConfig.host,
-          port: company.smtpConfig.port,
-          secure: company.smtpConfig.secure,
-          user: company.smtpConfig.user,
-          password: company.smtpConfig.password,
-          fromName: company.smtpConfig.fromName,
-          fromEmail: company.smtpConfig.fromEmail
-        });
-      } else {
-        // Configurar valores padrão para empresas sem configuração SMTP (SendGrid)
-        this.smtpForm.patchValue({
-          host: 'smtp.sendgrid.net',
-          port: 587,
-          secure: true,
-          user: 'apikey',
-          fromName: company.name || 'Sistema Kanban'
-        });
+          host: company.smtpConfig.host || this.smtpForm.get('host')?.value,
+          port: company.smtpConfig.port || this.smtpForm.get('port')?.value,
+          secure: company.smtpConfig.secure !== undefined ? company.smtpConfig.secure : this.smtpForm.get('secure')?.value,
+          user: company.smtpConfig.user || this.smtpForm.get('user')?.value,
+          password: company.smtpConfig.password || this.smtpForm.get('password')?.value || '',
+          fromName: company.smtpConfig.fromName || this.smtpForm.get('fromName')?.value,
+          fromEmail: company.smtpConfig.fromEmail || this.smtpForm.get('fromEmail')?.value
+        }, { emitEvent: false });
       }
+    };
+
+    if (existing && !forceFetch) {
+      hydrateForm(existing);
+      return;
     }
+
+    // Force fetch from Firestore by subdomain or user email
+    (async () => {
+      let company = existing || null;
+      try {
+        const sub = this.companyService.getCompanySubdomain();
+        if (sub) company = await this.companyService.getCompanyBySubdomain(sub);
+      } catch {}
+      if (!company) {
+        try {
+          const currentUser = this.authService.getCurrentUser();
+          if (currentUser?.email) company = await this.companyService.getCompanyByUserEmail(currentUser.email);
+        } catch {}
+      }
+      if (company) {
+        this.subdomainService.setCurrentCompany(company);
+        hydrateForm(company);
+      }
+    })();
   }
 
   async saveConfiguration() {
@@ -352,30 +368,8 @@ export class SmtpConfigComponent implements OnInit {
 
     let company = this.currentCompany();
     if (!company?.id) {
-      try {
-        const sub = this.companyService.getCompanySubdomain();
-        if (sub) {
-          const fetched = await this.companyService.getCompanyBySubdomain(sub);
-          if (fetched?.id) {
-            this.subdomainService.setCurrentCompany(fetched);
-            this.currentCompany.set(fetched);
-            company = fetched;
-          }
-        }
-      } catch {}
-    }
-    if (!company?.id) {
-      try {
-        const currentUser = this.authService.getCurrentUser();
-        if (currentUser?.email) {
-          const byEmail = await this.companyService.getCompanyByUserEmail(currentUser.email);
-          if (byEmail?.id) {
-            this.subdomainService.setCurrentCompany(byEmail);
-            this.currentCompany.set(byEmail);
-            company = byEmail;
-          }
-        }
-      } catch {}
+      await new Promise(resolve => { this.loadCurrentConfiguration(true); setTimeout(resolve, 500); });
+      company = this.currentCompany();
     }
     if (!company?.id) {
       this.showError('Empresa não encontrada');
@@ -388,15 +382,14 @@ export class SmtpConfigComponent implements OnInit {
     try {
       const formValue = this.smtpForm.value;
       
-      // Garantir que os valores sejam do tipo correto
       const smtpConfig = {
-        host: String(formValue.host || ''),
-        port: Number(formValue.port || 587),
-        secure: Boolean(formValue.secure),
-        user: String(formValue.user || ''),
-        password: String(formValue.password || ''),
-        fromName: String(formValue.fromName || ''),
-        fromEmail: String(formValue.fromEmail || '')
+        host: String(formValue.host || this.currentCompany()?.smtpConfig?.host || ''),
+        port: Number(formValue.port || this.currentCompany()?.smtpConfig?.port || 587),
+        secure: Boolean(formValue.secure ?? this.currentCompany()?.smtpConfig?.secure ?? true),
+        user: String(formValue.user || this.currentCompany()?.smtpConfig?.user || ''),
+        password: String((formValue.password ?? '').toString().trim() || this.currentCompany()?.smtpConfig?.password || ''),
+        fromName: String(formValue.fromName || this.currentCompany()?.smtpConfig?.fromName || ''),
+        fromEmail: String(formValue.fromEmail || this.currentCompany()?.smtpConfig?.fromEmail || '')
       };
       
       const updatedCompany: Partial<Company> = {
@@ -405,10 +398,8 @@ export class SmtpConfigComponent implements OnInit {
       
       await this.companyService.updateCompany(company.id, updatedCompany);
       
-      // Update current company
-      const refreshedCompany = { ...company, smtpConfig: smtpConfig };
-      this.subdomainService.setCurrentCompany(refreshedCompany);
-      this.currentCompany.set(refreshedCompany);
+      // Refetch from Firestore to ensure persistence
+      this.loadCurrentConfiguration(true);
       
       this.showSuccess('Configurações SMTP salvas com sucesso!');
     } catch (error) {
@@ -464,7 +455,7 @@ export class SmtpConfigComponent implements OnInit {
       const result = await this.smtpService.sendEmail(testEmailData).toPromise();
       
       if (result?.success) {
-        this.showSuccess(`✅ Email de teste enviado com sucesso para ${this.testEmail}! Verifique sua caixa de entrada.`);
+        this.showSuccess(`Email de teste enviado com sucesso para ${this.testEmail}.`);
       } else {
         throw new Error(result?.error || 'Falha no envio do email');
       }
@@ -493,15 +484,17 @@ export class SmtpConfigComponent implements OnInit {
   }
 
   private showSuccess(message: string) {
-    this.successMessage.set(message);
+    // Usar toast padrão do sistema
+    try { this.toast.success(message); } catch {}
+    this.successMessage.set(null);
     this.errorMessage.set(null);
-    setTimeout(() => this.successMessage.set(null), 5000);
   }
 
   private showError(message: string) {
-    this.errorMessage.set(message);
+    // Usar toast padrão do sistema
+    try { this.toast.error(message); } catch {}
+    this.errorMessage.set(null);
     this.successMessage.set(null);
-    setTimeout(() => this.errorMessage.set(null), 5000);
   }
 
   private clearMessages() {

@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/components/config-header/config-header.component.ts"],
-  "sourcesContent": ["\n    header {\n      position: sticky;\n      top: 0;\n      z-index: 10;\n    }\n  "],
-  "mappings": ";AACI;AACE,YAAA;AACA,OAAA;AACA,WAAA;;",
-  "names": []
-}
