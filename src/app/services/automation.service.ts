@@ -565,9 +565,22 @@ export class AutomationService {
         if (!type) continue;
 
         // Avaliar cada lead
+        console.log(`📊 Avaliando ${leads.length} leads para automação "${automation.name}" (tipo: ${type})`);
+        
         for (const lead of leads) {
           // Filtrar por fase se definido
           if (phaseId && lead.columnId !== phaseId) continue;
+          
+          const movedTs = (lead.movedToCurrentColumnAt as any);
+          const moved = movedTs?.toDate ? movedTs.toDate().getTime() : (movedTs?.seconds ? movedTs.seconds * 1000 : (new Date(movedTs)).getTime());
+          const daysPassed = moved ? Math.floor((now - moved) / DAY) : 'N/A';
+          
+          console.log(`👤 Lead ${lead.id} (${lead.fields.contactName || lead.fields.companyName}):`, {
+            fase: lead.columnId,
+            diasNaFase: daysPassed,
+            isRetroativo: typeof daysPassed === 'number' ? daysPassed > 1 : false,
+            hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY)
+          });
 
           try {
             if (type === 'card-in-phase-for-time') {
