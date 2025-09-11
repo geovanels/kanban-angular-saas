@@ -78,20 +78,31 @@ export class CompanyService {
 
   private async queryCompanyBySubdomain(subdomain: string): Promise<Company | null> {
     try {
+      console.log('🔍 Buscando empresa por subdomínio:', subdomain);
       return await runInInjectionContext(this.injector, async () => {
         const companiesRef = collection(this.firestore, 'companies');
         const q = query(companiesRef, where('subdomain', '==', subdomain));
         const querySnapshot = await getDocs(q);
         
+        console.log('📊 Resultado da query:', {
+          empty: querySnapshot.empty,
+          size: querySnapshot.size,
+          docs: querySnapshot.docs.map(doc => ({ id: doc.id, subdomain: doc.data()['subdomain'] }))
+        });
+        
         if (querySnapshot.empty) {
+          console.log('❌ Nenhuma empresa encontrada para subdomínio:', subdomain);
           return null;
         }
         
         const docData = querySnapshot.docs[0];
-        return { id: docData.id, ...docData.data() } as Company;
+        const company = { id: docData.id, ...docData.data() } as Company;
+        console.log('✅ Empresa encontrada:', { id: company.id, subdomain: company.subdomain, name: company.name });
+        return company;
       });
     } catch (error) {
       // Erro silencioso para segurança
+      console.error('❌ Erro ao buscar empresa por subdomínio:', subdomain, error);
       return null;
     }
   }
