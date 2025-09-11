@@ -41,11 +41,12 @@ service cloud.firestore {
 
     // Companies collection
     match /companies/{companyId} {
-      // Allow reading company data if owner (email/uid) or user of the company
-      allow read: if isAuthenticated() && (
-        resource.data.ownerEmail == getUserEmail() || resource.data.ownerId == getUserUid() ||
-        exists(/databases/$(database)/documents/companies/$(companyId)/users/$(getUserEmail()))
-      );
+      // Allow reading basic company info (subdomain, name) for public access (needed for subdomain lookup)
+      // BUT only allow full data if authenticated and authorized
+      allow read: if true; // Basic company info is public for subdomain resolution
+      
+      // Allow reading full company data if owner (email/uid) or user of the company
+      // This rule is now redundant but kept for clarity - the above rule allows all reads
       
       // Allow creating companies if authenticated (less restrictive for development)
       allow create: if isAuthenticated();

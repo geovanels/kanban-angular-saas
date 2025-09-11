@@ -102,17 +102,26 @@ export class SubdomainService {
 
   private handleInvalidSubdomain(subdomain: string) {
     if (typeof window !== 'undefined') {
-      if (this.isDevelopment()) {
+      const hostname = window.location.hostname;
+      const isDev = this.isDevelopment();
+      console.log('🚨 handleInvalidSubdomain chamado:', { 
+        subdomain, 
+        hostname, 
+        isDevelopment: isDev 
+      });
+      
+      if (isDev) {
+        console.log('🔧 Ambiente de desenvolvimento - não exibindo alert');
         return;
       }
       
-      const hostname = window.location.hostname;
-      
       if (hostname.includes(`${subdomain}.taskboard.com.br`)) {
+        console.log('⚠️ Exibindo alert para empresa não encontrada');
         alert(`Empresa '${subdomain}' não encontrada. Entre em contato com o suporte.`);
         return;
       }
       
+      console.log('🔄 Redirecionando para página de empresa não encontrada');
       window.location.href = 'https://taskboard.com.br/empresa-nao-encontrada?subdomain=' + encodeURIComponent(subdomain);
     }
   }
