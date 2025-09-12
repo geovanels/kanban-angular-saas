@@ -35,6 +35,7 @@ export class TemplateModalComponent implements AfterViewInit {
   
   public editorContent = '';
   public editorInstance: any = null;
+  public highlightedHtml = '';
   
   // CKEditor configuration
   public Editor: any = ClassicEditor;
@@ -48,6 +49,7 @@ export class TemplateModalComponent implements AfterViewInit {
         'insertTable', 'blockQuote', '|',
         'fontSize', 'fontColor', 'fontBackgroundColor', '|',
         'alignment', '|',
+        'sourceEditing', '|',
         'undo', 'redo'
       ]
     },
@@ -58,18 +60,50 @@ export class TemplateModalComponent implements AfterViewInit {
     },
     fontColor: {
       colors: [
-        { color: '#000000', label: 'Black' },
-        { color: '#4d4d4d', label: 'Dim grey' },
-        { color: '#999999', label: 'Grey' },
-        { color: '#e6e6e6', label: 'Light grey' },
-        { color: '#ffffff', label: 'White', hasBorder: true },
-        { color: '#e64545', label: 'Red' },
-        { color: '#ff9500', label: 'Orange' },
-        { color: '#ffff00', label: 'Yellow' },
-        { color: '#00ff00', label: 'Light green' },
-        { color: '#00ffff', label: 'Cyan' },
-        { color: '#0080ff', label: 'Light blue' },
-        { color: '#8000ff', label: 'Purple' }
+        { color: '#000000', label: 'Preto' },
+        { color: '#4d4d4d', label: 'Cinza escuro' },
+        { color: '#999999', label: 'Cinza' },
+        { color: '#e6e6e6', label: 'Cinza claro' },
+        { color: '#ffffff', label: 'Branco', hasBorder: true },
+        { color: '#e64545', label: 'Vermelho' },
+        { color: '#ff9500', label: 'Laranja' },
+        { color: '#ffff00', label: 'Amarelo' },
+        { color: '#00ff00', label: 'Verde claro' },
+        { color: '#008000', label: 'Verde' },
+        { color: '#00ffff', label: 'Ciano' },
+        { color: '#0080ff', label: 'Azul claro' },
+        { color: '#0000ff', label: 'Azul' },
+        { color: '#8000ff', label: 'Roxo' },
+        { color: '#ff00ff', label: 'Magenta' }
+      ]
+    },
+    fontBackgroundColor: {
+      colors: [
+        { color: '#000000', label: 'Preto' },
+        { color: '#4d4d4d', label: 'Cinza escuro' },
+        { color: '#999999', label: 'Cinza' },
+        { color: '#e6e6e6', label: 'Cinza claro' },
+        { color: '#ffffff', label: 'Branco', hasBorder: true },
+        { color: '#e64545', label: 'Vermelho' },
+        { color: '#ff9500', label: 'Laranja' },
+        { color: '#ffff00', label: 'Amarelo' },
+        { color: '#00ff00', label: 'Verde claro' },
+        { color: '#008000', label: 'Verde' },
+        { color: '#00ffff', label: 'Ciano' },
+        { color: '#0080ff', label: 'Azul claro' },
+        { color: '#0000ff', label: 'Azul' },
+        { color: '#8000ff', label: 'Roxo' },
+        { color: '#ff00ff', label: 'Magenta' }
+      ]
+    },
+    htmlSupport: {
+      allow: [
+        {
+          name: /.*/,
+          attributes: true,
+          classes: true,
+          styles: true
+        }
       ]
     }
   };
@@ -239,8 +273,39 @@ export class TemplateModalComponent implements AfterViewInit {
         const formatted = this.autoFormatHtml(this.editorContent);
         this.templateForm.patchValue({ body: formatted });
         this.editorContent = formatted;
+        this.updateHtmlHighlight(formatted);
       } catch {}
     }
+  }
+
+  onHtmlChange(event: any) {
+    const html = event.target.value;
+    this.updateHtmlHighlight(html);
+  }
+
+  onHtmlScroll(event: any) {
+    // Sincronizar scroll entre textarea e overlay de highlight (se implementado)
+  }
+
+  private updateHtmlHighlight(html: string) {
+    this.highlightedHtml = this.highlightHtmlSyntax(html);
+  }
+
+  private highlightHtmlSyntax(html: string): string {
+    if (!html) return '';
+    
+    return html
+      // HTML tags
+      .replace(/(&lt;\/?)([\w-]+)([^&]*?)(&gt;)/g, '<span style="color: #569cd6">$1</span><span style="color: #4fc1ff">$2</span><span style="color: #92c5f7">$3</span><span style="color: #569cd6">$4</span>')
+      // Attributes
+      .replace(/(\w+)(=)(".*?")/g, '<span style="color: #9cdcfe">$1</span><span style="color: #d4d4d4">$2</span><span style="color: #ce9178">$3</span>')
+      // Variables {{...}}
+      .replace(/(\{\{.*?\}\})/g, '<span style="color: #dcdcaa; background-color: rgba(255,255,0,0.1)">$1</span>')
+      // Comments
+      .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6a9955">$1</span>')
+      // Escape HTML for display
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
 

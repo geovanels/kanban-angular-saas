@@ -115,10 +115,23 @@
               </ckeditor>
             </div>
             <!-- HTML -->
-            <textarea *ngIf="showHtmlMode"
-              formControlName="body"
-              class="w-full min-h-[540px] max-h-[72vh] p-4 font-mono text-sm focus:outline-none resize-y overflow-auto whitespace-pre"
-              placeholder="Digite o HTML aqui..."></textarea>
+            <div *ngIf="showHtmlMode" class="relative">
+              <textarea 
+                formControlName="body"
+                class="w-full min-h-[540px] max-h-[72vh] p-4 font-mono text-sm focus:outline-none resize-y overflow-auto whitespace-pre bg-gray-900 text-green-400 border-0"
+                placeholder="Digite o HTML aqui..."
+                spellcheck="false"
+                (input)="onHtmlChange($event)"
+                (scroll)="onHtmlScroll($event)"
+                #htmlTextarea></textarea>
+              
+              <!-- Syntax highlighting overlay -->
+              <pre 
+                *ngIf="false"
+                class="absolute top-0 left-0 w-full min-h-[540px] max-h-[72vh] p-4 font-mono text-sm pointer-events-none overflow-auto whitespace-pre bg-transparent text-transparent"
+                [innerHTML]="highlightedHtml"
+                #highlightOverlay></pre>
+            </div>
           </div>
         </div>
       </div>
