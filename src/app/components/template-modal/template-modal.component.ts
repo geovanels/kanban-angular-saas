@@ -34,6 +34,7 @@ export class TemplateModalComponent implements AfterViewInit {
   showHtmlMode = false;
   
   public editorContent = '';
+  public editorInstance: any = null;
   
   // CKEditor configuration
   public Editor: any = ClassicEditor;
@@ -86,6 +87,12 @@ export class TemplateModalComponent implements AfterViewInit {
     console.log('Template modal inicializado');
   }
 
+  // Método chamado quando o CKEditor é inicializado
+  onEditorReady(editor: any) {
+    this.editorInstance = editor;
+    console.log('CKEditor inicializado e pronto');
+  }
+
   execCommand(command: string) {
     document.execCommand(command, false);
   }
@@ -101,8 +108,23 @@ export class TemplateModalComponent implements AfterViewInit {
 
   // CKEditor is bound via formControl; no manual syncing to avoid loops
 
-  // Método para inserir variáveis no CKEditor (concat na posição final)
+  // Método para inserir variáveis no CKEditor na posição do cursor
   insertVariable(variable: string) {
+    // Tenta inserir usando o CKEditor se estiver disponível
+    if (this.editorInstance) {
+      try {
+        this.editorInstance.model.change((writer: any) => {
+          const selection = this.editorInstance.model.document.selection;
+          const position = selection.getFirstPosition();
+          writer.insertText(variable, position);
+        });
+        return;
+      } catch (error) {
+        console.warn('Falha ao inserir no CKEditor, usando fallback:', error);
+      }
+    }
+
+    // Fallback: inserir no final (comportamento atual)
     const currentContent = this.templateForm.get('body')?.value || '';
     const newContent = currentContent + ' ' + variable;
     this.templateForm.patchValue({ body: newContent });
