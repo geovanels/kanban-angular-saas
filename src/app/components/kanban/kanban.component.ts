@@ -696,9 +696,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
             // iniciar nova fase
             phaseHistory[targetColumnId] = {
               phaseId: targetColumnId,
-              enteredAt: now,
-              exitedAt: undefined,
-              duration: undefined
+              enteredAt: now
             };
             await this.firestoreService.updateLead(this.ownerId, this.boardId, lead.id!, { phaseHistory } as any);
           }

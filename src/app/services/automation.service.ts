@@ -312,9 +312,7 @@ export class AutomationService {
       // Iniciar nova fase
       phaseHistory[action.phaseId] = {
         phaseId: action.phaseId,
-        enteredAt: now,
-        exitedAt: undefined,
-        duration: undefined
+        enteredAt: now
       };
 
       console.log('📝 Atualizando lead no Firestore:', {
