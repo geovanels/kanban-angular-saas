@@ -110,6 +110,7 @@
                 [editor]="Editor"
                 [config]="editorConfig"
                 formControlName="body"
+                (ready)="onEditorReady($event)"
                 class="min-h-[540px] max-h-[72vh] overflow-auto">
               </ckeditor>
             </div>
