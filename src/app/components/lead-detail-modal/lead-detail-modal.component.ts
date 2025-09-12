@@ -522,9 +522,7 @@ export class LeadDetailModalComponent {
       // Iniciar nova fase
       phaseHistory[targetColumnId] = {
         phaseId: targetColumnId,
-        enteredAt: now,
-        exitedAt: undefined,
-        duration: undefined
+        enteredAt: now
       };
 
       // Salvar movimento
