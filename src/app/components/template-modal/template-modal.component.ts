@@ -49,7 +49,6 @@ export class TemplateModalComponent implements AfterViewInit {
         'insertTable', 'blockQuote', '|',
         'fontSize', 'fontColor', 'fontBackgroundColor', '|',
         'alignment', '|',
-        'sourceEditing', '|',
         'undo', 'redo'
       ]
     },
@@ -95,16 +94,6 @@ export class TemplateModalComponent implements AfterViewInit {
         { color: '#8000ff', label: 'Roxo' },
         { color: '#ff00ff', label: 'Magenta' }
       ]
-    },
-    htmlSupport: {
-      allow: [
-        {
-          name: /.*/,
-          attributes: true,
-          classes: true,
-          styles: true
-        }
-      ]
     }
   };
 
@@ -125,6 +114,61 @@ export class TemplateModalComponent implements AfterViewInit {
   onEditorReady(editor: any) {
     this.editorInstance = editor;
     console.log('CKEditor inicializado e pronto');
+    
+    // Configurar para permitir todos os elementos e atributos HTML
+    this.configureHtmlSupport(editor);
+  }
+
+  private configureHtmlSupport(editor: any) {
+    try {
+      // Configuração mais simples: modificar o schema para permitir atributos style
+      editor.model.schema.extend('$text', { 
+        allowAttributes: ['style', 'color', 'backgroundColor', 'fontSize'] 
+      });
+      
+      // Para todos os elementos block
+      const blockElements = ['paragraph', 'heading1', 'heading2', 'heading3', 'heading4', 'heading5', 'heading6', 'blockQuote'];
+      blockElements.forEach(elementName => {
+        if (editor.model.schema.isRegistered(elementName)) {
+          editor.model.schema.extend(elementName, { 
+            allowAttributes: ['style', 'class', 'align'] 
+          });
+        }
+      });
+      
+      // Permitir elementos div, span, etc
+      editor.model.schema.register('htmlDiv', {
+        inheritAllFrom: '$container',
+        allowAttributes: ['style', 'class']
+      });
+      
+      editor.model.schema.register('htmlSpan', {
+        inheritAllFrom: '$text',
+        allowAttributes: ['style', 'class']
+      });
+      
+      console.log('Schema HTML configurado para permitir estilos');
+    } catch (error) {
+      console.warn('Não foi possível configurar HTML Support:', error);
+      
+      // Fallback: tentar uma abordagem mais agressiva
+      try {
+        this.disableHtmlFiltering(editor);
+      } catch (e) {
+        console.warn('Fallback também falhou:', e);
+      }
+    }
+  }
+
+  private disableHtmlFiltering(editor: any) {
+    // Tentar desabilitar filtros de HTML do CKEditor
+    if (editor.data && editor.data.processor) {
+      const originalToView = editor.data.processor.toView;
+      editor.data.processor.toView = function(data: string) {
+        // Preservar HTML original tanto quanto possível
+        return originalToView.call(this, data);
+      };
+    }
   }
 
   execCommand(command: string) {
