@@ -1,0 +1,860 @@
+<!-- Standalone Reports (accessed via URL) -->
+<app-main-layout *ngIf="boardId && isStandaloneView()">
+  <!-- Breadcrumb -->
+  <app-company-breadcrumb [title]="'Relatórios - ' + (board?.name || 'Board')">
+    <div class="flex space-x-2">
+      <!-- Board Selector -->
+      <select 
+        [value]="boardId"
+        (change)="selectBoard($any($event.target).value)"
+        class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="">Selecione um quadro...</option>
+        <option *ngFor="let availableBoard of availableBoards" [value]="availableBoard.id">
+          {{ availableBoard.name }}
+        </option>
+      </select>
+
+      <!-- Export Dropdown -->
+      <div class="relative">
+        <select 
+          (change)="exportReport($any($event.target).value)"
+          class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Exportar...</option>
+          <option *ngFor="let format of exportFormats" [value]="format">{{ format }}</option>
+        </select>
+      </div>
+    </div>
+  </app-company-breadcrumb>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    <!-- Filters Section -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">
+        <i class="fas fa-filter mr-2 text-blue-500"></i>
+        Filtros do Relatório
+      </h2>
+      
+      <!-- Quick Filter Buttons -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Filtros Rápidos</label>
+        <div class="flex flex-wrap gap-2">
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('all')"
+            class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+            Todos os Dados
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('week')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Última Semana
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('month')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Último Mês
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('3months')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Últimos 3 Meses
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('6months')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Últimos 6 Meses
+          </button>
+        </div>
+      </div>
+      
+      <form [formGroup]="filtersForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Date Range -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+          <input 
+            type="date" 
+            formControlName="startDate"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+          <input 
+            type="date" 
+            formControlName="endDate"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <!-- Phase Filter -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Fases</label>
+          <select 
+            formControlName="phases" 
+            multiple
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option *ngFor="let column of columns" [value]="column.id">{{ column.name }}</option>
+          </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select 
+            formControlName="status"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="concluded">Concluídos</option>
+            <option value="overdue">Em Atraso</option>
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+          <button
+            *ngFor="let tab of [
+              { key: 'overview', label: 'Visão Geral', icon: 'fas fa-chart-pie' },
+              { key: 'sla', label: 'Indicadores SLA', icon: 'fas fa-clock' },
+              { key: 'phases', label: 'Métricas por Fase', icon: 'fas fa-columns' },
+              { key: 'leads', label: 'Lista de Registros', icon: 'fas fa-list' },
+              { key: 'charts', label: 'Gráficos', icon: 'fas fa-chart-bar' }
+            ]"
+            (click)="setView($any(tab.key))"
+            [class.border-blue-500]="currentView === tab.key"
+            [class.text-blue-600]="currentView === tab.key"
+            [class.border-transparent]="currentView !== tab.key"
+            [class.text-gray-500]="currentView !== tab.key"
+            class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm hover:text-gray-700 hover:border-gray-300 transition-colors">
+            <i [class]="tab.icon + ' mr-2'"></i>
+            {{ tab.label }}
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading || isGeneratingReport" class="flex items-center justify-center py-12">
+      <div class="text-center">
+        <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+        <p class="text-gray-600">{{ isLoading ? 'Carregando dados...' : 'Gerando relatório...' }}</p>
+      </div>
+    </div>
+
+    <!-- Content based on current view -->
+    <div *ngIf="!isLoading && !isGeneratingReport">
+
+      <!-- Overview Tab -->
+      <div *ngIf="currentView === 'overview'">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fas fa-users text-2xl text-blue-500"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Total de Leads</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.totalLeads }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fas fa-plus-circle text-2xl text-green-500"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Novos no Período</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.newLeadsThisPeriod }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fas fa-check-circle text-2xl text-purple-500"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Convertidos</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.convertedLeads }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fas fa-clock text-2xl text-orange-500"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Tempo Médio</p>
+                <p class="text-2xl font-bold text-gray-900">{{ formatDuration(summaryStats.avgConversionTime) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fas fa-play-circle text-2xl text-blue-500"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Ativos</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.activeLeads }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-2xl text-red-500"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Em Atraso</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.overdueLeads }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Phase Distribution -->
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Distribuição por Fase</h3>
+            <div class="space-y-3">
+              <div *ngFor="let item of chartData.phaseDistribution" class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="item.color"></div>
+                  <span class="text-sm font-medium text-gray-700">{{ item.name }}</span>
+                </div>
+                <span class="text-sm font-bold text-gray-900">{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conversion Funnel -->
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Funil de Conversão</h3>
+            <div class="space-y-2">
+              <div *ngFor="let item of chartData.conversionFunnel; let i = index" 
+                   class="relative">
+                <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                  <span class="text-sm font-medium text-gray-700">{{ item.phase }}</span>
+                  <span class="text-sm font-bold text-gray-900">{{ item.leads }}</span>
+                </div>
+                <div *ngIf="i < chartData.conversionFunnel.length - 1" 
+                     class="flex justify-center py-1">
+                  <i class="fas fa-chevron-down text-gray-400"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLA Indicators Tab -->
+      <div *ngIf="currentView === 'sla'">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Indicadores de SLA por Fase</h3>
+            <p class="text-sm text-gray-600 mt-1">Análise de cumprimento de prazos definidos para cada fase</p>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">SLA (dias)</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">No Prazo</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Em Atraso</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">% Cumprimento</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr *ngFor="let indicator of slaIndicators">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="w-3 h-3 rounded-full mr-3" [style.background-color]="indicator.phaseColor"></div>
+                      <span class="text-sm font-medium text-gray-900">{{ indicator.phaseName }}</span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                    {{ indicator.slaDays }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                    {{ indicator.totalLeads }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      {{ indicator.onTime }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      {{ indicator.overdue }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <div class="flex items-center justify-center">
+                      <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                        <div 
+                          class="h-2 rounded-full transition-all duration-300"
+                          [class.bg-green-500]="indicator.compliance >= 80"
+                          [class.bg-yellow-500]="indicator.compliance >= 60 && indicator.compliance < 80"
+                          [class.bg-red-500]="indicator.compliance < 60"
+                          [style.width.%]="indicator.compliance">
+                        </div>
+                      </div>
+                      <span class="text-sm font-medium text-gray-900">{{ indicator.compliance }}%</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div *ngIf="slaIndicators.length === 0" class="px-6 py-8 text-center">
+            <i class="fas fa-clock text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">Nenhuma fase possui SLA configurado</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase Metrics Tab -->
+      <div *ngIf="currentView === 'phases'">
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div *ngFor="let metric of phaseMetrics" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">{{ metric.phaseName }}</h3>
+              <div class="w-4 h-4 rounded-full" [style.background-color]="metric.phaseColor"></div>
+            </div>
+            
+            <div class="space-y-4">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Registros</span>
+                <span class="text-lg font-bold text-gray-900">{{ metric.leadsCount }}</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Tempo Médio</span>
+                <span class="text-lg font-bold text-gray-900">{{ formatDuration(metric.avgTimeInPhase) }}</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Taxa de Conversão</span>
+                <span class="text-lg font-bold text-gray-900">{{ metric.conversionRate }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leads List Tab -->
+      <div *ngIf="currentView === 'leads'">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Lista Detalhada de Registros</h3>
+            <p class="text-sm text-gray-600 mt-1">{{ filteredLeads.length }} registros encontrados</p>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase Atual</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr *ngFor="let lead of filteredLeads; let i = index" [class.bg-gray-50]="i % 2 === 1">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ lead.fields?.contactName || lead.fields?.companyName || 'Lead sem nome' }}
+                    </div>
+                    <div class="text-sm text-gray-500">
+                      {{ lead.fields?.contactEmail || 'Email não informado' }}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
+                      <span class="text-sm text-gray-900">{{ getColumnName(lead.columnId) }}</span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ lead.responsibleUserId ? getResponsibleName(lead.responsibleUserId) : 'Não atribuído' }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ formatDate(lead.createdAt) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span 
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      [class.bg-green-100]="isLeadConcluded(lead)"
+                      [class.text-green-800]="isLeadConcluded(lead)"
+                      [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                      [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                      [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
+                      [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
+                      {{ isLeadConcluded(lead) ? 'Concluído' : (isLeadOverdue(lead) ? 'Em Atraso' : 'Ativo') }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div *ngIf="filteredLeads.length === 0" class="px-6 py-8 text-center">
+            <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">Nenhum registro encontrado com os filtros aplicados</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Tab -->
+      <div *ngIf="currentView === 'charts'">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Leads Over Time -->
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Leads ao Longo do Tempo</h3>
+            <div class="h-64 flex items-end space-x-2">
+              <div *ngFor="let item of chartData.leadsOverTime" 
+                   class="flex-1 bg-blue-500 rounded-t flex flex-col justify-end items-center relative"
+                   [style.height.%]="getChartBarHeight(item.leads)">
+                <span class="text-white text-xs font-medium mb-2">{{ item.leads }}</span>
+                <span class="absolute -bottom-6 text-xs text-gray-600 transform rotate-45 origin-bottom-left">{{ item.period }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase Performance -->
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance por Fase</h3>
+            <div class="space-y-4">
+              <div *ngFor="let metric of phaseMetrics" class="flex items-center justify-between">
+                <div class="flex items-center flex-1">
+                  <div class="w-3 h-3 rounded-full mr-3" [style.background-color]="metric.phaseColor"></div>
+                  <span class="text-sm font-medium text-gray-700 flex-1">{{ metric.phaseName }}</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                  <div class="text-right">
+                    <div class="text-sm font-bold text-gray-900">{{ metric.leadsCount }}</div>
+                    <div class="text-xs text-gray-500">leads</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-bold text-gray-900">{{ metric.conversionRate }}%</div>
+                    <div class="text-xs text-gray-500">conversão</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</app-main-layout>
+
+<!-- Inline Reports (used within kanban) -->
+<div *ngIf="boardId && !isStandaloneView()" class="p-4 md:p-8">
+  <div class="max-w-7xl mx-auto">
+    
+    <!-- Header with Export -->
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">
+        <i class="fas fa-chart-bar mr-2 text-blue-500"></i>
+        Relatórios - {{ board?.name }}
+      </h2>
+      <div class="flex space-x-2">
+        <!-- Board Selector -->
+        <select 
+          [value]="boardId"
+          (change)="selectBoard($any($event.target).value)"
+          class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option *ngFor="let availableBoard of availableBoards" [value]="availableBoard.id">
+            {{ availableBoard.name }}
+          </option>
+        </select>
+
+        <!-- Export Dropdown -->
+        <select 
+          (change)="exportReport($any($event.target).value)"
+          class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Exportar...</option>
+          <option *ngFor="let format of exportFormats" [value]="format">{{ format }}</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Filters Section -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">
+        <i class="fas fa-filter mr-2 text-blue-500"></i>
+        Filtros
+      </h2>
+      
+      <!-- Quick Filter Buttons -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Filtros Rápidos</label>
+        <div class="flex flex-wrap gap-2">
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('all')"
+            class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+            Todos os Dados
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('week')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Última Semana
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('month')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Último Mês
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('3months')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Últimos 3 Meses
+          </button>
+          <button 
+            type="button"
+            (click)="setDateRangeFilter('6months')"
+            class="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+            Últimos 6 Meses
+          </button>
+        </div>
+      </div>
+      
+      <form [formGroup]="filtersForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Date Range -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+          <input 
+            type="date" 
+            formControlName="startDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+          <input 
+            type="date" 
+            formControlName="endDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <!-- Phase Filter -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Fases</label>
+          <select 
+            formControlName="phases"
+            multiple
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option *ngFor="let column of columns" [value]="column.id">{{ column.name }}</option>
+          </select>
+        </div>
+        
+        <!-- Status Filter -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+          <select 
+            formControlName="status"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="concluded">Concluídos</option>
+            <option value="overdue">Atrasados</option>
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tab Navigation for Views -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div class="border-b border-gray-200">
+        <nav class="flex space-x-8 px-6">
+          <button
+            *ngFor="let tab of viewTabs"
+            (click)="setView($any(tab.key))"
+            class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+            [class.border-blue-500]="currentView === tab.key"
+            [class.text-blue-600]="currentView === tab.key"
+            [class.border-transparent]="currentView !== tab.key"
+            [class.text-gray-500]="currentView !== tab.key"
+            [class.hover:text-gray-700]="currentView !== tab.key">
+            <i class="fas {{ tab.icon }} mr-2"></i>
+            {{ tab.name }}
+          </button>
+        </nav>
+      </div>
+
+      <!-- Report Content -->
+      <div class="p-6">
+        
+        <!-- Overview Tab -->
+        <div *ngIf="currentView === 'overview'">
+          <!-- Summary Stats -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-blue-100">Total de Leads</p>
+                  <p class="text-3xl font-bold">{{ summaryStats.totalLeads }}</p>
+                </div>
+                <div class="bg-blue-400 bg-opacity-30 p-3 rounded-full">
+                  <i class="fas fa-users text-2xl"></i>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow p-6 text-white">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-green-100">Leads Convertidos</p>
+                  <p class="text-3xl font-bold">{{ summaryStats.convertedLeads }}</p>
+                </div>
+                <div class="bg-green-400 bg-opacity-30 p-3 rounded-full">
+                  <i class="fas fa-check-circle text-2xl"></i>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg shadow p-6 text-white">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-yellow-100">Leads Atrasados</p>
+                  <p class="text-3xl font-bold">{{ summaryStats.overdueLeads }}</p>
+                </div>
+                <div class="bg-yellow-400 bg-opacity-30 p-3 rounded-full">
+                  <i class="fas fa-clock text-2xl"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLA Indicators Tab -->
+        <div *ngIf="currentView === 'sla'">
+          <div class="bg-white">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Indicadores de SLA por Fase</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">SLA (dias)</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">% Cumprimento</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">No Prazo</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Atrasados</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let indicator of slaIndicators">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <div class="w-3 h-3 rounded-full mr-3" [style.background-color]="indicator.phaseColor"></div>
+                        <span class="text-sm font-medium text-gray-900">{{ indicator.phaseName }}</span>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                      {{ indicator.slaDays }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                      <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                            [class.bg-green-100]="indicator.compliance >= 80"
+                            [class.text-green-800]="indicator.compliance >= 80"
+                            [class.bg-yellow-100]="indicator.compliance >= 60 && indicator.compliance < 80"
+                            [class.text-yellow-800]="indicator.compliance >= 60 && indicator.compliance < 80"
+                            [class.bg-red-100]="indicator.compliance < 60"
+                            [class.text-red-800]="indicator.compliance < 60">
+                        {{ indicator.compliance }}%
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-green-600 font-medium">
+                      {{ indicator.onTime }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-red-600 font-medium">
+                      {{ indicator.overdue }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase Metrics Tab -->
+        <div *ngIf="currentView === 'phases'">
+          <div class="space-y-6">
+            <div *ngFor="let metric of phaseMetrics" class="bg-white rounded-lg border border-gray-200 p-6">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center">
+                  <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="metric.phaseColor"></div>
+                  <h3 class="text-lg font-semibold text-gray-900">{{ metric.phaseName }}</h3>
+                </div>
+                <span class="text-2xl font-bold text-gray-900">{{ metric.leadsCount }} leads</span>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <p class="text-sm text-gray-600">Tempo Médio na Fase</p>
+                  <p class="text-xl font-semibold text-gray-900">{{ formatDuration(metric.avgTimeInPhase) }}</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <p class="text-sm text-gray-600">Taxa de Conversão</p>
+                  <p class="text-xl font-semibold text-gray-900">{{ metric.conversionRate }}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leads List Tab -->
+        <div *ngIf="currentView === 'leads'">
+          <div class="bg-white">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Lista de Leads ({{ filteredLeads.length }})</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase Atual</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let lead of filteredLeads | slice:0:50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm font-medium text-gray-900">{{ lead.fields?.contactName || lead.fields?.contactEmail || 'Lead sem nome' }}</div>
+                      <div class="text-sm text-gray-500" *ngIf="lead.fields?.contactEmail">{{ lead.fields?.contactEmail }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
+                        <span class="text-sm text-gray-900">{{ getColumnName(lead.columnId) }}</span>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {{ formatDate(lead.createdAt) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                            [class.bg-green-100]="isLeadConcluded(lead)"
+                            [class.text-green-800]="isLeadConcluded(lead)"
+                            [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                            [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                            [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
+                            [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
+                        <span *ngIf="isLeadConcluded(lead)">Concluído</span>
+                        <span *ngIf="!isLeadConcluded(lead) && isLeadOverdue(lead)">Atrasado</span>
+                        <span *ngIf="!isLeadConcluded(lead) && !isLeadOverdue(lead)">Ativo</span>
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Tab -->
+        <div *ngIf="currentView === 'charts'">
+          <div class="space-y-8">
+            <!-- Phase Distribution Chart -->
+            <div class="bg-white rounded-lg p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Distribuição por Fase</h3>
+              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div *ngFor="let item of chartData.phaseDistribution" class="text-center">
+                  <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-white font-bold text-lg"
+                       [style.background-color]="item.color">
+                    {{ item.value }}
+                  </div>
+                  <p class="mt-2 text-sm text-gray-600">{{ item.name }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Leads Over Time Chart -->
+            <div class="bg-white rounded-lg p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Leads ao Longo do Tempo</h3>
+              <div class="h-64 flex items-end space-x-2">
+                <div *ngFor="let item of chartData.leadsOverTime" 
+                     class="flex-1 bg-blue-500 rounded-t flex flex-col justify-end items-center relative"
+                     [style.height.%]="getChartBarHeight(item.leads)">
+                  <span class="text-white text-xs font-medium mb-2">{{ item.leads }}</span>
+                  <span class="absolute -bottom-6 text-xs text-gray-600 transform rotate-45 origin-bottom-left">{{ item.period }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<!-- Board Selection Interface -->
+<div *ngIf="!boardId" class="min-h-screen bg-gray-50 flex items-center justify-center">
+  <div class="max-w-md w-full mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-4">
+          <i class="fas fa-chart-bar text-2xl text-blue-500"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Relatórios</h2>
+        <p class="text-gray-600">Selecione um quadro para visualizar seus relatórios</p>
+      </div>
+
+      <div class="space-y-3">
+        <div *ngFor="let availableBoard of availableBoards" 
+             (click)="selectBoard(availableBoard.id!)" 
+             class="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-medium text-gray-900">{{ availableBoard.name }}</h3>
+              <p class="text-sm text-gray-600" *ngIf="availableBoard.description">{{ availableBoard.description }}</p>
+            </div>
+            <i class="fas fa-chevron-right text-gray-400"></i>
+          </div>
+        </div>
+        
+        <div *ngIf="availableBoards.length === 0" class="text-center py-8">
+          <p class="text-gray-500">Nenhum quadro encontrado</p>
+          <button 
+            (click)="goBack()"
+            class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            Voltar ao Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -28,6 +28,11 @@ export const routes: Routes = [
     canActivate: [CompanyGuard, authGuard] // Verificar empresa e autenticação
   },
   {
+    path: 'reports',
+    loadComponent: () => import('./components/reports/reports.component').then(m => m.ReportsComponent),
+    canActivate: [CompanyGuard, authGuard] // Verificar empresa e autenticação
+  },
+  {
     path: 'usuarios',
     loadComponent: () => import('./components/user-management/user-management.component').then(m => m.UserManagementComponent),
     canActivate: [CompanyGuard, authGuard] // Verificar empresa e autenticação

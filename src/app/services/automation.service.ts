@@ -636,13 +636,29 @@ export class AutomationService {
                 currentPhase: lead.columnId,
                 targetPhase: phaseId,
                 waitDays: days,
-                leadName: lead.fields.contactName || lead.fields.companyName
+                leadName: lead.fields?.contactName || lead.fields?.companyName || 'Nome não informado',
+                automationId: automation.id,
+                automationName: automation.name
               });
 
+              // Verificar se a automação é para a fase atual ou uma fase específica
               const targetPhase = phaseId || lead.columnId;
+              if (phaseId && lead.columnId !== phaseId) {
+                console.log(`⚠️ Lead não está na fase alvo ${phaseId} (está em ${lead.columnId}) - pulando automação`);
+                continue;
+              }
+
               const fields = await getFormFieldsForPhase(targetPhase);
               
-              console.log(`📋 Campos do formulário na fase ${targetPhase}:`, fields);
+              console.log(`📋 Campos do formulário na fase ${targetPhase}:`, {
+                fieldsCount: fields?.length || 0,
+                fields: fields?.map((f: any) => ({ 
+                  name: f.name, 
+                  apiFieldName: f.apiFieldName, 
+                  type: f.type,
+                  required: f.required 
+                })) || []
+              });
               
               if (!fields || fields.length === 0) {
                 console.log(`⚠️ Sem formulário configurado na fase ${targetPhase} - pulando automação`);
@@ -652,46 +668,104 @@ export class AutomationService {
               // Disparar apenas após "days" dias sem resposta (default 1)
               const waitDays = days && days > 0 ? days : 1;
               const movedTs = (lead.movedToCurrentColumnAt as any);
-              const moved = movedTs?.toDate ? movedTs.toDate().getTime() : (movedTs?.seconds ? movedTs.seconds * 1000 : (new Date(movedTs)).getTime());
+              let moved = null;
               
-              console.log(`⏰ Tempo na fase:`, {
+              if (movedTs?.toDate) {
+                moved = movedTs.toDate().getTime();
+              } else if (movedTs?.seconds) {
+                moved = movedTs.seconds * 1000;
+              } else if (movedTs) {
+                try {
+                  moved = new Date(movedTs).getTime();
+                } catch {
+                  moved = null;
+                }
+              }
+
+              // Fallback: usar createdAt se movedToCurrentColumnAt não existir
+              if (!moved) {
+                const createdTs = (lead.createdAt as any);
+                if (createdTs?.toDate) {
+                  moved = createdTs.toDate().getTime();
+                } else if (createdTs?.seconds) {
+                  moved = createdTs.seconds * 1000;
+                } else if (createdTs) {
+                  try {
+                    moved = new Date(createdTs).getTime();
+                  } catch {
+                    moved = Date.now(); // último recurso
+                  }
+                }
+              }
+              
+              const daysPassed = moved ? Math.floor((now - moved) / DAY) : 0;
+              
+              console.log(`⏰ Análise temporal:`, {
                 movedToCurrentColumnAt: lead.movedToCurrentColumnAt,
+                createdAt: lead.createdAt,
                 movedTimestamp: moved,
+                now: now,
                 waitDays: waitDays,
-                daysPassed: moved ? Math.floor((now - moved) / DAY) : 'N/A',
-                shouldWait: !moved || now - moved < waitDays * DAY
+                daysPassed: daysPassed,
+                shouldWait: !moved || now - moved < waitDays * DAY,
+                timeElapsed: moved ? `${Math.round((now - moved) / (1000 * 60 * 60))}h` : 'N/A'
               });
 
               if (!moved || now - moved < waitDays * DAY) {
-                console.log(`⏳ Ainda não passou tempo suficiente (${waitDays} dias) - pulando`);
+                console.log(`⏳ Ainda não passou tempo suficiente (${waitDays} dias, atual: ${daysPassed} dias) - pulando`);
                 continue;
               }
 
               // Considerar não respondido se todos os campos do form estão vazios
               const fieldValues: any = {};
+              const fieldAnalysis: any[] = [];
+              
               const allEmpty = fields.every((f: any) => {
                 const key = f.apiFieldName || f.name;
                 const val = (lead as any).fields?.[key];
                 fieldValues[key] = val;
-                const isEmpty = val === undefined || val === null || `${val}`.trim() === '';
+                
+                let isEmpty = true;
+                if (val !== undefined && val !== null && val !== '') {
+                  const strVal = `${val}`.trim();
+                  isEmpty = strVal === '' || strVal === 'undefined' || strVal === 'null';
+                }
+                
+                fieldAnalysis.push({
+                  fieldName: f.name,
+                  apiFieldName: f.apiFieldName,
+                  value: val,
+                  isEmpty: isEmpty,
+                  type: typeof val
+                });
+                
                 return isEmpty;
               });
 
-              console.log(`📝 Análise dos campos do formulário:`, {
-                fields: fields.map((f: any) => ({ name: f.name, apiFieldName: f.apiFieldName })),
-                fieldValues,
-                allEmpty,
+              console.log(`📝 Análise DETALHADA dos campos:`, {
+                targetPhase: targetPhase,
+                totalFields: fields.length,
+                fieldAnalysis: fieldAnalysis,
+                allEmpty: allEmpty,
+                leadFields: (lead as any).fields,
                 hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY)
               });
 
               if (allEmpty && !this.hasRecentlyExecuted(lead, automation.id, DAY)) {
-                console.log(`🚀 EXECUTANDO automação form-not-answered para lead ${lead.id}`);
-                await this.executeAutomation(automation, lead, boardId, ownerId);
-                await this.markExecuted(ownerId, boardId, lead, automation.id);
+                console.log(`🚀 EXECUTANDO automação form-not-answered para lead ${lead.id} - todos os ${fields.length} campos estão vazios após ${daysPassed} dias`);
+                try {
+                  await this.executeAutomation(automation, lead, boardId, ownerId);
+                  await this.markExecuted(ownerId, boardId, lead, automation.id);
+                  console.log(`✅ Automação form-not-answered executada com sucesso para lead ${lead.id}`);
+                } catch (executeError) {
+                  console.error(`❌ Erro ao executar automação form-not-answered para lead ${lead.id}:`, executeError);
+                }
               } else {
-                console.log(`❌ NÃO executando automação:`, { 
-                  allEmpty, 
-                  hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY) 
+                console.log(`❌ NÃO executando automação form-not-answered:`, { 
+                  allEmpty: allEmpty,
+                  fieldsWithData: fieldAnalysis.filter(f => !f.isEmpty).map(f => `${f.fieldName}="${f.value}"`),
+                  hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY),
+                  reason: !allEmpty ? 'Formulário já foi respondido' : 'Automação já foi executada recentemente'
                 });
               }
             }
@@ -707,12 +781,50 @@ export class AutomationService {
 
   private hasRecentlyExecuted(lead: Lead, automationId: string, withinMs: number): boolean {
     try {
-      const record = ((lead as any).executedAutomations || {})[automationId];
-      if (!record) return false;
-      const t = record.lastExecutedAt?.toDate ? record.lastExecutedAt.toDate().getTime() : (record.lastExecutedAt?.seconds ? record.lastExecutedAt.seconds * 1000 : (new Date(record.lastExecutedAt)).getTime());
-      if (!t) return false;
-      return (Date.now() - t) < withinMs;
-    } catch {
+      const executedAutomations = (lead as any).executedAutomations || {};
+      const record = executedAutomations[automationId];
+      
+      if (!record) {
+        console.log(`🔍 Automação ${automationId} nunca foi executada para lead ${lead.id}`);
+        return false;
+      }
+
+      let timestamp = null;
+      const lastExecutedAt = record.lastExecutedAt;
+      
+      if (lastExecutedAt?.toDate) {
+        timestamp = lastExecutedAt.toDate().getTime();
+      } else if (lastExecutedAt?.seconds) {
+        timestamp = lastExecutedAt.seconds * 1000;
+      } else if (lastExecutedAt) {
+        try {
+          timestamp = new Date(lastExecutedAt).getTime();
+        } catch {
+          timestamp = null;
+        }
+      }
+
+      if (!timestamp) {
+        console.log(`🔍 Timestamp inválido para automação ${automationId} no lead ${lead.id}:`, lastExecutedAt);
+        return false;
+      }
+
+      const elapsed = Date.now() - timestamp;
+      const isRecent = elapsed < withinMs;
+      
+      console.log(`🔍 Verificação de execução recente para automação ${automationId}:`, {
+        leadId: lead.id,
+        lastExecutedAt: new Date(timestamp).toLocaleString('pt-BR'),
+        elapsedMs: elapsed,
+        elapsedHours: Math.round(elapsed / (1000 * 60 * 60)),
+        withinMs: withinMs,
+        withinHours: Math.round(withinMs / (1000 * 60 * 60)),
+        isRecent: isRecent
+      });
+
+      return isRecent;
+    } catch (error) {
+      console.error(`❌ Erro ao verificar execução recente para automação ${automationId}:`, error);
       return false;
     }
   }
@@ -720,8 +832,21 @@ export class AutomationService {
   private async markExecuted(ownerId: string, boardId: string, lead: Lead, automationId: string) {
     try {
       const exec = { ...((lead as any).executedAutomations || {}) };
-      exec[automationId] = { lastExecutedAt: new Date() };
+      const now = new Date();
+      exec[automationId] = { lastExecutedAt: now };
+      
+      console.log(`📝 Marcando automação ${automationId} como executada para lead ${lead.id}:`, {
+        leadId: lead.id,
+        automationId: automationId,
+        timestamp: now.toLocaleString('pt-BR'),
+        previousExecutions: Object.keys((lead as any).executedAutomations || {})
+      });
+
       await this.firestoreService.updateLead(ownerId, boardId, lead.id!, { executedAutomations: exec } as any);
-    } catch {}
+      
+      console.log(`✅ Automação ${automationId} marcada como executada com sucesso para lead ${lead.id}`);
+    } catch (error) {
+      console.error(`❌ Erro ao marcar automação ${automationId} como executada para lead ${lead.id}:`, error);
+    }
   }
 }

@@ -18,12 +18,13 @@ import { AutomationModal } from '../automation-modal/automation-modal';
 import { AutomationHistoryModal } from '../automation-history-modal/automation-history-modal';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
 import { VisualFormBuilderComponent } from '../visual-form-builder/visual-form-builder';
+import { ReportsComponent } from '../reports/reports.component';
 import { ToastService } from '../toast/toast.service';
 
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent, ReportsComponent],
   templateUrl: './kanban.component.html',
   styleUrls: ['./kanban.component.scss']
 })
@@ -2094,5 +2095,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       console.error('Erro ao copiar texto:', err);
     });
   }
+
 }
 

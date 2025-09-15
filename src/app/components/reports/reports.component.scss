@@ -1,0 +1,210 @@
+// Reports Component Styles
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Custom chart styles
+.chart-container {
+  position: relative;
+  height: 300px;
+  
+  .chart-bar {
+    transition: all 0.3s ease;
+    
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}
+
+// SLA indicator styles
+.sla-indicator {
+  .compliance-bar {
+    transition: width 0.5s ease-in-out;
+  }
+  
+  &.high-compliance .compliance-bar {
+    background: linear-gradient(to right, #10B981, #059669);
+  }
+  
+  &.medium-compliance .compliance-bar {
+    background: linear-gradient(to right, #F59E0B, #D97706);
+  }
+  
+  &.low-compliance .compliance-bar {
+    background: linear-gradient(to right, #EF4444, #DC2626);
+  }
+}
+
+// Phase metric cards
+.metric-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Table enhancements
+.table-container {
+  .table-row {
+    transition: background-color 0.2s ease;
+    
+    &:hover {
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+  }
+}
+
+// Status badges
+.status-badge {
+  &.status-active {
+    background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  }
+  
+  &.status-concluded {
+    background: linear-gradient(135deg, #10B981, #059669);
+  }
+  
+  &.status-overdue {
+    background: linear-gradient(135deg, #EF4444, #DC2626);
+  }
+}
+
+// Filter section
+.filters-section {
+  background: linear-gradient(135deg, #F8FAFC, #F1F5F9);
+  border-left: 4px solid #3B82F6;
+}
+
+// Tab navigation
+.tab-nav {
+  .tab-button {
+    position: relative;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      color: #3B82F6;
+    }
+    
+    &.active {
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(to right, #3B82F6, #1D4ED8);
+        border-radius: 1px;
+      }
+    }
+  }
+}
+
+// Animation for loading states
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Summary cards
+.summary-card {
+  background: linear-gradient(135deg, #FFFFFF, #F8FAFC);
+  border-left: 4px solid transparent;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  &.card-primary {
+    border-left-color: #3B82F6;
+  }
+  
+  &.card-success {
+    border-left-color: #10B981;
+  }
+  
+  &.card-warning {
+    border-left-color: #F59E0B;
+  }
+  
+  &.card-danger {
+    border-left-color: #EF4444;
+  }
+}
+
+// Chart legends
+.chart-legend {
+  .legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+    }
+  }
+}
+
+// Responsive improvements
+@media (max-width: 768px) {
+  .filters-section {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .summary-cards {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  .tab-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 640px) {
+  .summary-cards {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+// Print styles
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .page-break {
+    page-break-before: always;
+  }
+  
+  .chart-container {
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+}

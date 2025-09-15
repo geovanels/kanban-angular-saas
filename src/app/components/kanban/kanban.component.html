@@ -55,8 +55,10 @@
         </button>
       </div>
 
-      <!-- Right side: Action Buttons (none) -->
-      <div class="hidden md:flex items-center space-x-2"></div>
+      <!-- Right side: Action Buttons -->
+      <div class="hidden md:flex items-center space-x-2">
+        <!-- Add any future action buttons here -->
+      </div>
     </div>
   </nav>
 
@@ -386,70 +388,6 @@
     </div>
   </div>
 
-  <!-- Reports Tab -->
-  <div *ngIf="!isLoading && activeTab === 'reports'" class="p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-900">Relatórios</h2>
-        <button class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-          <i class="fas fa-download mr-2"></i>
-          Exportar Relatório
-        </button>
-      </div>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total de Leads</p>
-              <p class="text-2xl font-bold text-gray-900">{{ leads.length }}</p>
-            </div>
-            <div class="bg-blue-100 p-3 rounded-full">
-              <i class="fas fa-users text-blue-500"></i>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Leads Ativos</p>
-              <p class="text-2xl font-bold text-gray-900">{{ getActiveLeads().length }}</p>
-            </div>
-            <div class="bg-green-100 p-3 rounded-full">
-              <i class="fas fa-chart-line text-green-500"></i>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total de Colunas</p>
-              <p class="text-2xl font-bold text-gray-900">{{ columns.length }}</p>
-            </div>
-            <div class="bg-purple-100 p-3 rounded-full">
-              <i class="fas fa-columns text-purple-500"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Leads por Fase</h3>
-        <div class="space-y-4">
-          <div *ngFor="let column of columns" class="flex items-center justify-between">
-            <div class="flex items-center">
-              <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="column.color || '#4A90E2'"></div>
-              <span class="font-medium">{{ column.name }}</span>
-            </div>
-            <span class="text-gray-600">{{ getLeadsForColumn(column.id!).length }} leads</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Flow Tab - Novo Editor Simplificado -->
   <div *ngIf="!isLoading && activeTab === 'flow'" class="p-4 md:p-8">
     <div class="w-full mx-auto">
@@ -567,6 +505,14 @@
         <button class="px-4 py-2 rounded-lg bg-red-600 text-white" (click)="confirmDeleteAutomation()">Excluir</button>
       </div>
     </div>
+  </div>
+
+  <!-- Reports Tab -->
+  <div *ngIf="!isLoading && activeTab === 'reports'">
+    <app-reports 
+      [boardId]="boardId" 
+      [ownerId]="ownerId">
+    </app-reports>
   </div>
 
   <!-- Outbox/Caixa de Saída Tab -->
