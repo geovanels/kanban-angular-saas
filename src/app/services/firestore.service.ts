@@ -1,8 +1,9 @@
 
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { Firestore, collection, doc, getDoc, getDocs, addDoc, setDoc, 
-         updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp,
+         updateDoc, deleteDoc, query, where, onSnapshot,
          writeBatch, orderBy, collectionGroup, limit } from '@angular/fire/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { CompanyService } from './company.service';
 import { SubdomainService } from './subdomain.service';
@@ -82,7 +83,7 @@ export class FirestoreService {
   private async safeGetDocs(collectionRef: any, operationName: string = 'buscar dados'): Promise<any[]> {
     try {
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(collectionRef));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() as any }));
     } catch (error: any) {
       if (error.code === 'permission-denied') {
         console.log(`Permissões para ${operationName} não configuradas - retornando array vazio`);
@@ -167,7 +168,7 @@ export class FirestoreService {
         // Buscar boards da empresa atual (tudo dentro do InjectionContext)
         const boardsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', companyId, 'boards'));
         const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(boardsRef));
-        let allBoards = querySnapshot.docs.map(doc => ({ 
+        let allBoards = querySnapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
           companyId: companyId 
@@ -178,7 +179,7 @@ export class FirestoreService {
           try {
             const oldBoardsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'users', userId, 'boards'));
             const oldSnapshot = await runInInjectionContext(this.injector, () => getDocs(oldBoardsRef));
-            const oldBoards = oldSnapshot.docs.map(doc => ({ 
+            const oldBoards = oldSnapshot.docs.map((doc: any) => ({ 
               id: doc.id, 
               ...doc.data(),
               companyId: companyId 
@@ -191,7 +192,7 @@ export class FirestoreService {
         }
         
         // Filtrar apenas quadros ativos
-        allBoards = allBoards.filter(board => (board.status || 'active') === 'active');
+        allBoards = allBoards.filter((board: any) => (board.status || 'active') === 'active');
         
         return allBoards;
         
@@ -321,7 +322,7 @@ export class FirestoreService {
         const batchDocs = snapshot.docs.slice(i, i + batchSize);
         const batch = writeBatch(this.firestore);
         
-        batchDocs.forEach(doc => {
+        batchDocs.forEach((doc: any) => {
           batch.delete(doc.ref);
         });
         
@@ -433,7 +434,7 @@ export class FirestoreService {
 
       const leadsRef = runInInjectionContext(this.injector, () => collection(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads'));
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(leadsRef));
-      return snapshot.docs.map(doc => ({ 
+      return snapshot.docs.map((doc: any) => ({ 
         id: doc.id, 
         ...doc.data(),
         companyId: this.currentCompanyId,
@@ -577,12 +578,12 @@ export class FirestoreService {
 
     const boardsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards');
     return runInInjectionContext(this.injector, () => 
-      onSnapshot(boardsRef, snapshot => {
-        const boards = snapshot.docs.map(doc => ({ 
+      onSnapshot(boardsRef, (snapshot: any) => {
+        const boards = snapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
           companyId: this.currentCompanyId
-        } as Board)).filter(board => (board.status || 'active') === 'active');
+        } as Board)).filter((board: any) => (board.status || 'active') === 'active');
         callback(boards);
       })
     );
@@ -610,8 +611,8 @@ export class FirestoreService {
     const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
     const q = query(columnsRef, orderBy('order'));
     return runInInjectionContext(this.injector, () => 
-      onSnapshot(q, snapshot => {
-        const columns = snapshot.docs.map(doc => ({ 
+      onSnapshot(q, (snapshot: any) => {
+        const columns = snapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
           companyId: this.currentCompanyId,
@@ -643,8 +644,8 @@ export class FirestoreService {
 
     const leadsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads');
     return runInInjectionContext(this.injector, () => 
-      onSnapshot(leadsRef, snapshot => {
-        const leads = snapshot.docs.map(doc => ({ 
+      onSnapshot(leadsRef, (snapshot: any) => {
+        const leads = snapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
           companyId: this.currentCompanyId,
@@ -717,7 +718,7 @@ export class FirestoreService {
       const historyRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId, 'history');
       const q = query(historyRef, orderBy('timestamp', 'desc'));
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() as any }));
     } catch (error) {
       console.error('Erro ao buscar histórico do lead:', error);
       return [];
@@ -737,10 +738,10 @@ export class FirestoreService {
 
     const historyRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads', leadId, 'history');
     const qHist = query(historyRef, orderBy('timestamp', 'desc'));
-    return runInInjectionContext(this.injector, () => onSnapshot(qHist, (snapshot) => {
-      const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    return runInInjectionContext(this.injector, () => onSnapshot(qHist, (snapshot: any) => {
+      const items = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }));
       callback(items);
-    }, (err) => {
+    }, (err: any) => {
       console.error('Erro na subscrição do histórico do lead:', err);
       callback([]);
     }));
@@ -910,7 +911,7 @@ export class FirestoreService {
     const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
     const snap = await runInInjectionContext(this.injector, () => getDocs(columnsRef));
     const updates: Promise<any>[] = [];
-    snap.docs.forEach(d => {
+    snap.docs.forEach((d: any) => {
       if (d.id !== keepColumnId && d.data()['isInitialPhase']) {
         updates.push(updateDoc(doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'columns', d.id), { isInitialPhase: false }));
       }
@@ -1023,7 +1024,7 @@ export class FirestoreService {
     const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
     const q = query(emailsRef, orderBy('createdAt', 'desc'));
     return runInInjectionContext(this.injector, () => 
-      onSnapshot(q, snapshot => {
+      onSnapshot(q, (snapshot: any) => {
         const emails = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }));
         callback(emails);
@@ -1043,7 +1044,7 @@ export class FirestoreService {
       const outboxRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
       const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(outboxRef));
       
-      const deletePromises = querySnapshot.docs.map(docSnapshot => 
+      const deletePromises = querySnapshot.docs.map((docSnapshot: any) => 
         deleteDoc(docSnapshot.ref)
       );
       
@@ -1071,7 +1072,7 @@ export class FirestoreService {
       
       const templatesRef = collection(this.firestore, templatesPath);
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(templatesRef));
-      const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const templates = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
       
       console.log(`Templates encontrados (multi-empresa): ${templates.length} itens`);
       return templates;
@@ -1158,8 +1159,8 @@ export class FirestoreService {
     
     return runInInjectionContext(this.injector, () => 
       onSnapshot(templatesRef, 
-        snapshot => {
-          const templates = snapshot.docs.map(doc => ({ 
+        (snapshot: any) => {
+          const templates = snapshot.docs.map((doc: any) => ({ 
             id: doc.id, 
             path: doc.ref.path, 
             ...doc.data() 
@@ -1167,7 +1168,7 @@ export class FirestoreService {
           console.log(`Templates encontrados (multi-empresa) para boardId: ${boardId}:`, templates.length);
           callback(templates);
         },
-        error => {
+        (error: any) => {
           // Tratar erros de permissão silenciosamente em desenvolvimento
           if (error.code === 'permission-denied') {
             console.log('Permissões de templates não configuradas - retornando array vazio');
@@ -1194,7 +1195,7 @@ export class FirestoreService {
         
         const automationsRef = collection(this.firestore, automationsPath);
         const snapshot = await runInInjectionContext(this.injector, () => getDocs(automationsRef));
-        const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const automations = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         
         console.log(`Automações encontradas (multi-empresa): ${automations.length} itens`);
         return automations;
@@ -1207,7 +1208,7 @@ export class FirestoreService {
       
       const automationsRef = collection(this.firestore, automationsPath);
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(automationsRef));
-      const automations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const automations = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
       
       console.log(`Automações encontradas (estrutura antiga): ${automations.length} itens`);
       return automations;
@@ -1292,12 +1293,12 @@ export class FirestoreService {
 
     return runInInjectionContext(this.injector, () => 
       onSnapshot(q,
-        snapshot => {
-          const historyItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        (snapshot: any) => {
+          const historyItems = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
           console.log(`Histórico de automação (multi-empresa): ${historyItems.length} itens`);
           callback(historyItems);
         },
-        error => {
+        (error: any) => {
           console.error('Erro ao buscar histórico de automação (multi-empresa):', error);
           callback([]);
         }
@@ -1347,8 +1348,8 @@ export class FirestoreService {
     
     return runInInjectionContext(this.injector, () => 
       onSnapshot(automationsRef, 
-        snapshot => {
-          const automations = snapshot.docs.map(doc => ({ 
+        (snapshot: any) => {
+          const automations = snapshot.docs.map((doc: any) => ({ 
             id: doc.id, 
             path: doc.ref.path, 
             ...doc.data() 
@@ -1356,7 +1357,7 @@ export class FirestoreService {
           console.log(`Automações encontradas (multi-empresa) para boardId: ${boardId}:`, automations.length);
           callback(automations);
         },
-        error => {
+        (error: any) => {
           // Tratar erros de permissão silenciosamente em desenvolvimento
           if (error.code === 'permission-denied') {
             console.log('Permissões de automações não configuradas - retornando array vazio');
@@ -1398,7 +1399,7 @@ export class FirestoreService {
               const subcollectionRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/${subcollectionName}`);
               const subcollectionSnapshot = await runInInjectionContext(this.injector, () => getDocs(subcollectionRef));
               
-              subcollectionSnapshot.docs.forEach(doc => {
+              subcollectionSnapshot.docs.forEach((doc: any) => {
                 batch.delete(doc.ref);
                 operationCount++;
               });
@@ -1426,7 +1427,7 @@ export class FirestoreService {
             const structureRef = collection(this.firestore, `users/${currentUserId}/${structureName}`);
             const structureSnapshot = await runInInjectionContext(this.injector, () => getDocs(structureRef));
             
-            structureSnapshot.docs.forEach(doc => {
+            structureSnapshot.docs.forEach((doc: any) => {
               batch.delete(doc.ref);
               operationCount++;
             });

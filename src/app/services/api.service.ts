@@ -68,8 +68,8 @@ export class ApiService {
     };
 
     return this.http.post<LeadIntakeResponse>(apiUrl, payload, { headers }).pipe(
-      map(response => ({
-        ...response,
+      map((response: any) => ({
+        ...(response as object),
         success: true
       })),
       catchError(error => {
@@ -140,7 +140,7 @@ export class ApiService {
     const headers = this.getApiHeaders(token);
 
     return this.http.post<{ valid: boolean }>(url, {}, { headers }).pipe(
-      map(response => response.valid),
+      map((response: any) => response.valid),
       catchError(error => {
         console.error('Erro ao validar token:', error);
         return throwError(() => false);
@@ -163,7 +163,7 @@ export class ApiService {
       map(response => {
         // Atualizar token localmente
         if (company) {
-          company.apiConfig.token = response.token;
+          company.apiConfig.token = (response as any).token;
           this.subdomainService.setCurrentCompany(company);
         }
         return response;
@@ -229,8 +229,8 @@ export class ApiService {
     };
 
     return this.submitLead(testPayload).pipe(
-      map(response => ({
-        ...response,
+      map((response: any) => ({
+        ...(response as object),
         testMode: true,
         timestamp: new Date().toISOString()
       }))

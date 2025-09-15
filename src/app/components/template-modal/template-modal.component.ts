@@ -1,14 +1,16 @@
 import { Component, inject, Input, Output, EventEmitter, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { CKEditorModule } from '@ckeditor/ckeditor5-angular';
-import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
+import { EditorModule, TINYMCE_SCRIPT_SRC } from '@tinymce/tinymce-angular';
 import { FirestoreService } from '../../services/firestore.service';
 
 @Component({
   selector: 'app-template-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, CKEditorModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, EditorModule],
+  providers: [
+    { provide: TINYMCE_SCRIPT_SRC, useValue: 'tinymce/tinymce.min.js' }
+  ],
   templateUrl: './template-modal.component.html',
   styleUrls: ['./template-modal.component.scss']
 })
@@ -22,79 +24,32 @@ export class TemplateModalComponent implements AfterViewInit {
   @Output() templateSaved = new EventEmitter<void>();
   @Output() closeModal = new EventEmitter<void>();
 
-  // Editor HTML nativo
-  @ViewChild('visualEditor', { static: false }) visualEditor!: ElementRef;
-
   isVisible = false;
   isEditing = false;
   isLoading = false;
   errorMessage = '';
   currentTemplate: any = null;
-  // Toggle leve para HTML plano (sem plugin custom do CKEditor)
-  showHtmlMode = false;
   
-  public editorContent = '';
-  public editorInstance: any = null;
-  public highlightedHtml = '';
+  public tinymceEditor: any = null;
   
-  // CKEditor configuration
-  public Editor: any = ClassicEditor;
-  public editorConfig = {
-    toolbar: {
-      items: [
-        'heading', '|',
-        'bold', 'italic', 'underline', 'strikethrough', '|',
-        'link', 'bulletedList', 'numberedList', '|',
-        'outdent', 'indent', '|',
-        'insertTable', 'blockQuote', '|',
-        'fontSize', 'fontColor', 'fontBackgroundColor', '|',
-        'alignment', '|',
-        'undo', 'redo'
-      ]
-    },
-    shouldNotGroupWhenFull: true,
+  // Configuração do TinyMCE
+  public tinymceConfig = {
+    height: 400,
+    menubar: false,
+    plugins: [
+      'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+      'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+      'insertdatetime', 'media', 'table', 'help', 'wordcount'
+    ],
+    toolbar: 'undo redo | blocks | ' +
+      'bold italic backcolor | alignleft aligncenter ' +
+      'alignright alignjustify | bullist numlist outdent indent | ' +
+      'removeformat | code | help',
+    content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
     placeholder: 'Digite o conteúdo do seu template de email aqui...',
-    fontSize: {
-      options: [9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36]
-    },
-    fontColor: {
-      colors: [
-        { color: '#000000', label: 'Preto' },
-        { color: '#4d4d4d', label: 'Cinza escuro' },
-        { color: '#999999', label: 'Cinza' },
-        { color: '#e6e6e6', label: 'Cinza claro' },
-        { color: '#ffffff', label: 'Branco', hasBorder: true },
-        { color: '#e64545', label: 'Vermelho' },
-        { color: '#ff9500', label: 'Laranja' },
-        { color: '#ffff00', label: 'Amarelo' },
-        { color: '#00ff00', label: 'Verde claro' },
-        { color: '#008000', label: 'Verde' },
-        { color: '#00ffff', label: 'Ciano' },
-        { color: '#0080ff', label: 'Azul claro' },
-        { color: '#0000ff', label: 'Azul' },
-        { color: '#8000ff', label: 'Roxo' },
-        { color: '#ff00ff', label: 'Magenta' }
-      ]
-    },
-    fontBackgroundColor: {
-      colors: [
-        { color: '#000000', label: 'Preto' },
-        { color: '#4d4d4d', label: 'Cinza escuro' },
-        { color: '#999999', label: 'Cinza' },
-        { color: '#e6e6e6', label: 'Cinza claro' },
-        { color: '#ffffff', label: 'Branco', hasBorder: true },
-        { color: '#e64545', label: 'Vermelho' },
-        { color: '#ff9500', label: 'Laranja' },
-        { color: '#ffff00', label: 'Amarelo' },
-        { color: '#00ff00', label: 'Verde claro' },
-        { color: '#008000', label: 'Verde' },
-        { color: '#00ffff', label: 'Ciano' },
-        { color: '#0080ff', label: 'Azul claro' },
-        { color: '#0000ff', label: 'Azul' },
-        { color: '#8000ff', label: 'Roxo' },
-        { color: '#ff00ff', label: 'Magenta' }
-      ]
-    }
+    branding: false,
+    code_dialog_width: 800,
+    code_dialog_height: 600
   };
 
   templateForm: FormGroup = this.fb.group({
@@ -110,102 +65,29 @@ export class TemplateModalComponent implements AfterViewInit {
     console.log('Template modal inicializado');
   }
 
-  // Método chamado quando o CKEditor é inicializado
-  onEditorReady(editor: any) {
-    this.editorInstance = editor;
-    console.log('CKEditor inicializado e pronto');
-    
-    // Configurar para permitir todos os elementos e atributos HTML
-    this.configureHtmlSupport(editor);
-  }
-
-  private configureHtmlSupport(editor: any) {
-    try {
-      // Configuração mais simples: modificar o schema para permitir atributos style
-      editor.model.schema.extend('$text', { 
-        allowAttributes: ['style', 'color', 'backgroundColor', 'fontSize'] 
-      });
-      
-      // Para todos os elementos block
-      const blockElements = ['paragraph', 'heading1', 'heading2', 'heading3', 'heading4', 'heading5', 'heading6', 'blockQuote'];
-      blockElements.forEach(elementName => {
-        if (editor.model.schema.isRegistered(elementName)) {
-          editor.model.schema.extend(elementName, { 
-            allowAttributes: ['style', 'class', 'align'] 
-          });
-        }
-      });
-      
-      // Permitir elementos div, span, etc
-      editor.model.schema.register('htmlDiv', {
-        inheritAllFrom: '$container',
-        allowAttributes: ['style', 'class']
-      });
-      
-      editor.model.schema.register('htmlSpan', {
-        inheritAllFrom: '$text',
-        allowAttributes: ['style', 'class']
-      });
-      
-      console.log('Schema HTML configurado para permitir estilos');
-    } catch (error) {
-      console.warn('Não foi possível configurar HTML Support:', error);
-      
-      // Fallback: tentar uma abordagem mais agressiva
-      try {
-        this.disableHtmlFiltering(editor);
-      } catch (e) {
-        console.warn('Fallback também falhou:', e);
-      }
-    }
-  }
-
-  private disableHtmlFiltering(editor: any) {
-    // Tentar desabilitar filtros de HTML do CKEditor
-    if (editor.data && editor.data.processor) {
-      const originalToView = editor.data.processor.toView;
-      editor.data.processor.toView = function(data: string) {
-        // Preservar HTML original tanto quanto possível
-        return originalToView.call(this, data);
-      };
-    }
-  }
-
-  execCommand(command: string) {
-    document.execCommand(command, false);
-  }
-
-  createLink() {
-    const url = window.prompt('Digite a URL:');
-    if (url) {
-      document.execCommand('createLink', false, url);
-    }
-  }
-
-  // Legacy handlers removidos
-
-  // CKEditor is bound via formControl; no manual syncing to avoid loops
-
-  // Método para inserir variáveis no CKEditor na posição do cursor
+  // Método para inserir variáveis no TinyMCE na posição do cursor
   insertVariable(variable: string) {
-    // Tenta inserir usando o CKEditor se estiver disponível
-    if (this.editorInstance) {
+    if (this.tinymceEditor) {
       try {
-        this.editorInstance.model.change((writer: any) => {
-          const selection = this.editorInstance.model.document.selection;
-          const position = selection.getFirstPosition();
-          writer.insertText(variable, position);
-        });
+        // Inserir variável na posição do cursor no TinyMCE
+        this.tinymceEditor.insertContent(variable);
+        this.tinymceEditor.focus();
         return;
       } catch (error) {
-        console.warn('Falha ao inserir no CKEditor, usando fallback:', error);
+        console.warn('Falha ao inserir no TinyMCE, usando fallback:', error);
       }
     }
 
-    // Fallback: inserir no final (comportamento atual)
+    // Fallback: inserir no final do conteúdo atual
     const currentContent = this.templateForm.get('body')?.value || '';
     const newContent = currentContent + ' ' + variable;
     this.templateForm.patchValue({ body: newContent });
+  }
+
+  // Método chamado quando TinyMCE é inicializado
+  onEditorInit(editor: any) {
+    this.tinymceEditor = editor;
+    console.log('TinyMCE Editor inicializado e pronto');
   }
 
   showCreateModal() {
@@ -239,7 +121,6 @@ export class TemplateModalComponent implements AfterViewInit {
     });
     this.errorMessage = '';
     this.isLoading = false;
-    this.editorContent = '';
   }
 
   private populateForm(template: any) {
@@ -251,17 +132,8 @@ export class TemplateModalComponent implements AfterViewInit {
       body: template.body || ''
     });
 
-    // Carregar conteúdo no editor
-    this.editorContent = template.body || '';
-    console.log('Conteúdo do editor definido:', this.editorContent);
-    
-    // CKEditor será preenchido automaticamente através do modelo do formulário
-    // Aguardar o próximo tick do Angular e definir o conteúdo no editor visual (fallback)
-    setTimeout(() => {
-      if (this.visualEditor && this.editorContent) {
-        this.visualEditor.nativeElement.innerHTML = this.editorContent;
-      }
-    }, 100);
+    // TinyMCE será preenchido automaticamente através do modelo do formulário
+    console.log('Template carregado:', template.body);
   }
 
   private async loadDynamicVariables() {
@@ -307,50 +179,6 @@ export class TemplateModalComponent implements AfterViewInit {
     }
   }
 
-  toggleHtmlMode() {
-    // sincroniza editorContent com o form antes de alternar
-    this.editorContent = this.templateForm.get('body')?.value || '';
-    this.showHtmlMode = !this.showHtmlMode;
-    // Ao entrar no modo HTML, auto-formatar para facilitar edição
-    if (this.showHtmlMode) {
-      try {
-        const formatted = this.autoFormatHtml(this.editorContent);
-        this.templateForm.patchValue({ body: formatted });
-        this.editorContent = formatted;
-        this.updateHtmlHighlight(formatted);
-      } catch {}
-    }
-  }
-
-  onHtmlChange(event: any) {
-    const html = event.target.value;
-    this.updateHtmlHighlight(html);
-  }
-
-  onHtmlScroll(event: any) {
-    // Sincronizar scroll entre textarea e overlay de highlight (se implementado)
-  }
-
-  private updateHtmlHighlight(html: string) {
-    this.highlightedHtml = this.highlightHtmlSyntax(html);
-  }
-
-  private highlightHtmlSyntax(html: string): string {
-    if (!html) return '';
-    
-    return html
-      // HTML tags
-      .replace(/(&lt;\/?)([\w-]+)([^&]*?)(&gt;)/g, '<span style="color: #569cd6">$1</span><span style="color: #4fc1ff">$2</span><span style="color: #92c5f7">$3</span><span style="color: #569cd6">$4</span>')
-      // Attributes
-      .replace(/(\w+)(=)(".*?")/g, '<span style="color: #9cdcfe">$1</span><span style="color: #d4d4d4">$2</span><span style="color: #ce9178">$3</span>')
-      // Variables {{...}}
-      .replace(/(\{\{.*?\}\})/g, '<span style="color: #dcdcaa; background-color: rgba(255,255,0,0.1)">$1</span>')
-      // Comments
-      .replace(/(&lt;!--.*?--&gt;)/g, '<span style="color: #6a9955">$1</span>')
-      // Escape HTML for display
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
 
 
 
@@ -366,20 +194,11 @@ export class TemplateModalComponent implements AfterViewInit {
     try {
       const formData = this.templateForm.value;
       
-      // Capturar conteúdo diretamente do form control (fonte da verdade)
-      // Auto-formatar o HTML antes de salvar
-      const rawBody: string = this.templateForm.get('body')?.value || '';
-      const body: string = this.autoFormatHtml(rawBody);
-      console.log('Salvando template com body final (form control):', body);
-      
-      // Garantir que o form control esteja sincronizado (no-op se já estiver)
-      this.templateForm.patchValue({ body });
-
       const templateData = {
         name: formData.name,
         subject: formData.subject,
         recipients: formData.recipients || '',
-        body: body
+        body: formData.body || ''
       };
 
       if (this.isEditing && this.currentTemplate) {
@@ -415,92 +234,3 @@ export class TemplateModalComponent implements AfterViewInit {
     }
   }
 }
-
-// Helpers de formatação
-// Nota: Implementação leve para identar HTML no cliente sem dependências
-// Regras: quebra entre tags, identação por nível, trata fechamento/auto-fechamento
-export function isSelfClosing(tag: string): boolean {
-  return /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)(\s|\/|>)/i.test(tag);
-}
-
-export function isClosingTag(line: string): boolean {
-  return /^\s*<\//.test(line);
-}
-
-export function isOpeningTag(line: string): boolean {
-  return /^\s*<([a-zA-Z]+)([^>]*)>\s*$/.test(line) && !isSelfClosing(line) && !/^\s*<\//.test(line);
-}
-
-export function compactHtml(html: string): string {
-  // Remove espaços extras entre tags para melhorar a quebra
-  return html
-    .replace(/\r\n|\r/g, '\n')
-    .replace(/>\s+</g, '><')
-    .replace(/\n+/g, '\n')
-    .trim();
-}
-
-export function prettyPrintHtml(html: string): string {
-  const compact = compactHtml(html);
-  const withBreaks = compact.replace(/></g, '>\n<');
-  const lines = withBreaks.split('\n');
-  const result: string[] = [];
-  let indent = 0;
-  const indentUnit = '  ';
-
-  for (let raw of lines) {
-    let line = raw.trim();
-    if (!line) continue;
-
-    const close = isClosingTag(line);
-    const open = isOpeningTag(line);
-    const selfClosing = isSelfClosing(line) || /\/>\s*$/.test(line);
-
-    if (close) {
-      indent = Math.max(0, indent - 1);
-    }
-
-    result.push(indentUnit.repeat(indent) + line);
-
-    if (open && !selfClosing) {
-      indent += 1;
-    }
-  }
-
-  return result.join('\n');
-}
-
-export function normalizeNewlines(s: string): string {
-  return s.replace(/\r\n|\r/g, '\n');
-}
-
-export function ensureTrailingNewline(s: string): string {
-  return /\n$/.test(s) ? s : s + '\n';
-}
-
-export function minifyWhitespaceInsideTextNodes(s: string): string {
-  // Mantém espaços únicos entre textos para evitar esticar linhas no HTML cru
-  return s.replace(/([^>\s])\s+([^<\s])/g, '$1 $2');
-}
-
-// Método principal: formata, normaliza quebras de linha e espaços
-export function autoFormatHtmlCore(html: string): string {
-  const pretty = prettyPrintHtml(html);
-  const normalized = normalizeNewlines(pretty);
-  const trimmed = normalized.trim();
-  const minimized = minifyWhitespaceInsideTextNodes(trimmed);
-  return ensureTrailingNewline(minimized);
-}
-
-// Instância método da classe para uso interno
-// (Anexa ao prototype implicitamente por estar no mesmo arquivo)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export interface TemplateModalComponent { autoFormatHtml: (html: string) => string; }
-TemplateModalComponent.prototype.autoFormatHtml = function(html: string): string {
-  try {
-    return autoFormatHtmlCore(html || '');
-  } catch {
-    // Se algo falhar, retorna o original
-    return html || '';
-  }
-};

@@ -462,7 +462,7 @@ export class ApiConfigComponent implements OnInit {
     this.clearMessages();
 
     this.apiService.regenerateApiToken().subscribe({
-      next: (response) => {
+      next: (response: any) => {
         const company = this.currentCompany();
         if (company) {
           company.apiConfig.token = response.token;
@@ -472,7 +472,7 @@ export class ApiConfigComponent implements OnInit {
         this.loadIntegrationExamples(); // Recarregar exemplos com novo token
         this.isLoading.set(false);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Erro ao regenerar token:', error);
         this.showError('Erro ao regenerar token da API.');
         this.isLoading.set(false);
@@ -488,7 +488,7 @@ export class ApiConfigComponent implements OnInit {
     const boardId = this.getCurrentBoardId();
     
     this.apiService.testApiEndpoint(boardId).subscribe({
-      next: (response) => {
+      next: (response: any) => {
         if (response.success) {
           this.showSuccess(`API testada com sucesso! Lead de teste criado${boardId ? ` no quadro ${boardId}` : ''}.`);
         } else {
@@ -496,7 +496,7 @@ export class ApiConfigComponent implements OnInit {
         }
         this.isLoading.set(false);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Erro ao testar API:', error);
         this.showError('Erro ao testar API: ' + (error.message || 'Erro desconhecido'));
         this.isLoading.set(false);
@@ -525,10 +525,10 @@ export class ApiConfigComponent implements OnInit {
 
   private loadApiStats() {
     this.apiService.getApiStats('24h').subscribe({
-      next: (stats) => {
+      next: (stats: any) => {
         this.apiStats.set(stats);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Erro ao carregar estatísticas da API:', error);
       }
     });

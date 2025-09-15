@@ -13,7 +13,7 @@ export class CompanyGuard implements CanActivate {
   canActivate(): Observable<boolean> {
     return new Observable(observer => {
       // Verificar se já foi inicializado
-      this.subdomainService.isInitialized$.subscribe(isInitialized => {
+      this.subdomainService.isInitialized$.subscribe((isInitialized: any) => {
         if (isInitialized) {
           const company = this.subdomainService.getCurrentCompany();
           

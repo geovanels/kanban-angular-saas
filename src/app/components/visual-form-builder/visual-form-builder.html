@@ -154,14 +154,32 @@
             <span class="text-sm text-gray-700">Incluir este campo na API</span>
           </label>
           
-          <!-- Exibir no Card -->
-          <label class="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              formControlName="showInCard"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="text-sm text-gray-700">Exibir no card do registro</span>
-          </label>
+          <!-- Opções de Exibição -->
+          <div class="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+            <p class="text-xs text-blue-700 font-medium mb-2">Opções de Exibição</p>
+            
+            <!-- Exibir no Card -->
+            <label class="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                formControlName="showInCard"
+                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+              <span class="text-sm text-gray-700">Exibir no card do registro</span>
+            </label>
+
+            <!-- Exibir em todas as fases -->
+            <label class="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                formControlName="showInAllPhases"
+                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+              <span class="text-sm text-gray-700">Exibir em todas as fases</span>
+            </label>
+            
+            <p class="text-xs text-blue-600 italic">
+              💡 Campos visíveis no card são automaticamente visíveis em todas as fases
+            </p>
+          </div>
 
           <!-- Obrigatório para avançar de fase -->
           <label class="flex items-center space-x-2">
@@ -170,15 +188,6 @@
               formControlName="requiredToAdvance"
               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
             <span class="text-sm text-gray-700">Obrigatório para avançar de fase</span>
-          </label>
-
-          <!-- Exibir em todas as fases -->
-          <label class="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              formControlName="showInAllPhases"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="text-sm text-gray-700">Exibir em todas as fases</span>
           </label>
           
           <!-- Nome do campo na API -->

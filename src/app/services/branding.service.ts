@@ -40,7 +40,7 @@ export class BrandingService {
 
     // Reagir a mudanças de empresa (ex.: após F5 quando SubdomainService carrega versão completa)
     try {
-      this.subdomainService.currentCompany$.subscribe((company) => {
+      this.subdomainService.currentCompany$.subscribe((company: any) => {
         if (company) {
           this.applyCompanyBranding(company);
         }
@@ -101,9 +101,9 @@ export class BrandingService {
 
     return this.http.post<LogoUploadResponse>(uploadUrl, formData).pipe(
       map(response => {
-        if (response.success && response.logoUrl) {
+        if (((response as any)).success && ((response as any)).logoUrl) {
           // Atualizar empresa com nova URL do logo
-          this.updateCompanyLogo(response.logoUrl);
+          this.updateCompanyLogo(((response as any)).logoUrl);
         }
         return response;
       }),
@@ -139,9 +139,9 @@ export class BrandingService {
 
     return this.http.post<LogoUploadResponse>(uploadUrl, formData).pipe(
       map(response => {
-        if (response.success && response.logoUrl) {
+        if (((response as any)).success && ((response as any)).logoUrl) {
           // Aplicar favicon dinamicamente
-          this.applyFavicon(response.logoUrl);
+          this.applyFavicon(((response as any)).logoUrl);
         }
         return response;
       }),

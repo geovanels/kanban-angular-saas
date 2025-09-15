@@ -14,9 +14,9 @@ import {
   getDocs,
   orderBy,
   limit,
-  onSnapshot,
-  serverTimestamp
+  onSnapshot
 } from '@angular/fire/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 import { Company, CompanyUser, CompanySettings } from '../models/company.model';
 import { FirestoreService } from './firestore.service';
 
@@ -87,7 +87,7 @@ export class CompanyService {
         console.log('📊 Resultado da query:', {
           empty: querySnapshot.empty,
           size: querySnapshot.size,
-          docs: querySnapshot.docs.map(doc => ({ id: doc.id, subdomain: doc.data()['subdomain'] }))
+          docs: querySnapshot.docs.map((doc: any) => ({ id: doc.id, subdomain: doc.data()['subdomain'] }))
         });
         
         if (querySnapshot.empty) {
@@ -133,7 +133,7 @@ export class CompanyService {
         const querySnapshot = await getDocs(q);
         
         const companies: Company[] = [];
-        querySnapshot.docs.forEach((doc) => {
+        querySnapshot.docs.forEach((doc: any) => {
           companies.push({ id: doc.id, ...doc.data() } as Company);
         });
         
@@ -266,7 +266,7 @@ export class CompanyService {
       const usersRef = collection(this.firestore, 'companies', companyId, 'users');
       const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
       
-      const users = querySnapshot.docs.map(doc => ({
+      const users = querySnapshot.docs.map((doc: any) => ({
         uid: doc.id,
         ...doc.data()
       } as CompanyUser));
@@ -297,6 +297,25 @@ export class CompanyService {
       });
     } catch (error) {
       throw error;
+    }
+  }
+
+  async getCompanyUser(companyId: string, userEmail: string): Promise<CompanyUser | null> {
+    try {
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      const userDoc = await runInInjectionContext(this.injector, () => getDoc(userRef));
+      
+      if (userDoc.exists()) {
+        return {
+          uid: userDoc.id,
+          ...userDoc.data()
+        } as CompanyUser;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Erro ao buscar usuário da empresa:', error);
+      return null;
     }
   }
 
@@ -566,7 +585,7 @@ export class CompanyService {
   subscribeToCompany(companyId: string, callback: (company: Company | null) => void) {
     const companyRef = doc(this.firestore, 'companies', companyId);
     return runInInjectionContext(this.injector, () => 
-      onSnapshot(companyRef, (doc) => {
+      onSnapshot(companyRef, (doc: any) => {
         if (doc.exists()) {
           callback({ id: doc.id, ...doc.data() } as Company);
         } else {

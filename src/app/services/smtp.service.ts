@@ -86,8 +86,8 @@ export class SmtpService {
         console.log('📧 Preparando envio de email via HTTP Firebase Functions:', {
           to: emailData.to,
           subject: emailData.subject,
-          fromEmail: company.smtpConfig?.fromEmail,
-          fromName: company.smtpConfig?.fromName
+          fromEmail: (company as any).smtpConfig?.fromEmail,
+          fromName: (company as any).smtpConfig?.fromName
         });
 
         // Usar HTTP Function para melhor controle de CORS
@@ -102,16 +102,16 @@ export class SmtpService {
             cc: emailData.cc,
             bcc: emailData.bcc
           },
-          companyId: company.id, // Cloud Function pode resolver via companyId
+          companyId: (company as any).id, // Cloud Function pode resolver via companyId
           // Enviar smtpConfig também, para compatibilidade retro
           smtpConfig: {
-            host: company.smtpConfig?.host,
-            port: company.smtpConfig?.port,
-            secure: company.smtpConfig?.secure,
-            user: company.smtpConfig?.user,
-            password: company.smtpConfig?.password,
-            fromName: company.smtpConfig?.fromName,
-            fromEmail: company.smtpConfig?.fromEmail
+            host: (company as any).smtpConfig?.host,
+            port: (company as any).smtpConfig?.port,
+            secure: (company as any).smtpConfig?.secure,
+            user: (company as any).smtpConfig?.user,
+            password: (company as any).smtpConfig?.password,
+            fromName: (company as any).smtpConfig?.fromName,
+            fromEmail: (company as any).smtpConfig?.fromEmail
           }
         };
 
@@ -269,13 +269,13 @@ export class SmtpService {
     
     const payload = {
       smtpConfig: {
-        host: company.smtpConfig.host,
-        port: company.smtpConfig.port,
-        secure: company.smtpConfig.secure,
-        user: company.smtpConfig.user,
-        password: company.smtpConfig.password,
-        fromName: company.smtpConfig.fromName,
-        fromEmail: company.smtpConfig.fromEmail
+        host: (company as any).smtpConfig.host,
+        port: (company as any).smtpConfig.port,
+        secure: (company as any).smtpConfig.secure,
+        user: (company as any).smtpConfig.user,
+        password: (company as any).smtpConfig.password,
+        fromName: (company as any).smtpConfig.fromName,
+        fromEmail: (company as any).smtpConfig.fromEmail
       },
       testEmail: company.ownerEmail
     };
@@ -309,7 +309,7 @@ export class SmtpService {
 
   // Validar configuração SMTP da empresa
   private validateSmtpConfig(company: Company): boolean {
-    const config = company.smtpConfig;
+    const config = (company as any).smtpConfig;
     
     return !!(
       config &&
@@ -324,7 +324,7 @@ export class SmtpService {
 
   // Validar configuração SMTP e retornar campos faltantes
   private getSmtpValidationErrors(company: Company): string[] {
-    const config = company.smtpConfig;
+    const config = (company as any).smtpConfig;
     const errors: string[] = [];
     
     if (!config) {
@@ -352,12 +352,12 @@ export class SmtpService {
     }
 
     return {
-      fromName: company.smtpConfig.fromName,
-      fromEmail: company.smtpConfig.fromEmail,
+      fromName: (company as any).smtpConfig.fromName,
+      fromEmail: (company as any).smtpConfig.fromEmail,
       isConfigured: this.validateSmtpConfig(company),
-      host: company.smtpConfig.host,
-      port: company.smtpConfig.port,
-      secure: company.smtpConfig.secure
+      host: (company as any).smtpConfig.host,
+      port: (company as any).smtpConfig.port,
+      secure: (company as any).smtpConfig.secure
     };
   }
 
@@ -374,7 +374,7 @@ export class SmtpService {
       map(response => {
         // Atualizar a configuração localmente
         if (company) {
-          company.smtpConfig = { ...smtpConfig };
+          (company as any).smtpConfig = { ...smtpConfig };
           this.subdomainService.setCurrentCompany(company);
         }
         return response;

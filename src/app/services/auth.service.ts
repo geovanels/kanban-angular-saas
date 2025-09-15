@@ -1,6 +1,7 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-         signOut, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, updateProfile } from '@angular/fire/auth';
+         signOut, signInWithPopup, onAuthStateChanged, updateProfile } from '@angular/fire/auth';
+import { GoogleAuthProvider } from 'firebase/auth';
 import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
 
@@ -34,7 +35,7 @@ export class AuthService {
 
   async updateUserProfile(profile: { displayName?: string; phoneNumber?: string; photoURL?: string }) {
     try {
-      const currentUser = this.auth.currentUser;
+      const currentUser = (this.auth as any).currentUser;
       if (!currentUser) {
         throw new Error('Usuário não autenticado');
       }
@@ -123,7 +124,7 @@ export class AuthService {
   }
 
   getCurrentUser() {
-    return this.auth.currentUser;
+    return (this.auth as any).currentUser;
   }
 
   isAuthenticated(): Observable<boolean> {
