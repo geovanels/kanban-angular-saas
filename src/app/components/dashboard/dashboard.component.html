@@ -1,7 +1,7 @@
 <app-main-layout>
   <!-- Company Breadcrumb -->
-  <app-company-breadcrumb title="Meus quadros Kanban">
-    <div class="flex space-x-2">
+  <app-company-breadcrumb title="Dashboard">
+    <div class="flex space-x-2" *ngIf="activeTab === 'boards'">
       <button 
         (click)="showCreateBoardModal()"
         class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center">
@@ -11,8 +11,28 @@
     </div>
   </app-company-breadcrumb>
 
-  <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Tab Navigation -->
+  <div class="bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav class="flex space-x-8">
+        <button
+          *ngFor="let tab of tabs"
+          (click)="switchTab(tab.id)"
+          class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+          [class.border-blue-500]="activeTab === tab.id"
+          [class.text-blue-600]="activeTab === tab.id"
+          [class.border-transparent]="activeTab !== tab.id"
+          [class.text-gray-500]="activeTab !== tab.id"
+          [class.hover:text-gray-700]="activeTab !== tab.id">
+          <i class="fas {{ tab.icon }} mr-2"></i>
+          {{ tab.name }}
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Boards Tab Content -->
+  <div *ngIf="activeTab === 'boards'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     @if (isLoading) {
       <!-- Loading State -->
       <div class="flex items-center justify-center py-12">
@@ -117,6 +137,11 @@
         }
       </div>
     }
+  </div>
+
+  <!-- Reports Tab Content -->
+  <div *ngIf="activeTab === 'reports'">
+    <app-reports></app-reports>
   </div>
 
   <!-- Create Board Modal -->
