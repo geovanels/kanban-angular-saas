@@ -79,7 +79,7 @@ export class LoginComponent implements OnInit {
     this.registerForm.get('subdomain')?.valueChanges.pipe(
       debounceTime(500),
       distinctUntilChanged(),
-      switchMap(alias => {
+      switchMap((alias: string) => {
         if (!alias || alias.length < 3) {
           this.aliasAvailable.set(null);
           this.aliasError.set('');
@@ -108,7 +108,7 @@ export class LoginComponent implements OnInit {
         return this.companyService.isSubdomainAvailable(alias);
       })
     ).subscribe({
-      next: (available) => {
+      next: (available: any) => {
         this.isCheckingAlias.set(false);
         if (available !== null) {
           this.aliasAvailable.set(available);

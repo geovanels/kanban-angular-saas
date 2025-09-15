@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { FirestoreService, Lead, Column } from './firestore.service';
 import { SmtpService } from './smtp.service';
 import { SubdomainService } from './subdomain.service';
+import { CompanyService } from './company.service';
 import { Observable, from } from 'rxjs';
 
 export interface AutomationTrigger {
@@ -38,6 +39,7 @@ export class AutomationService {
   private firestoreService = inject(FirestoreService);
   private smtpService = inject(SmtpService);
   private subdomainService = inject(SubdomainService);
+  private companyService = inject(CompanyService);
 
   // Processar automações quando um novo lead é criado
   async processNewLeadAutomations(lead: Lead, boardId: string, ownerId: string): Promise<void> {
@@ -251,7 +253,7 @@ export class AutomationService {
     // Enviar email
     await new Promise<void>((resolve, reject) => {
       this.smtpService.sendEmail({ to: toValue, subject: processedSubject, html: processedContent }).subscribe({
-        next: async (response) => {
+        next: async (response: any) => {
           // Atualizar status no outbox
           try {
             if (outboxId) {
@@ -262,7 +264,7 @@ export class AutomationService {
           } catch {}
           resolve();
         },
-        error: async (error) => {
+        error: async (error: any) => {
           try {
             if (outboxId) {
               await this.firestoreService.updateOutboxEmail(ownerId, boardId, outboxId, {
@@ -356,11 +358,37 @@ export class AutomationService {
 
     console.log('👤 Executando ação de atribuir usuário:', { leadId: lead.id, userId: action.userId });
 
-    // Atualizar lead com usuário atribuído
+    // Buscar dados do usuário para preencher nome e email
+    const companyId = this.subdomainService.getCurrentCompany()?.id;
+    let userName = '';
+    let userEmail = '';
+    
+    if (companyId && action.userId) {
+      try {
+        // Primeiro tentar buscar por email (assumindo que userId pode ser email)
+        const user = await this.companyService.getCompanyUser(companyId, action.userId);
+        if (user) {
+          userName = user.displayName || '';
+          userEmail = user.email || action.userId;
+        } else {
+          // Fallback: tentar buscar na lista de usuários da empresa por uid
+          const users = await this.companyService.getCompanyUsers(companyId);
+          const foundUser = users.find(u => u.uid === action.userId || u.email === action.userId);
+          if (foundUser) {
+            userName = foundUser.displayName || '';
+            userEmail = foundUser.email || '';
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar dados do usuário:', error);
+      }
+    }
+
+    // Atualizar lead com usuário atribuído e seus dados
     await this.firestoreService.updateLead(ownerId, boardId, lead.id!, {
       responsibleUserId: action.userId,
-      responsibleUserName: '', // Será preenchido pelo serviço se necessário
-      responsibleUserEmail: ''  // Será preenchido pelo serviço se necessário
+      responsibleUserName: userName,
+      responsibleUserEmail: userEmail
     });
   }
 

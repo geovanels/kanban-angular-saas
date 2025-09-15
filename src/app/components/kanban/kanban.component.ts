@@ -426,7 +426,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         try {
           const cfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, col.id!);
           const fields = (cfg as any)?.fields || [];
-          map[col.id!] = fields.filter((f: any) => !!f?.showInCard).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+          map[col.id!] = fields.filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
         } catch {
           map[col.id!] = [];
         }
@@ -528,8 +528,34 @@ export class KanbanComponent implements OnInit, OnDestroy {
     // Unir configuração da fase com fallback do formulário inicial (sem duplicar)
     const phaseList = this.phaseCardFields[lead.columnId] || [];
     const fallbackInitial = (this.initialFormFields || [])
-      .filter((f: any) => !!f?.showInCard)
+      .filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases)
       .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+    // Debug logging
+    console.log('🔍 Debug getCardFieldsForLead:', {
+      leadId: lead.id,
+      columnId: lead.columnId,
+      phaseListLength: phaseList.length,
+      fallbackInitialLength: fallbackInitial.length,
+      initialFormFields: this.initialFormFields?.map((f: any) => ({
+        name: f.name,
+        type: f.type,
+        showInCard: f.showInCard,
+        showInAllPhases: f.showInAllPhases
+      })),
+      phaseList: phaseList.map((f: any) => ({
+        name: f.name,
+        type: f.type,
+        showInCard: f.showInCard,
+        showInAllPhases: f.showInAllPhases
+      })),
+      fallbackInitial: fallbackInitial.map((f: any) => ({
+        name: f.name,
+        type: f.type,
+        showInCard: f.showInCard,
+        showInAllPhases: f.showInAllPhases
+      }))
+    });
 
     const merged: any[] = [...phaseList];
     const seen = new Set<string>();
@@ -553,10 +579,21 @@ export class KanbanComponent implements OnInit, OnDestroy {
     for (const f of merged) {
       if (isTitleField(f)) continue;
       const value = this.readFieldValue(lead, f.apiFieldName || f.name, f.label || f.name);
+      console.log('🔍 Processing field:', {
+        field: f.name,
+        type: f.type,
+        apiFieldName: f.apiFieldName,
+        label: f.label,
+        value: value,
+        showInCard: f.showInCard,
+        showInAllPhases: f.showInAllPhases
+      });
       if (value !== undefined && value !== null && `${value}`.trim() !== '') {
         out.push({ label: f.label || f.name || f.apiFieldName, value, type: (f.type || '').toLowerCase() });
       }
     }
+    
+    console.log('🔍 Final card fields output:', out);
     return out;
   }
 
@@ -568,12 +605,40 @@ export class KanbanComponent implements OnInit, OnDestroy {
         ...(this.phaseCardFields[lead.columnId] || []),
         ...(this.initialFormFields || [])
       ];
-      const tempField = (sources as any[]).find(f => (f.type || '').toLowerCase() === 'temperatura' && f.showInCard);
+      
+      console.log('🌡️ getTemperatureGlobalItem DEBUG:', {
+        leadId: lead.id,
+        columnId: lead.columnId,
+        phaseCardFields: this.phaseCardFields[lead.columnId],
+        initialFormFields: this.initialFormFields,
+        sourcesLength: sources.length,
+        sources: sources
+      });
+      
+      const tempField = (sources as any[]).find(f => {
+        const isTemperatura = (f.type || '').toLowerCase() === 'temperatura';
+        const hasVisibilityFlag = f.showInCard || f.showInAllPhases;
+        console.log('🌡️ Checking field:', {
+          name: f.name,
+          type: f.type,
+          isTemperatura: isTemperatura,
+          showInCard: f.showInCard,
+          showInAllPhases: f.showInAllPhases,
+          hasVisibilityFlag: hasVisibilityFlag,
+          matches: isTemperatura && hasVisibilityFlag
+        });
+        return isTemperatura && hasVisibilityFlag;
+      });
+      
+      console.log('🌡️ Found tempField:', tempField);
+      
       if (!tempField) return null;
       const val = this.readFieldValue(lead, tempField.apiFieldName || tempField.name, tempField.label || tempField.name);
+      console.log('🌡️ Temperature value:', val);
       if (val === undefined || val === null || `${val}`.trim() === '') return null;
       return { label: tempField.label || 'Temperatura', value: val };
-    } catch {
+    } catch (error) {
+      console.error('🌡️ getTemperatureGlobalItem error:', error);
       return null;
     }
   }
@@ -1327,9 +1392,23 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private async loadInitialForm() {
     try {
       const cfg = await this.firestoreService.getInitialFormConfig(this.boardId);
+      console.log('🔍 RAW CONFIG from database:', cfg);
       this.initialFormFields = (cfg as any)?.fields || [];
+      console.log('🔍 loadInitialForm loaded fields:', this.initialFormFields.map(f => ({
+        name: f.name,
+        type: f.type,
+        showInCard: f.showInCard,
+        showInAllPhases: f.showInAllPhases
+      })));
+      console.log('🔍 ALL FIELD DETAILS:', this.initialFormFields);
+      
+      // Verificar especificamente por campos de temperatura
+      const tempFields = this.initialFormFields.filter(f => f.type === 'temperatura' || f.name?.toLowerCase().includes('temp'));
+      console.log('🌡️ CAMPOS DE TEMPERATURA ENCONTRADOS:', tempFields);
+      
       this.buildApiExampleFromFields();
-    } catch {
+    } catch (error) {
+      console.log('🔍 loadInitialForm error:', error);
       this.initialFormFields = [];
       this.buildApiExampleFromFields();
     }
@@ -1337,16 +1416,57 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   async saveInitialForm() {
     try {
-      await this.firestoreService.saveInitialFormConfig(this.boardId, { fields: this.initialFormFields });
+      console.log('💾 saveInitialForm INICIADO');
+      console.log('💾 boardId:', this.boardId);
+      console.log('💾 initialFormFields:', this.initialFormFields);
+      console.log('💾 Total de campos:', this.initialFormFields?.length);
+      
+      // Log detalhado de cada campo
+      this.initialFormFields?.forEach((field, index) => {
+        console.log(`💾 Campo ${index + 1}:`, {
+          name: field.name,
+          label: field.label,
+          type: field.type,
+          showInCard: field.showInCard,
+          showInAllPhases: field.showInAllPhases,
+          completeField: field
+        });
+      });
+      
+      const dataToSave = { fields: this.initialFormFields };
+      console.log('💾 Dados que serão salvos:', dataToSave);
+      
+      await this.firestoreService.saveInitialFormConfig(this.boardId, dataToSave);
+      
+      console.log('💾 saveInitialForm SUCESSO - dados salvos no Firestore');
       this.toast.success('Formulário inicial salvo.');
-    } catch {
+    } catch (error) {
+      console.error('💾 saveInitialForm ERRO:', error);
       this.toast.error('Erro ao salvar formulário inicial.');
     }
   }
 
   onInitialFieldsChanged(fields: any[]) {
+    console.log('🔄 onInitialFieldsChanged CHAMADO');
+    console.log('🔄 Campos recebidos:', fields);
+    console.log('🔄 Número de campos:', fields?.length);
+    
+    // Log detalhado dos campos recebidos
+    fields?.forEach((field, index) => {
+      console.log(`🔄 Campo recebido ${index + 1}:`, {
+        name: field.name,
+        label: field.label,
+        type: field.type,
+        showInCard: field.showInCard,
+        showInAllPhases: field.showInAllPhases
+      });
+    });
+    
     this.initialFormFields = fields;
+    console.log('🔄 initialFormFields atualizado:', this.initialFormFields);
+    
     this.buildApiExampleFromFields();
+    console.log('🔄 onInitialFieldsChanged CONCLUÍDO');
   }
 
   private buildApiExampleFromFields() {

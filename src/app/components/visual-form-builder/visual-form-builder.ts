@@ -74,6 +74,20 @@ export class VisualFormBuilderComponent implements OnInit {
       requiredToAdvance: [false],
       showInAllPhases: [false]
     });
+
+    // Listener para automaticamente marcar "showInAllPhases" quando "showInCard" for marcado
+    this.fieldsForm.get('showInCard')?.valueChanges.subscribe(showInCard => {
+      if (showInCard) {
+        this.fieldsForm.patchValue({ showInAllPhases: true }, { emitEvent: false });
+      }
+    });
+
+    // Listener para automaticamente desmarcar "showInCard" quando "showInAllPhases" for desmarcado
+    this.fieldsForm.get('showInAllPhases')?.valueChanges.subscribe(showInAllPhases => {
+      if (!showInAllPhases) {
+        this.fieldsForm.patchValue({ showInCard: false }, { emitEvent: false });
+      }
+    });
   }
 
   ngOnInit() {
@@ -151,7 +165,24 @@ export class VisualFormBuilderComponent implements OnInit {
   }
 
   private emitFieldsChange() {
+    console.log('📤 emitFieldsChange CHAMADO');
+    console.log('📤 Total de campos:', this.fields?.length);
+    console.log('📤 Campos atuais:', this.fields);
+    
+    // Log detalhado dos campos sendo emitidos
+    this.fields?.forEach((field, index) => {
+      console.log(`📤 Campo emitido ${index + 1}:`, {
+        name: field.name,
+        label: field.label,
+        type: field.type,
+        showInCard: field.showInCard,
+        showInAllPhases: field.showInAllPhases,
+        completeField: field
+      });
+    });
+    
     this.fieldsChanged.emit([...this.fields]);
+    console.log('📤 emitFieldsChange CONCLUÍDO - fieldsChanged.emit() executado');
   }
 
   // Método para obter tipo de campo formatado
@@ -220,18 +251,28 @@ export class VisualFormBuilderComponent implements OnInit {
   }
 
   addField() {
+    console.log('➕ addField INICIADO');
     const formValue = this.fieldsForm.value;
+    console.log('➕ Valores do formulário:', formValue);
     
     if (!formValue.name || !formValue.label) {
+      console.log('➕ ERRO: Nome e rótulo são obrigatórios');
       alert('Nome e rótulo são obrigatórios');
       return;
     }
 
     // Verificar se nome já existe
     if (this.fields.some(f => f.name === formValue.name && this.editingIndex === -1)) {
+      console.log('➕ ERRO: Já existe um campo com este nome');
       alert('Já existe um campo com este nome');
       return;
     }
+
+    // Garantir que se showInCard for true, showInAllPhases também seja true
+    const showInCard = formValue.showInCard || false;
+    const showInAllPhases = showInCard ? true : (formValue.showInAllPhases || false);
+    
+    console.log('➕ Configurações de visibilidade:', { showInCard, showInAllPhases });
 
     const newField: FormField = {
       name: formValue.name,
@@ -240,13 +281,15 @@ export class VisualFormBuilderComponent implements OnInit {
       required: formValue.required || false,
       order: this.editingIndex >= 0 ? this.fields[this.editingIndex].order : this.fields.length,
       includeInApi: formValue.includeInApi !== false, // Default true
-      showInCard: formValue.showInCard || false, // Default false
+      showInCard: showInCard,
       requiredToAdvance: formValue.requiredToAdvance || false,
-      showInAllPhases: formValue.showInAllPhases || false,
+      showInAllPhases: showInAllPhases,
       // Só incluir propriedades que não sejam undefined
       ...(formValue.placeholder && formValue.placeholder.trim() && { placeholder: formValue.placeholder.trim() }),
       ...(formValue.apiFieldName && formValue.apiFieldName.trim() && { apiFieldName: formValue.apiFieldName.trim() })
     };
+
+    console.log('➕ Novo campo criado:', newField);
 
     // Processar opções para select, radio e temperatura
     if ((newField.type === 'select' || newField.type === 'radio') && formValue.options) {
@@ -254,25 +297,36 @@ export class VisualFormBuilderComponent implements OnInit {
         .split('\n')
         .map((opt: string) => opt.trim())
         .filter((opt: string) => opt);
+      console.log('➕ Opções processadas para select/radio:', newField.options);
     }
 
     // Auto-configurar opções para campo temperatura
     if (newField.type === 'temperatura') {
       newField.options = ['Quente', 'Morno', 'Frio'];
+      console.log('➕ Opções auto-configuradas para temperatura:', newField.options);
     }
+
+    console.log('➕ Campo final antes de adicionar:', newField);
 
     if (this.editingIndex >= 0) {
       // Editando campo existente
+      console.log('➕ EDITANDO campo existente no índice:', this.editingIndex);
       this.fields[this.editingIndex] = newField;
       this.editingIndex = -1;
       this.selectedField = null;
     } else {
       // Adicionando novo campo
+      console.log('➕ ADICIONANDO novo campo');
+      console.log('➕ Array antes do push:', this.fields);
       this.fields.push(newField);
+      console.log('➕ Array depois do push:', this.fields);
     }
 
+    console.log('➕ Total de campos após operação:', this.fields.length);
     this.resetForm();
+    console.log('➕ Chamando emitFieldsChange...');
     this.emitFieldsChange();
+    console.log('➕ addField CONCLUÍDO');
   }
 
   editField(index: number) {
