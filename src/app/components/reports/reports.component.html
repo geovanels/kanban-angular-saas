@@ -1,29 +1,7 @@
 <!-- Standalone Reports (accessed via URL) -->
 <app-main-layout *ngIf="boardId && isStandaloneView()">
   <!-- Breadcrumb -->
-  <app-company-breadcrumb [title]="'Relatórios - ' + (board?.name || 'Board')">
-    <div class="flex space-x-2">
-      <!-- Board Selector -->
-      <select 
-        [value]="boardId"
-        (change)="selectBoard($any($event.target).value)"
-        class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <option value="">Selecione um quadro...</option>
-        <option *ngFor="let availableBoard of availableBoards" [value]="availableBoard.id">
-          {{ availableBoard.name }}
-        </option>
-      </select>
-
-      <!-- Export Dropdown -->
-      <div class="relative">
-        <select 
-          (change)="exportReport($any($event.target).value)"
-          class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">Exportar...</option>
-          <option *ngFor="let format of exportFormats" [value]="format">{{ format }}</option>
-        </select>
-      </div>
-    </div>
+  <app-company-breadcrumb [title]="'Relatórios - ' + (board?.name || 'Quadro')">
   </app-company-breadcrumb>
 
   <!-- Main Content -->
@@ -115,6 +93,30 @@
           </select>
         </div>
       </form>
+      
+      <!-- Real-time Status and Clear Button -->
+      <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+        <div class="flex items-center space-x-2">
+          <span *ngIf="isGeneratingReport" class="text-sm text-blue-600 font-medium">
+            <i class="fas fa-spinner fa-spin mr-1"></i>
+            Atualizando relatório...
+          </span>
+          <span *ngIf="!isGeneratingReport" class="text-sm text-green-600 font-medium">
+            <i class="fas fa-check-circle mr-1"></i>
+            Filtros em tempo real ativos
+          </span>
+        </div>
+        
+        <div class="flex space-x-2">
+          <button 
+            type="button"
+            (click)="clearFilters()"
+            class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">
+            <i class="fas fa-times mr-1"></i>
+            Limpar Filtros
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Navigation Tabs -->
@@ -126,7 +128,7 @@
               { key: 'overview', label: 'Visão Geral', icon: 'fas fa-chart-pie' },
               { key: 'sla', label: 'Indicadores SLA', icon: 'fas fa-clock' },
               { key: 'phases', label: 'Métricas por Fase', icon: 'fas fa-columns' },
-              { key: 'leads', label: 'Lista de Registros', icon: 'fas fa-list' },
+              { key: 'registros', label: 'Lista de Registros', icon: 'fas fa-list' },
               { key: 'charts', label: 'Gráficos', icon: 'fas fa-chart-bar' }
             ]"
             (click)="setView($any(tab.key))"
@@ -163,8 +165,8 @@
                 <i class="fas fa-users text-2xl text-blue-500"></i>
               </div>
               <div class="ml-4">
-                <p class="text-sm font-medium text-gray-500">Total de Leads</p>
-                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.totalLeads }}</p>
+                <p class="text-sm font-medium text-gray-500">Total de Registros</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.totalRecords }}</p>
               </div>
             </div>
           </div>
@@ -176,7 +178,7 @@
               </div>
               <div class="ml-4">
                 <p class="text-sm font-medium text-gray-500">Novos no Período</p>
-                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.newLeadsThisPeriod }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.newRecordsThisPeriod }}</p>
               </div>
             </div>
           </div>
@@ -187,8 +189,8 @@
                 <i class="fas fa-check-circle text-2xl text-purple-500"></i>
               </div>
               <div class="ml-4">
-                <p class="text-sm font-medium text-gray-500">Convertidos</p>
-                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.convertedLeads }}</p>
+                <p class="text-sm font-medium text-gray-500">Concluídos</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.concludedRecords }}</p>
               </div>
             </div>
           </div>
@@ -212,7 +214,7 @@
               </div>
               <div class="ml-4">
                 <p class="text-sm font-medium text-gray-500">Ativos</p>
-                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.activeLeads }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.activeRecords }}</p>
               </div>
             </div>
           </div>
@@ -224,7 +226,7 @@
               </div>
               <div class="ml-4">
                 <p class="text-sm font-medium text-gray-500">Em Atraso</p>
-                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.overdueLeads }}</p>
+                <p class="text-2xl font-bold text-gray-900">{{ summaryStats.overdueRecords }}</p>
               </div>
             </div>
           </div>
@@ -254,7 +256,7 @@
                    class="relative">
                 <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                   <span class="text-sm font-medium text-gray-700">{{ item.phase }}</span>
-                  <span class="text-sm font-bold text-gray-900">{{ item.leads }}</span>
+                  <span class="text-sm font-bold text-gray-900">{{ item.registros }}</span>
                 </div>
                 <div *ngIf="i < chartData.conversionFunnel.length - 1" 
                      class="flex justify-center py-1">
@@ -298,7 +300,7 @@
                     {{ indicator.slaDays }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                    {{ indicator.totalLeads }}
+                    {{ indicator.totalRecords }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-center">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -348,7 +350,7 @@
             <div class="space-y-4">
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">Registros</span>
-                <span class="text-lg font-bold text-gray-900">{{ metric.leadsCount }}</span>
+                <span class="text-lg font-bold text-gray-900">{{ metric.recordsCount }}</span>
               </div>
               
               <div class="flex justify-between items-center">
@@ -365,19 +367,19 @@
         </div>
       </div>
 
-      <!-- Leads List Tab -->
+      <!-- Registros List Tab -->
       <div *ngIf="currentView === 'leads'">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900">Lista Detalhada de Registros</h3>
-            <p class="text-sm text-gray-600 mt-1">{{ filteredLeads.length }} registros encontrados</p>
+            <p class="text-sm text-gray-600 mt-1">{{ filteredRecords.length }} registros encontrados</p>
           </div>
           
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase Atual</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
@@ -385,10 +387,10 @@
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                <tr *ngFor="let lead of filteredLeads; let i = index" [class.bg-gray-50]="i % 2 === 1">
+                <tr *ngFor="let lead of filteredRecords; let i = index" [class.bg-gray-50]="i % 2 === 1">
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">
-                      {{ lead.fields?.contactName || lead.fields?.companyName || 'Lead sem nome' }}
+                      {{ lead.fields?.contactName || lead.fields?.companyName || 'Registro sem nome' }}
                     </div>
                     <div class="text-sm text-gray-500">
                       {{ lead.fields?.contactEmail || 'Email não informado' }}
@@ -409,13 +411,13 @@
                   <td class="px-6 py-4 whitespace-nowrap">
                     <span 
                       class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      [class.bg-green-100]="isLeadConcluded(lead)"
-                      [class.text-green-800]="isLeadConcluded(lead)"
-                      [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
-                      [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
-                      [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
-                      [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
-                      {{ isLeadConcluded(lead) ? 'Concluído' : (isLeadOverdue(lead) ? 'Em Atraso' : 'Ativo') }}
+                      [class.bg-green-100]="isRegistroConcluded(lead)"
+                      [class.text-green-800]="isRegistroConcluded(lead)"
+                      [class.bg-red-100]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
+                      [class.text-red-800]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
+                      [class.bg-blue-100]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)"
+                      [class.text-blue-800]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)">
+                      {{ isRegistroConcluded(lead) ? 'Concluído' : (isRegistroOverdue(lead) ? 'Em Atraso' : 'Ativo') }}
                     </span>
                   </td>
                 </tr>
@@ -423,7 +425,7 @@
             </table>
           </div>
           
-          <div *ngIf="filteredLeads.length === 0" class="px-6 py-8 text-center">
+          <div *ngIf="filteredRecords.length === 0" class="px-6 py-8 text-center">
             <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
             <p class="text-gray-500">Nenhum registro encontrado com os filtros aplicados</p>
           </div>
@@ -433,14 +435,14 @@
       <!-- Charts Tab -->
       <div *ngIf="currentView === 'charts'">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Leads Over Time -->
+          <!-- Registros Over Time -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Leads ao Longo do Tempo</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Registros ao Longo do Tempo</h3>
             <div class="h-64 flex items-end space-x-2">
               <div *ngFor="let item of chartData.leadsOverTime" 
                    class="flex-1 bg-blue-500 rounded-t flex flex-col justify-end items-center relative"
-                   [style.height.%]="getChartBarHeight(item.leads)">
-                <span class="text-white text-xs font-medium mb-2">{{ item.leads }}</span>
+                   [style.height.%]="getChartBarHeight(item.registros)">
+                <span class="text-white text-xs font-medium mb-2">{{ item.registros }}</span>
                 <span class="absolute -bottom-6 text-xs text-gray-600 transform rotate-45 origin-bottom-left">{{ item.period }}</span>
               </div>
             </div>
@@ -457,8 +459,8 @@
                 </div>
                 <div class="flex items-center space-x-4">
                   <div class="text-right">
-                    <div class="text-sm font-bold text-gray-900">{{ metric.leadsCount }}</div>
-                    <div class="text-xs text-gray-500">leads</div>
+                    <div class="text-sm font-bold text-gray-900">{{ metric.recordsCount }}</div>
+                    <div class="text-xs text-gray-500">registros</div>
                   </div>
                   <div class="text-right">
                     <div class="text-sm font-bold text-gray-900">{{ metric.conversionRate }}%</div>
@@ -479,31 +481,12 @@
 <div *ngIf="boardId && !isStandaloneView()" class="p-4 md:p-8">
   <div class="max-w-7xl mx-auto">
     
-    <!-- Header with Export -->
+    <!-- Header -->
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-900">
         <i class="fas fa-chart-bar mr-2 text-blue-500"></i>
         Relatórios - {{ board?.name }}
       </h2>
-      <div class="flex space-x-2">
-        <!-- Board Selector -->
-        <select 
-          [value]="boardId"
-          (change)="selectBoard($any($event.target).value)"
-          class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option *ngFor="let availableBoard of availableBoards" [value]="availableBoard.id">
-            {{ availableBoard.name }}
-          </option>
-        </select>
-
-        <!-- Export Dropdown -->
-        <select 
-          (change)="exportReport($any($event.target).value)"
-          class="bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">Exportar...</option>
-          <option *ngFor="let format of exportFormats" [value]="format">{{ format }}</option>
-        </select>
-      </div>
     </div>
     
     <!-- Filters Section -->
@@ -592,6 +575,30 @@
           </select>
         </div>
       </form>
+      
+      <!-- Real-time Status and Clear Button -->
+      <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+        <div class="flex items-center space-x-2">
+          <span *ngIf="isGeneratingReport" class="text-sm text-blue-600 font-medium">
+            <i class="fas fa-spinner fa-spin mr-1"></i>
+            Atualizando relatório...
+          </span>
+          <span *ngIf="!isGeneratingReport" class="text-sm text-green-600 font-medium">
+            <i class="fas fa-check-circle mr-1"></i>
+            Filtros em tempo real ativos
+          </span>
+        </div>
+        
+        <div class="flex space-x-2">
+          <button 
+            type="button"
+            (click)="clearFilters()"
+            class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">
+            <i class="fas fa-times mr-1"></i>
+            Limpar Filtros
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Tab Navigation for Views -->
@@ -623,8 +630,8 @@
             <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-blue-100">Total de Leads</p>
-                  <p class="text-3xl font-bold">{{ summaryStats.totalLeads }}</p>
+                  <p class="text-blue-100">Total de Registros</p>
+                  <p class="text-3xl font-bold">{{ summaryStats.totalRecords }}</p>
                 </div>
                 <div class="bg-blue-400 bg-opacity-30 p-3 rounded-full">
                   <i class="fas fa-users text-2xl"></i>
@@ -635,8 +642,8 @@
             <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow p-6 text-white">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-green-100">Leads Convertidos</p>
-                  <p class="text-3xl font-bold">{{ summaryStats.convertedLeads }}</p>
+                  <p class="text-green-100">Registros Concluídos</p>
+                  <p class="text-3xl font-bold">{{ summaryStats.concludedRecords }}</p>
                 </div>
                 <div class="bg-green-400 bg-opacity-30 p-3 rounded-full">
                   <i class="fas fa-check-circle text-2xl"></i>
@@ -647,8 +654,8 @@
             <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg shadow p-6 text-white">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-yellow-100">Leads Atrasados</p>
-                  <p class="text-3xl font-bold">{{ summaryStats.overdueLeads }}</p>
+                  <p class="text-yellow-100">Registros Atrasados</p>
+                  <p class="text-3xl font-bold">{{ summaryStats.overdueRecords }}</p>
                 </div>
                 <div class="bg-yellow-400 bg-opacity-30 p-3 rounded-full">
                   <i class="fas fa-clock text-2xl"></i>
@@ -717,7 +724,7 @@
                   <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="metric.phaseColor"></div>
                   <h3 class="text-lg font-semibold text-gray-900">{{ metric.phaseName }}</h3>
                 </div>
-                <span class="text-2xl font-bold text-gray-900">{{ metric.leadsCount }} leads</span>
+                <span class="text-2xl font-bold text-gray-900">{{ metric.recordsCount }} registros</span>
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -734,24 +741,24 @@
           </div>
         </div>
 
-        <!-- Leads List Tab -->
+        <!-- Registros List Tab -->
         <div *ngIf="currentView === 'leads'">
           <div class="bg-white">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Lista de Leads ({{ filteredLeads.length }})</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Lista de Registros ({{ filteredRecords.length }})</h3>
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase Atual</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr *ngFor="let lead of filteredLeads | slice:0:50">
+                  <tr *ngFor="let lead of filteredRecords | slice:0:50">
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm font-medium text-gray-900">{{ lead.fields?.contactName || lead.fields?.contactEmail || 'Lead sem nome' }}</div>
+                      <div class="text-sm font-medium text-gray-900">{{ lead.fields?.contactName || lead.fields?.contactEmail || 'Registro sem nome' }}</div>
                       <div class="text-sm text-gray-500" *ngIf="lead.fields?.contactEmail">{{ lead.fields?.contactEmail }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -765,15 +772,15 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                            [class.bg-green-100]="isLeadConcluded(lead)"
-                            [class.text-green-800]="isLeadConcluded(lead)"
-                            [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
-                            [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
-                            [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
-                            [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
-                        <span *ngIf="isLeadConcluded(lead)">Concluído</span>
-                        <span *ngIf="!isLeadConcluded(lead) && isLeadOverdue(lead)">Atrasado</span>
-                        <span *ngIf="!isLeadConcluded(lead) && !isLeadOverdue(lead)">Ativo</span>
+                            [class.bg-green-100]="isRegistroConcluded(lead)"
+                            [class.text-green-800]="isRegistroConcluded(lead)"
+                            [class.bg-red-100]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
+                            [class.text-red-800]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
+                            [class.bg-blue-100]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)"
+                            [class.text-blue-800]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)">
+                        <span *ngIf="isRegistroConcluded(lead)">Concluído</span>
+                        <span *ngIf="!isRegistroConcluded(lead) && isRegistroOverdue(lead)">Atrasado</span>
+                        <span *ngIf="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)">Ativo</span>
                       </span>
                     </td>
                   </tr>
@@ -800,14 +807,14 @@
               </div>
             </div>
 
-            <!-- Leads Over Time Chart -->
+            <!-- Registros Over Time Chart -->
             <div class="bg-white rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Leads ao Longo do Tempo</h3>
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Registros ao Longo do Tempo</h3>
               <div class="h-64 flex items-end space-x-2">
                 <div *ngFor="let item of chartData.leadsOverTime" 
                      class="flex-1 bg-blue-500 rounded-t flex flex-col justify-end items-center relative"
-                     [style.height.%]="getChartBarHeight(item.leads)">
-                  <span class="text-white text-xs font-medium mb-2">{{ item.leads }}</span>
+                     [style.height.%]="getChartBarHeight(item.registros)">
+                  <span class="text-white text-xs font-medium mb-2">{{ item.registros }}</span>
                   <span class="absolute -bottom-6 text-xs text-gray-600 transform rotate-45 origin-bottom-left">{{ item.period }}</span>
                 </div>
               </div>

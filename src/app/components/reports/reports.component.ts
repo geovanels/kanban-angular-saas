@@ -2,6 +2,7 @@ import { Component, inject, OnInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
+import { debounceTime } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column, Board } from '../../services/firestore.service';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
@@ -20,7 +21,7 @@ interface SLAIndicator {
   phaseName: string;
   phaseColor: string;
   slaDays: number;
-  totalLeads: number;
+  totalRecords: number;
   onTime: number;
   overdue: number;
   compliance: number;
@@ -30,7 +31,7 @@ interface PhaseMetric {
   phaseId: string;
   phaseName: string;
   phaseColor: string;
-  leadsCount: number;
+  recordsCount: number;
   avgTimeInPhase: number;
   conversionRate: number;
 }
@@ -56,7 +57,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   availableBoards: Board[] = [];
   
   // Data
-  leads: Lead[] = [];
+  records: Lead[] = [];
   columns: Column[] = [];
   users: any[] = [];
   
@@ -74,33 +75,33 @@ export class ReportsComponent implements OnInit, OnDestroy {
   isGeneratingReport = false;
 
   // Report data
-  filteredLeads: Lead[] = [];
+  filteredRecords: Lead[] = [];
   slaIndicators: SLAIndicator[] = [];
   phaseMetrics: PhaseMetric[] = [];
   summaryStats = {
-    totalLeads: 0,
-    newLeadsThisPeriod: 0,
-    convertedLeads: 0,
+    totalRecords: 0,
+    newRecordsThisPeriod: 0,
+    concludedRecords: 0,
     avgConversionTime: 0,
-    activeLeads: 0,
-    overdueLeads: 0
+    activeRecords: 0,
+    overdueRecords: 0
   };
 
   // Chart data
   chartData = {
     phaseDistribution: [] as any[],
-    leadsOverTime: [] as any[],
+    registrosOverTime: [] as any[],
     conversionFunnel: [] as any[]
   };
 
   // Display options
-  currentView: 'overview' | 'sla' | 'phases' | 'leads' | 'charts' = 'overview';
+  currentView: 'overview' | 'sla' | 'phases' | 'registros' | 'charts' = 'overview';
   exportFormats = ['PDF', 'Excel', 'CSV'];
   viewTabs = [
     { key: 'overview', name: 'Visão Geral', icon: 'fa-chart-pie' },
     { key: 'sla', name: 'SLA', icon: 'fa-clock' },
     { key: 'phases', name: 'Fases', icon: 'fa-columns' },
-    { key: 'leads', name: 'Leads', icon: 'fa-users' },
+    { key: 'registros', name: 'Leads', icon: 'fa-users' },
     { key: 'charts', name: 'Gráficos', icon: 'fa-chart-bar' }
   ];
 
@@ -121,13 +122,15 @@ export class ReportsComponent implements OnInit, OnDestroy {
       });
     }
 
+    // Setup form subscriptions immediately for real-time filtering
+    this.setupFormSubscriptions();
+
     // Load available boards
     await this.loadAvailableBoards();
 
     // If boardId is set (from input or URL), load data directly
     if (this.boardId && this.ownerId) {
       await this.loadData();
-      this.setupFormSubscriptions();
       this.generateReport();
     }
   }
@@ -147,8 +150,23 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private setupFormSubscriptions() {
-    this.filtersForm.valueChanges.subscribe(() => {
-      this.generateReport();
+    // Subscribe to form changes for real-time filtering - no debounce for quick response
+    this.filtersForm.valueChanges.subscribe(values => {
+      console.log('=== FORM VALUES CHANGED ===');
+      console.log('New values:', values);
+      console.log('Current state:', {
+        boardId: this.boardId,
+        ownerId: this.ownerId,
+        recordsCount: this.records.length,
+        hasData: this.boardId && this.ownerId && this.records.length > 0
+      });
+      
+      if (this.boardId && this.ownerId && this.records.length > 0) {
+        console.log('Conditions met - generating report...');
+        this.generateReport();
+      } else {
+        console.log('Conditions not met - skipping report generation');
+      }
     });
   }
 
@@ -165,11 +183,22 @@ export class ReportsComponent implements OnInit, OnDestroy {
   async selectBoard(boardId: string) {
     this.boardId = boardId;
     await this.loadData();
-    this.setupFormSubscriptions();
     this.generateReport();
   }
 
   setDateRangeFilter(range: 'week' | 'month' | '3months' | '6months' | 'all') {
+    console.log('=== Aplicando filtro de período:', range, '===');
+    console.log('Total de registros disponíveis:', this.records.length);
+    
+    if (range === 'all') {
+      console.log('Removendo filtros de data - mostrando todos os dados');
+      this.filtersForm.patchValue({
+        startDate: '',
+        endDate: ''
+      });
+      return; // Let the form subscription handle the update
+    }
+    
     const endDate = new Date();
     let startDate = new Date();
     
@@ -186,17 +215,34 @@ export class ReportsComponent implements OnInit, OnDestroy {
       case '6months':
         startDate.setMonth(startDate.getMonth() - 6);
         break;
-      case 'all':
-        this.filtersForm.patchValue({
-          startDate: '',
-          endDate: ''
-        });
-        return;
     }
     
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    console.log('Definindo período:', { 
+      range, 
+      startDate: startDateStr, 
+      endDate: endDateStr,
+      startDateObj: startDate,
+      endDateObj: endDate
+    });
+    
+    // Patch the form - this will trigger the subscription automatically
     this.filtersForm.patchValue({
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0]
+      startDate: startDateStr,
+      endDate: endDateStr
+    });
+  }
+
+  clearFilters() {
+    console.log('Limpando todos os filtros...');
+    this.filtersForm.reset({
+      startDate: '',
+      endDate: '',
+      phases: [],
+      responsible: [],
+      status: 'all'
     });
   }
 
@@ -207,21 +253,21 @@ export class ReportsComponent implements OnInit, OnDestroy {
       const boards = await this.firestoreService.getBoards(this.ownerId);
       this.board = boards.find(b => b.id === this.boardId) || null;
 
-      // Load leads and columns in parallel
-      const [leads, columns] = await Promise.all([
+      // Load registros and columns in parallel
+      const [registros, columns] = await Promise.all([
         this.firestoreService.getLeads(this.ownerId, this.boardId),
         this.firestoreService.getColumns(this.ownerId, this.boardId)
       ]);
 
-      this.leads = leads;
+      this.records = registros;
       this.columns = columns;
       this.users = []; // Será implementado posteriormente
 
       console.log('Dados carregados:', {
         boardId: this.boardId,
-        leadsCount: leads.length,
+        recordsCount: registros.length,
         columnsCount: columns.length,
-        leads: leads.slice(0, 3) // Log first 3 leads for debugging
+        registros: registros.slice(0, 3) // Log first 3 registros for debugging
       });
 
     } catch (error) {
@@ -248,44 +294,68 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private applyFilters(filters: ReportFilters) {
-    console.log('Aplicando filtros:', filters);
-    console.log('Total de leads antes do filtro:', this.leads.length);
+    console.log('=== INICIANDO FILTROS ===');
+    console.log('Filtros recebidos:', filters);
+    console.log('Total de registros disponíveis:', this.records.length);
     
-    this.filteredLeads = this.leads.filter(lead => {
-      // Date filter - only apply if dates are provided and valid
-      if (filters.startDate && filters.endDate) {
-        const leadDate = this.getLeadDate(lead);
-        const startDate = new Date(filters.startDate);
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(23, 59, 59, 999); // Include end of day
+    // Log das primeiras datas dos registros para debug
+    if (this.records.length > 0) {
+      console.log('Amostra de datas dos registros:', this.records.slice(0, 3).map(record => ({
+        id: record.id,
+        createdAt: record.createdAt,
+        date: this.getLeadDate(record)
+      })));
+    }
+    
+    this.filteredRecords = this.records.filter(record => {
+      let passedDateFilter = true;
+      
+      // Date filter - apply if ANY date filter is provided
+      if ((filters.startDate && filters.startDate.trim() !== '') || 
+          (filters.endDate && filters.endDate.trim() !== '')) {
         
-        console.log('Verificando data do lead:', {
-          leadDate: leadDate,
-          startDate: startDate,
-          endDate: endDate,
-          isInRange: leadDate >= startDate && leadDate <= endDate
-        });
+        console.log('Aplicando filtro de data...');
+        const leadDate = this.getLeadDate(record);
         
-        if (leadDate < startDate || leadDate > endDate) {
-          return false;
+        // Check start date if provided
+        if (filters.startDate && filters.startDate.trim() !== '') {
+          const startDate = new Date(filters.startDate);
+          if (leadDate < startDate) {
+            console.log(`Lead ${record.id} excluído: data ${leadDate.toISOString().split('T')[0]} < ${startDate.toISOString().split('T')[0]}`);
+            return false;
+          }
         }
+        
+        // Check end date if provided  
+        if (filters.endDate && filters.endDate.trim() !== '') {
+          const endDate = new Date(filters.endDate);
+          endDate.setHours(23, 59, 59, 999); // Include end of day
+          if (leadDate > endDate) {
+            console.log(`Lead ${record.id} excluído: data ${leadDate.toISOString().split('T')[0]} > ${endDate.toISOString().split('T')[0]}`);
+            return false;
+          }
+        }
+        
+        console.log(`Lead ${record.id} passou no filtro de data: ${leadDate.toISOString().split('T')[0]}`);
+      } else {
+        console.log('Nenhum filtro de data aplicado - campos vazios');
       }
 
       // Phase filter
-      if (filters.phases && filters.phases.length > 0 && !filters.phases.includes(lead.columnId)) {
+      if (filters.phases && filters.phases.length > 0 && !filters.phases.includes(record.columnId)) {
         return false;
       }
 
       // Responsible filter
-      if (filters.responsible && filters.responsible.length > 0 && lead.responsibleUserId && 
-          !filters.responsible.includes(lead.responsibleUserId)) {
+      if (filters.responsible && filters.responsible.length > 0 && record.responsibleUserId && 
+          !filters.responsible.includes(record.responsibleUserId)) {
         return false;
       }
 
       // Status filter
       if (filters.status && filters.status !== 'all') {
-        const isOverdue = this.isLeadOverdue(lead);
-        const isConcluded = this.isLeadConcluded(lead);
+        const isOverdue = this.isLeadOverdue(record);
+        const isConcluded = this.isLeadConcluded(record);
         
         switch (filters.status) {
           case 'active':
@@ -300,8 +370,12 @@ export class ReportsComponent implements OnInit, OnDestroy {
       return true;
     });
     
-    console.log('Leads após filtro:', this.filteredLeads.length);
-    console.log('Primeiros leads filtrados:', this.filteredLeads.slice(0, 3));
+    console.log('=== RESULTADO DOS FILTROS ===');
+    console.log(`${this.records.length} registros total -> ${this.filteredRecords.length} registros filtrados`);
+    console.log('Primeiros registros filtrados:', this.filteredRecords.slice(0, 3).map(record => ({
+      id: record.id,
+      date: this.getLeadDate(record).toISOString().split('T')[0]
+    })));
   }
 
   private getLeadDate(lead: Lead): Date {
@@ -340,74 +414,74 @@ export class ReportsComponent implements OnInit, OnDestroy {
     const endDate = new Date(filters.endDate);
 
     this.summaryStats = {
-      totalLeads: this.filteredLeads.length,
-      newLeadsThisPeriod: this.filteredLeads.filter(lead => {
-        const leadDate = this.getLeadDate(lead);
+      totalRecords: this.filteredRecords.length,
+      newRecordsThisPeriod: this.filteredRecords.filter(record => {
+        const leadDate = this.getLeadDate(record);
         return leadDate >= startDate && leadDate <= endDate;
       }).length,
-      convertedLeads: this.filteredLeads.filter(lead => this.isLeadConcluded(lead)).length,
+      concludedRecords: this.filteredRecords.filter(record => this.isLeadConcluded(record)).length,
       avgConversionTime: this.calculateAverageConversionTime(),
-      activeLeads: this.filteredLeads.filter(lead => !this.isLeadConcluded(lead)).length,
-      overdueLeads: this.filteredLeads.filter(lead => this.isLeadOverdue(lead) && !this.isLeadConcluded(lead)).length
+      activeRecords: this.filteredRecords.filter(record => !this.isLeadConcluded(record)).length,
+      overdueRecords: this.filteredRecords.filter(record => this.isLeadOverdue(record) && !this.isLeadConcluded(record)).length
     };
   }
 
   private calculateAverageConversionTime(): number {
-    const convertedLeads = this.filteredLeads.filter(lead => this.isLeadConcluded(lead));
-    if (convertedLeads.length === 0) return 0;
+    const concludedRecords = this.filteredRecords.filter(record => this.isLeadConcluded(record));
+    if (concludedRecords.length === 0) return 0;
 
-    const totalTime = convertedLeads.reduce((sum, lead) => {
+    const totalTime = concludedRecords.reduce((sum, lead) => {
       const createdDate = this.getLeadDate(lead);
       const movedDate = lead.movedToCurrentColumnAt?.toDate ? 
         lead.movedToCurrentColumnAt.toDate() : new Date();
       return sum + (movedDate.getTime() - createdDate.getTime());
     }, 0);
 
-    return Math.round(totalTime / convertedLeads.length / (1000 * 60 * 60 * 24)); // Days
+    return Math.round(totalTime / concludedRecords.length / (1000 * 60 * 60 * 24)); // Days
   }
 
   private calculateSLAIndicators() {
     this.slaIndicators = this.columns
       .filter(col => col.slaDays && col.slaDays > 0)
       .map(column => {
-        const leadsInPhase = this.filteredLeads.filter(lead => lead.columnId === column.id);
-        const overdueLeads = leadsInPhase.filter(lead => this.isLeadOverdue(lead));
-        const onTimeLeads = leadsInPhase.length - overdueLeads.length;
+        const registrosInPhase = this.filteredRecords.filter(record => record.columnId === column.id);
+        const overdueRecords = registrosInPhase.filter(record => this.isLeadOverdue(record));
+        const onTimeLeads = registrosInPhase.length - overdueRecords.length;
         
         return {
           phaseId: column.id!,
           phaseName: column.name,
           phaseColor: column.color,
           slaDays: column.slaDays,
-          totalLeads: leadsInPhase.length,
+          totalRecords: registrosInPhase.length,
           onTime: onTimeLeads,
-          overdue: overdueLeads.length,
-          compliance: leadsInPhase.length > 0 ? Math.round((onTimeLeads / leadsInPhase.length) * 100) : 100
+          overdue: overdueRecords.length,
+          compliance: registrosInPhase.length > 0 ? Math.round((onTimeLeads / registrosInPhase.length) * 100) : 100
         };
       });
   }
 
   private calculatePhaseMetrics() {
     this.phaseMetrics = this.columns.map(column => {
-      const leadsInPhase = this.filteredLeads.filter(lead => lead.columnId === column.id);
-      const avgTime = this.calculateAverageTimeInPhase(leadsInPhase);
+      const registrosInPhase = this.filteredRecords.filter(record => record.columnId === column.id);
+      const avgTime = this.calculateAverageTimeInPhase(registrosInPhase);
       const conversionRate = this.calculatePhaseConversionRate(column);
 
       return {
         phaseId: column.id!,
         phaseName: column.name,
         phaseColor: column.color,
-        leadsCount: leadsInPhase.length,
+        recordsCount: registrosInPhase.length,
         avgTimeInPhase: avgTime,
         conversionRate: conversionRate
       };
     });
   }
 
-  private calculateAverageTimeInPhase(leads: Lead[]): number {
-    if (leads.length === 0) return 0;
+  private calculateAverageTimeInPhase(registros: Lead[]): number {
+    if (registros.length === 0) return 0;
 
-    const totalTime = leads.reduce((sum, lead) => {
+    const totalTime = registros.reduce((sum, lead) => {
       const phaseHistory = (lead as any).phaseHistory || {};
       const phaseEntry = Object.values(phaseHistory).find((p: any) => p.phaseId === lead.columnId) as any;
       
@@ -422,38 +496,38 @@ export class ReportsComponent implements OnInit, OnDestroy {
       return sum;
     }, 0);
 
-    return Math.round(totalTime / leads.length / (1000 * 60 * 60 * 24)); // Days
+    return Math.round(totalTime / registros.length / (1000 * 60 * 60 * 24)); // Days
   }
 
   private calculatePhaseConversionRate(column: Column): number {
     const currentIndex = this.columns.findIndex(c => c.id === column.id);
     if (currentIndex === this.columns.length - 1) return 0; // Last phase
 
-    const leadsInCurrentPhase = this.filteredLeads.filter(lead => lead.columnId === column.id).length;
+    const registrosInCurrentPhase = this.filteredRecords.filter(record => record.columnId === column.id).length;
     const nextPhases = this.columns.slice(currentIndex + 1);
-    const leadsInNextPhases = this.filteredLeads.filter(lead => 
-      nextPhases.some(p => p.id === lead.columnId)
+    const registrosInNextPhases = this.filteredRecords.filter(record => 
+      nextPhases.some(p => p.id === record.columnId)
     ).length;
 
-    const totalProgressed = leadsInCurrentPhase + leadsInNextPhases;
-    return totalProgressed > 0 ? Math.round((leadsInNextPhases / totalProgressed) * 100) : 0;
+    const totalProgressed = registrosInCurrentPhase + registrosInNextPhases;
+    return totalProgressed > 0 ? Math.round((registrosInNextPhases / totalProgressed) * 100) : 0;
   }
 
   private generateChartData() {
     // Phase distribution
     this.chartData.phaseDistribution = this.phaseMetrics.map(metric => ({
       name: metric.phaseName,
-      value: metric.leadsCount,
+      value: metric.recordsCount,
       color: metric.phaseColor
     }));
 
     // Leads over time (simplified)
-    this.chartData.leadsOverTime = this.generateLeadsOverTimeData();
+    this.chartData.registrosOverTime = this.generateLeadsOverTimeData();
 
     // Conversion funnel
     this.chartData.conversionFunnel = this.phaseMetrics.map((metric, index) => ({
       phase: metric.phaseName,
-      leads: metric.leadsCount,
+      registros: metric.recordsCount,
       order: index
     }));
   }
@@ -470,14 +544,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
       const weekEnd = new Date(current);
       weekEnd.setDate(weekEnd.getDate() + 6);
       
-      const leadsInWeek = this.filteredLeads.filter(lead => {
-        const leadDate = this.getLeadDate(lead);
+      const registrosInWeek = this.filteredRecords.filter(record => {
+        const leadDate = this.getLeadDate(record);
         return leadDate >= current && leadDate <= weekEnd;
       }).length;
 
       data.push({
         period: `${current.getDate()}/${current.getMonth() + 1}`,
-        leads: leadsInWeek
+        registros: registrosInWeek
       });
 
       current.setDate(current.getDate() + 7);
@@ -487,7 +561,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   // View methods
-  setView(view: 'overview' | 'sla' | 'phases' | 'leads' | 'charts') {
+  setView(view: 'overview' | 'sla' | 'phases' | 'registros' | 'charts') {
     this.currentView = view;
   }
 
@@ -550,8 +624,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   getChartBarHeight(value: number): number {
-    if (this.chartData.leadsOverTime.length === 0) return 0;
-    const maxValue = Math.max(...this.chartData.leadsOverTime.map(d => d.leads));
+    if (this.chartData.registrosOverTime.length === 0) return 0;
+    const maxValue = Math.max(...this.chartData.registrosOverTime.map(d => d.registros));
     return maxValue > 0 ? (value / maxValue * 100) : 0;
   }
 }
