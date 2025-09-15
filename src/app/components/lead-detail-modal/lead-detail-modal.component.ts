@@ -254,10 +254,25 @@ export class LeadDetailModalComponent {
 
 
   getPhaseHistoryItems(): any[] {
+    console.log('📊 Gerando histórico de fases:', {
+      leadId: this.currentLead?.id,
+      phaseHistory: this.phaseHistory,
+      phaseHistoryKeys: Object.keys(this.phaseHistory || {}),
+      phaseHistoryLength: Object.keys(this.phaseHistory || {}).length,
+      availableColumns: this.columns.map(c => ({ id: c.id, name: c.name }))
+    });
+
     const items: any[] = [];
     
     Object.values(this.phaseHistory).forEach((phase: any) => {
       const column = this.columns.find(col => col.id === phase.phaseId);
+      console.log('📊 Processando fase:', {
+        phaseId: phase.phaseId,
+        columnFound: !!column,
+        columnName: column?.name,
+        phase: phase
+      });
+
       if (column) {
         const enteredAt = phase.enteredAt?.toDate ? phase.enteredAt.toDate() : new Date(phase.enteredAt);
         const exitedAt = phase.exitedAt?.toDate ? phase.exitedAt.toDate() : (phase.exitedAt ? new Date(phase.exitedAt) : null);
@@ -271,20 +286,38 @@ export class LeadDetailModalComponent {
           } else {
             duration = `${hours}h`;
           }
+        } else if (!exitedAt) {
+          // Calcular duração em tempo real para fase atual
+          const now = new Date();
+          const elapsed = now.getTime() - enteredAt.getTime();
+          const days = Math.floor(elapsed / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((elapsed % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          if (days > 0) {
+            duration = `${days}d ${hours}h (em andamento)`;
+          } else {
+            duration = `${hours}h (em andamento)`;
+          }
         }
 
-        items.push({
+        const item = {
           phaseName: column.name,
           phaseColor: column.color,
           enteredAt: enteredAt.toLocaleString('pt-BR'),
           exitedAt: exitedAt?.toLocaleString('pt-BR') || 'Atual',
-          duration: duration || 'Em andamento'
-        });
+          duration: duration || 'Em andamento',
+          isCurrentPhase: !exitedAt && this.currentLead?.columnId === phase.phaseId
+        };
+
+        console.log('📊 Item de histórico criado:', item);
+        items.push(item);
       }
     });
 
+    console.log('📊 Total de itens processados:', items.length);
+
     // Fallback: se não houver históricos registrados, exibir fase atual como entrada
     if (items.length === 0 && this.currentLead) {
+      console.log('📊 Nenhum histórico encontrado, criando fallback para fase atual');
       const currentColumn = this.getCurrentColumn();
       if (currentColumn) {
         const enteredAt = (this.currentLead.movedToCurrentColumnAt?.toDate && this.currentLead.movedToCurrentColumnAt.toDate())
@@ -292,17 +325,25 @@ export class LeadDetailModalComponent {
           || (this.currentLead.createdAt?.toDate && this.currentLead.createdAt.toDate())
           || this.currentLead.createdAt
           || new Date();
-        items.push({
+        
+        const fallbackItem = {
           phaseName: currentColumn.name,
           phaseColor: currentColumn.color,
           enteredAt: (enteredAt instanceof Date ? enteredAt : new Date(enteredAt)).toLocaleString('pt-BR'),
           exitedAt: 'Atual',
-          duration: 'Em andamento'
-        });
+          duration: 'Em andamento',
+          isCurrentPhase: true
+        };
+
+        console.log('📊 Item fallback criado:', fallbackItem);
+        items.push(fallbackItem);
       }
     }
 
-    return items.sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
+    const sortedItems = items.sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
+    console.log('📊 Itens finais ordenados:', sortedItems);
+    
+    return sortedItems;
   }
 
   getActivityLog(): LeadHistory[] {

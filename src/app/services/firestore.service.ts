@@ -544,11 +544,47 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
+      // Buscar dados atuais do lead para obter phaseHistory
       const leadRef = runInInjectionContext(this.injector, () => doc(this.firestore, 'companies', this.currentCompanyId!, 'boards', boardId, 'leads', leadId));
+      const leadSnap = await runInInjectionContext(this.injector, () => getDoc(leadRef));
+      
+      if (!leadSnap.exists()) {
+        throw new Error('Lead não encontrado');
+      }
+
+      const leadData = leadSnap.data() as any;
+      const currentColumnId = leadData.columnId;
+      const now = new Date();
+      
+      // Atualizar histórico de fases
+      const phaseHistory = { ...(leadData.phaseHistory || {}) };
+      
+      // Finalizar fase atual se existir
+      if (currentColumnId && phaseHistory[currentColumnId]) {
+        const enteredAt = phaseHistory[currentColumnId].enteredAt?.toDate() || new Date(phaseHistory[currentColumnId].enteredAt || now);
+        phaseHistory[currentColumnId].exitedAt = now;
+        phaseHistory[currentColumnId].duration = now.getTime() - enteredAt.getTime();
+      }
+      
+      // Iniciar nova fase
+      phaseHistory[newColumnId] = {
+        phaseId: newColumnId,
+        enteredAt: now
+      };
+
+      console.log('📝 Atualizando histórico de fases:', {
+        leadId,
+        from: currentColumnId,
+        to: newColumnId,
+        phaseHistoryKeys: Object.keys(phaseHistory)
+      });
+
       const updates = {
         columnId: newColumnId,
-        movedToCurrentColumnAt: serverTimestamp()
+        movedToCurrentColumnAt: serverTimestamp(),
+        phaseHistory: phaseHistory
       };
+      
       return await runInInjectionContext(this.injector, () => updateDoc(leadRef, updates));
     } catch (error) {
       console.error('Erro ao mover lead:', error);
