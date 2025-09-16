@@ -74,6 +74,11 @@ export interface CompanyUser {
   permissions: string[];
   joinedAt: any;
   lastActive?: any;
+  inviteStatus?: 'pending' | 'accepted' | 'expired' | 'inactive';
+  inviteToken?: string | null;
+  acceptedAt?: any;
+  photoURL?: string;
+  emailVerified?: boolean;
 }
 
 export interface CompanySettings {

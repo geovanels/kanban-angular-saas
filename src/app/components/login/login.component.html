@@ -6,7 +6,7 @@
         <i class="fas fa-tasks logo-icon"></i>
       </div>
       <h1 class="auth-title">TaskBoard</h1>
-      <p class="auth-subtitle">Sistema Kanban Multi-Empresas</p>
+      <p class="auth-subtitle">Sistema de Gestão Kanban</p>
     </div>
 
     <!-- Tab Navigation -->
@@ -83,6 +83,17 @@
           <i class="fas fa-sign-in-alt" *ngIf="!isLoading()"></i>
           {{ isLoading() ? 'Entrando...' : 'Entrar' }}
         </button>
+
+        <div class="text-center mt-3">
+          <button 
+            type="button"
+            class="btn-link"
+            (click)="switchView('forgot-password')"
+            [disabled]="isLoading()">
+            <i class="fas fa-key"></i>
+            Esqueceu a senha?
+          </button>
+        </div>
       </form>
 
       <div class="auth-divider">
@@ -304,6 +315,54 @@
       </form>
     </div>
 
+    <!-- Forgot Password Form -->
+    <div class="auth-content" *ngIf="currentView() === 'forgot-password'">
+      <div class="forgot-password-header">
+        <i class="fas fa-key icon-large"></i>
+        <h3>Recuperar Senha</h3>
+        <p class="text-muted">
+          Informe seu email e enviaremos instruções para redefinir sua senha.
+        </p>
+      </div>
+
+      <form (ngSubmit)="sendPasswordReset()" class="auth-form">
+        <div class="form-group">
+          <label for="reset-email" class="form-label">
+            <i class="fas fa-envelope"></i>
+            Email
+          </label>
+          <input 
+            type="email" 
+            id="reset-email"
+            class="form-control"
+            [value]="resetEmail()"
+            (input)="resetEmail.set($any($event.target).value)"
+            placeholder="seu@email.com"
+            required>
+        </div>
+
+        <button 
+          type="submit" 
+          class="btn btn-primary btn-block"
+          [disabled]="resetLoading() || !resetEmail().trim()">
+          <i class="fas fa-spinner fa-spin" *ngIf="resetLoading()"></i>
+          <i class="fas fa-paper-plane" *ngIf="!resetLoading()"></i>
+          {{ resetLoading() ? 'Enviando...' : 'Enviar Email de Recuperação' }}
+        </button>
+      </form>
+
+      <div class="text-center mt-4">
+        <button 
+          type="button"
+          class="btn-link"
+          (click)="switchView('login')"
+          [disabled]="resetLoading()">
+          <i class="fas fa-arrow-left"></i>
+          Voltar para o login
+        </button>
+      </div>
+    </div>
+
     <!-- Footer Info -->
     <div class="auth-footer">
       <div class="footer-features">
@@ -322,7 +381,7 @@
       </div>
       
       <p class="copyright">
-        © 2024 TaskBoard - Sistema Kanban Multi-Empresas
+        © 2024 TaskBoard - Sistema de Gestão Kanban
       </p>
     </div>
   </div>

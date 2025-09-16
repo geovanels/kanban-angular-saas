@@ -35,10 +35,14 @@ export class LoginComponent implements OnInit {
   registerForm!: FormGroup;
   
   // UI State
-  currentView = signal<'login' | 'register' | 'company-setup'>('login');
+  currentView = signal<'login' | 'register' | 'company-setup' | 'forgot-password'>('login');
   isLoading = signal(false);
   errorMessage = signal('');
   successMessage = signal('');
+  
+  // Password reset
+  resetEmail = signal('');
+  resetLoading = signal(false);
   
   // Registration state
   userCreated = signal(false);
@@ -354,10 +358,46 @@ export class LoginComponent implements OnInit {
     ].filter(alias => alias.length >= 3 && alias.length <= 30);
   }
 
-  switchView(view: 'login' | 'register') {
+  async sendPasswordReset() {
+    const email = this.resetEmail().trim();
+    
+    if (!email) {
+      this.errorMessage.set('Por favor, informe o email.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      this.errorMessage.set('Por favor, informe um email válido.');
+      return;
+    }
+
+    this.resetLoading.set(true);
+    this.clearMessages();
+
+    try {
+      const result = await this.authService.sendPasswordReset(email);
+      
+      if (result.success) {
+        this.successMessage.set(
+          `Email de recuperação enviado para ${email}. ` +
+          'Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.'
+        );
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      this.errorMessage.set(this.getErrorMessage(error));
+    } finally {
+      this.resetLoading.set(false);
+    }
+  }
+
+  switchView(view: 'login' | 'register' | 'forgot-password') {
     this.currentView.set(view);
     this.clearMessages();
     this.resetForms();
+    this.resetEmail.set('');
   }
 
   private resetForms() {

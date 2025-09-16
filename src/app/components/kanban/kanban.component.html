@@ -771,23 +771,55 @@ Authorization: Bearer {{ apiToken }}
   <!-- Mobile board: stages list + cards feed -->
   <div *ngIf="!isLoading && activeTab === 'kanban'" class="mobile-board">
     <div class="p-4 space-y-3">
-      <!-- Mobile filters (placeholders) -->
+      <!-- Mobile filters -->
       <div class="flex gap-2 overflow-x-auto pb-2">
-        <button (click)="setTextFilter()" class="px-3 py-2 bg-gray-100 rounded-full text-gray-600 text-sm flex items-center gap-2">
+        <button (click)="setTextFilter()" 
+                class="px-3 py-2 rounded-full text-sm flex items-center gap-2 transition-colors"
+                [class.bg-blue-100]="filterQuery"
+                [class.text-blue-700]="filterQuery" 
+                [class.bg-gray-100]="!filterQuery"
+                [class.text-gray-600]="!filterQuery">
           <i class="fas fa-search"></i>
-          {{ filterQuery ? ('"' + filterQuery + '"') : 'Filtrar por palavra' }}
+          <span *ngIf="!filterQuery">Filtrar por palavra</span>
+          <span *ngIf="filterQuery" class="max-w-24 truncate">"{{ filterQuery }}"</span>
         </button>
-        <button (click)="toggleOnlyMine()" class="px-3 py-2 rounded-full text-sm"
-                [class.bg-blue-100]="filterOnlyMine" [class.text-blue-700]="filterOnlyMine" [class.bg-gray-100]="!filterOnlyMine" [class.text-gray-600]="!filterOnlyMine">
-          Seus cards
+        
+        <button (click)="toggleOnlyMine()" 
+                class="px-3 py-2 rounded-full text-sm transition-colors flex items-center gap-1"
+                [class.bg-blue-100]="filterOnlyMine" 
+                [class.text-blue-700]="filterOnlyMine" 
+                [class.bg-gray-100]="!filterOnlyMine" 
+                [class.text-gray-600]="!filterOnlyMine">
+          <i class="fas fa-user" [class.fa-user-check]="filterOnlyMine"></i>
+          Meus cards
         </button>
-        <button (click)="setTagFilter()" class="px-3 py-2 bg-gray-100 rounded-full text-gray-600 text-sm flex items-center gap-2">
+        
+        <button (click)="setTagFilter()" 
+                class="px-3 py-2 rounded-full text-sm flex items-center gap-2 transition-colors"
+                [class.bg-blue-100]="filterTag"
+                [class.text-blue-700]="filterTag"
+                [class.bg-gray-100]="!filterTag"
+                [class.text-gray-600]="!filterTag">
           <i class="fas fa-tag"></i>
-          {{ filterTag || 'Por etiqueta' }}
+          <span *ngIf="!filterTag">Etiqueta</span>
+          <span *ngIf="filterTag" class="max-w-20 truncate">{{ filterTag }}</span>
         </button>
-        <button *ngIf="filterQuery || filterOnlyMine || filterTag" (click)="clearFilters()" class="px-3 py-2 bg-gray-100 rounded-full text-gray-600 text-sm">
+        
+        <button *ngIf="hasActiveFilters()" 
+                (click)="clearFilters()" 
+                class="px-3 py-2 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors flex items-center gap-1">
+          <i class="fas fa-times"></i>
           Limpar
         </button>
+      </div>
+      
+      <!-- Filter status indicator -->
+      <div *ngIf="hasActiveFilters()" class="mt-2 text-xs text-blue-600 flex items-center gap-1">
+        <i class="fas fa-filter"></i>
+        <span>Filtros ativos</span>
+        <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+          {{ (filterQuery ? 1 : 0) + (filterOnlyMine ? 1 : 0) + (filterTag ? 1 : 0) }}
+        </span>
       </div>
 
       <!-- Stages as accordion list -->

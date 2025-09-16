@@ -18,6 +18,11 @@ export const routes: Routes = [
     canActivate: [CompanyGuard] // Verificar empresa antes do login
   },
   {
+    path: 'accept-invite',
+    loadComponent: () => import('./components/invite-accept/invite-accept.component').then(m => m.InviteAcceptComponent)
+    // Sem guards - deve ser acessível mesmo sem estar logado
+  },
+  {
     path: 'dashboard',
     loadComponent: () => import('./components/dashboard/dashboard.component').then(m => m.DashboardComponent),
     canActivate: [CompanyGuard, authGuard] // Verificar empresa e autenticação
