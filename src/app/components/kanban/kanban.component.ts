@@ -528,46 +528,25 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   getCardFieldsForLead(lead: Lead): Array<{ label: string; value: any; type?: string }> {
-    // Unir configuração da fase com fallback do formulário inicial (sem duplicar)
-    const phaseList = this.phaseCardFields[lead.columnId] || [];
-    const fallbackInitial = (this.initialFormFields || [])
-      .filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases)
-      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    // SOLUÇÃO: Usar APENAS campos do formulário inicial que estão marcados para exibir
+    // Os campos marcados com showInCard/showInAllPhases devem aparecer em TODAS as fases
+    // Logs de debug removidos
 
-    // Debug logging
-    console.log('🔍 Debug getCardFieldsForLead:', {
-      leadId: lead.id,
-      columnId: lead.columnId,
-      phaseListLength: phaseList.length,
-      fallbackInitialLength: fallbackInitial.length,
-      initialFormFields: this.initialFormFields?.map((f: any) => ({
-        name: f.name,
-        type: f.type,
-        showInCard: f.showInCard,
-        showInAllPhases: f.showInAllPhases
-      })),
-      phaseList: phaseList.map((f: any) => ({
-        name: f.name,
-        type: f.type,
-        showInCard: f.showInCard,
-        showInAllPhases: f.showInAllPhases
-      })),
-      fallbackInitial: fallbackInitial.map((f: any) => ({
-        name: f.name,
-        type: f.type,
-        showInCard: f.showInCard,
-        showInAllPhases: f.showInAllPhases
-      }))
+    console.log('🔍 TODOS OS 5 CAMPOS DETALHADOS:');
+    this.initialFormFields?.forEach((f: any, index: number) => {
+      console.log(`Campo ${index + 1}: ${f.name} (${f.type}) - showInCard: ${f.showInCard}, showInAllPhases: ${f.showInAllPhases}`);
     });
 
-    const merged: any[] = [...phaseList];
-    const seen = new Set<string>();
-    const keyOf = (f: any) => (f.apiFieldName && f.apiFieldName.trim()) || (f.name && f.name.trim()) || (f.label && f.label.trim()) || '';
-    for (const f of merged) seen.add(keyOf(f).toLowerCase());
-    for (const f of fallbackInitial) {
-      const k = keyOf(f).toLowerCase();
-      if (!seen.has(k)) { merged.push(f); seen.add(k); }
-    }
+    const fieldsToShow = (this.initialFormFields || [])
+      .filter((f: any) => {
+        const shouldShow = !!f?.showInCard || !!f?.showInAllPhases;
+        return shouldShow;
+      })
+      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+    console.log('📋 CAMPOS MARCADOS PARA EXIBIR:', fieldsToShow.map((f: any) => f.name));
+
+    // Logs removidos
 
     const out: Array<{ label: string; value: any; type?: string }> = [];
     const isTitleField = (f: any): boolean => {
@@ -579,24 +558,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
       const k = norm(key); const l = norm(lbl);
       return companyGroup.includes(k) || companyGroup.includes(l) || cnpjGroup.includes(k) || cnpjGroup.includes(l);
     };
-    for (const f of merged) {
-      if (isTitleField(f)) continue;
+    
+    for (const f of fieldsToShow) {
+      const isTitle = isTitleField(f);
       const value = this.readFieldValue(lead, f.apiFieldName || f.name, f.label || f.name);
-      console.log('🔍 Processing field:', {
-        field: f.name,
-        type: f.type,
-        apiFieldName: f.apiFieldName,
-        label: f.label,
-        value: value,
-        showInCard: f.showInCard,
-        showInAllPhases: f.showInAllPhases
-      });
-      if (value !== undefined && value !== null && `${value}`.trim() !== '') {
-        out.push({ label: f.label || f.name || f.apiFieldName, value, type: (f.type || '').toLowerCase() });
+      const hasValue = value !== undefined && value !== null && `${value}`.trim() !== '';
+      
+      if (!isTitle && hasValue) {
+        const item = { label: f.label || f.name || f.apiFieldName, value, type: (f.type || '').toLowerCase() };
+        out.push(item);
       }
     }
-    
-    console.log('🔍 Final card fields output:', out);
     return out;
   }
 
@@ -609,35 +581,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
         ...(this.initialFormFields || [])
       ];
       
-      console.log('🌡️ getTemperatureGlobalItem DEBUG:', {
-        leadId: lead.id,
-        columnId: lead.columnId,
-        phaseCardFields: this.phaseCardFields[lead.columnId],
-        initialFormFields: this.initialFormFields,
-        sourcesLength: sources.length,
-        sources: sources
-      });
+      // Removido log desnecessário
       
       const tempField = (sources as any[]).find(f => {
         const isTemperatura = (f.type || '').toLowerCase() === 'temperatura';
         const hasVisibilityFlag = f.showInCard || f.showInAllPhases;
-        console.log('🌡️ Checking field:', {
-          name: f.name,
-          type: f.type,
-          isTemperatura: isTemperatura,
-          showInCard: f.showInCard,
-          showInAllPhases: f.showInAllPhases,
-          hasVisibilityFlag: hasVisibilityFlag,
-          matches: isTemperatura && hasVisibilityFlag
-        });
+        // Removido log desnecessário
         return isTemperatura && hasVisibilityFlag;
       });
       
-      console.log('🌡️ Found tempField:', tempField);
+      // Removido log desnecessário
       
       if (!tempField) return null;
       const val = this.readFieldValue(lead, tempField.apiFieldName || tempField.name, tempField.label || tempField.name);
-      console.log('🌡️ Temperature value:', val);
+      // Removido log desnecessário
       if (val === undefined || val === null || `${val}`.trim() === '') return null;
       return { label: tempField.label || 'Temperatura', value: val };
     } catch (error) {
