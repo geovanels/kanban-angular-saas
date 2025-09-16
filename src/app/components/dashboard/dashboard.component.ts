@@ -45,7 +45,45 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.currentUser = this.authService.getCurrentUser();
     
     if (this.currentUser) {
+      // Processar convites pendentes se houver
+      await this.processPendingInvites();
+      
       await this.loadBoards();
+    }
+  }
+
+  private async processPendingInvites() {
+    try {
+      const pendingInviteData = localStorage.getItem('pendingInvite');
+      if (!pendingInviteData) return;
+
+      const inviteData = JSON.parse(pendingInviteData);
+      console.log('🔄 Debug Dashboard - Processando convite pendente...', inviteData);
+
+      // Verificar se o convite não é muito antigo (1 hora)
+      const oneHour = 60 * 60 * 1000;
+      if (Date.now() - inviteData.timestamp > oneHour) {
+        console.log('⏰ Debug Dashboard - Convite expirado, removendo');
+        localStorage.removeItem('pendingInvite');
+        return;
+      }
+
+      // Processar convite
+      const success = await this.authService.processPendingInvite(
+        inviteData.companyId,
+        inviteData.email,
+        inviteData.token
+      );
+
+      if (success) {
+        console.log('✅ Debug Dashboard - Convite processado com sucesso');
+        localStorage.removeItem('pendingInvite');
+      } else {
+        console.log('❌ Debug Dashboard - Falha ao processar convite');
+        // Manter no localStorage para tentar novamente na próxima vez
+      }
+    } catch (error) {
+      console.error('❌ Debug Dashboard - Erro ao processar convite pendente:', error);
     }
   }
 

@@ -97,11 +97,16 @@ export class ReportsComponent implements OnInit, OnDestroy {
   // Display options
   currentView: 'overview' | 'sla' | 'phases' | 'registros' | 'charts' = 'overview';
   exportFormats = ['PDF', 'Excel', 'CSV'];
+  
+  // Column management for registros table
+  availableColumns: any[] = [];
+  selectedColumns: string[] = [];
+  showColumnSelector = false;
   viewTabs = [
     { key: 'overview', name: 'Visão Geral', icon: 'fa-chart-pie' },
     { key: 'sla', name: 'SLA', icon: 'fa-clock' },
     { key: 'phases', name: 'Fases', icon: 'fa-columns' },
-    { key: 'registros', name: 'Leads', icon: 'fa-users' },
+    { key: 'registros', name: 'Registros', icon: 'fa-users' },
     { key: 'charts', name: 'Gráficos', icon: 'fa-chart-bar' }
   ];
 
@@ -131,6 +136,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
     // If boardId is set (from input or URL), load data directly
     if (this.boardId && this.ownerId) {
       await this.loadData();
+      this.initializeColumns();
       this.generateReport();
     }
   }
@@ -183,6 +189,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   async selectBoard(boardId: string) {
     this.boardId = boardId;
     await this.loadData();
+    this.initializeColumns();
     this.generateReport();
   }
 
@@ -253,7 +260,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
       const boards = await this.firestoreService.getBoards(this.ownerId);
       this.board = boards.find(b => b.id === this.boardId) || null;
 
-      // Load registros and columns in parallel
+      // Load registros, columns, and form config in parallel
       const [registros, columns] = await Promise.all([
         this.firestoreService.getLeads(this.ownerId, this.boardId),
         this.firestoreService.getColumns(this.ownerId, this.boardId)
@@ -263,12 +270,21 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.columns = columns;
       this.users = []; // Será implementado posteriormente
 
+      // Load initial form fields from board configuration
+      await this.loadInitialFormFields();
+
       console.log('Dados carregados:', {
         boardId: this.boardId,
         recordsCount: registros.length,
         columnsCount: columns.length,
+        formFieldsCount: (this.board as any)?.initialFormFields?.length || 0,
         registros: registros.slice(0, 3) // Log first 3 registros for debugging
       });
+
+      // Debug form fields structure
+      if (registros.length > 0 && registros[0].fields) {
+        console.log('📋 Campos disponíveis no primeiro registro:', Object.keys(registros[0].fields));
+      }
 
     } catch (error) {
       console.error('Erro ao carregar dados do relatório:', error);
@@ -627,5 +643,275 @@ export class ReportsComponent implements OnInit, OnDestroy {
     if (this.chartData.registrosOverTime.length === 0) return 0;
     const maxValue = Math.max(...this.chartData.registrosOverTime.map(d => d.registros));
     return maxValue > 0 ? (value / maxValue * 100) : 0;
+  }
+
+  // Column management methods
+  private initializeColumns() {
+    this.initializeAvailableColumns();
+    this.loadSelectedColumns();
+  }
+
+  private async loadInitialFormFields() {
+    if (!this.boardId) return;
+    
+    try {
+      const formConfig = await this.firestoreService.getInitialFormConfig(this.boardId);
+      if (formConfig && formConfig.fields) {
+        (this.board as any).initialFormFields = formConfig.fields || [];
+        console.log('📋 Campos do formulário carregados:', (this.board as any).initialFormFields);
+      } else {
+        (this.board as any).initialFormFields = [];
+      }
+    } catch (error) {
+      console.log('ℹ️ Nenhuma configuração de formulário encontrada, usando campos padrão');
+      (this.board as any).initialFormFields = [];
+    }
+  }
+
+  private initializeAvailableColumns() {
+    // Reset available columns
+    this.availableColumns = [];
+
+    // Always add essential system columns
+    const systemColumns = [
+      { key: 'currentPhase', label: 'Fase Atual', type: 'system', field: 'columnId' },
+      { key: 'createdAt', label: 'Criado em', type: 'system', field: 'createdAt' },
+      { key: 'status', label: 'Status', type: 'system', field: 'status' },
+      { key: 'responsibleUser', label: 'Responsável', type: 'system', field: 'responsibleUserEmail' }
+    ];
+
+    this.availableColumns.push(...systemColumns);
+
+    // Add form fields from the board's initial form configuration
+    const formFields = (this.board as any)?.initialFormFields || [];
+    
+    console.log('🔍 Campos do formulário para colunas:', formFields);
+    
+    // First, add common form fields that we know exist
+    const commonFormFields = [
+      { name: 'contactName', label: 'Nome do Contato', type: 'text' },
+      { name: 'contactEmail', label: 'Email do Contato', type: 'email' },
+      { name: 'contactPhone', label: 'Telefone do Contato', type: 'tel' },
+      { name: 'companyName', label: 'Nome da Empresa', type: 'text' },
+      { name: 'cnpj', label: 'CNPJ', type: 'text' }
+    ];
+
+    // Add common fields first (they might be overridden if exist in form config)
+    commonFormFields.forEach(field => {
+      this.availableColumns.push({
+        key: field.name,
+        label: field.label,
+        type: 'form',
+        field: `fields.${field.name}`,
+        fieldType: field.type
+      });
+    });
+
+    // Then add configured form fields (will not duplicate if already added)
+    formFields.forEach((field: any) => {
+      if (field.name && field.label) {
+        // Check if this field already exists
+        const existingColumn = this.availableColumns.find(col => col.key === field.name);
+        if (!existingColumn) {
+          this.availableColumns.push({
+            key: field.name,
+            label: field.label || field.name,
+            type: 'form',
+            field: `fields.${field.name}`,
+            fieldType: field.type || 'text'
+          });
+        } else {
+          // Update existing column with form config
+          existingColumn.label = field.label || existingColumn.label;
+          existingColumn.fieldType = field.type || existingColumn.fieldType;
+        }
+      }
+    });
+
+    console.log('📊 Colunas disponíveis inicializadas:', this.availableColumns);
+  }
+
+  private loadSelectedColumns() {
+    if (!this.boardId) return;
+    
+    try {
+      const saved = localStorage.getItem(`report-columns-${this.boardId}`);
+      if (saved) {
+        this.selectedColumns = JSON.parse(saved);
+      } else {
+        // Default columns - include the most important fields
+        this.selectedColumns = [
+          'contactName',
+          'contactEmail',
+          'companyName', 
+          'currentPhase',
+          'createdAt',
+          'status'
+        ];
+      }
+    } catch (error) {
+      console.warn('Could not load selected columns from localStorage:', error);
+      this.selectedColumns = ['contactName', 'contactEmail', 'companyName', 'currentPhase', 'createdAt', 'status'];
+    }
+  }
+
+  private saveSelectedColumns() {
+    if (!this.boardId) return;
+    
+    try {
+      localStorage.setItem(`report-columns-${this.boardId}`, JSON.stringify(this.selectedColumns));
+    } catch (error) {
+      console.warn('Could not save selected columns to localStorage:', error);
+    }
+  }
+
+  toggleColumnSelector() {
+    this.showColumnSelector = !this.showColumnSelector;
+  }
+
+  isColumnSelected(columnKey: string): boolean {
+    return this.selectedColumns.includes(columnKey);
+  }
+
+  toggleColumn(columnKey: string) {
+    if (this.isColumnSelected(columnKey)) {
+      this.selectedColumns = this.selectedColumns.filter(key => key !== columnKey);
+    } else {
+      this.selectedColumns.push(columnKey);
+    }
+    this.saveSelectedColumns();
+  }
+
+  getSelectedColumns() {
+    return this.availableColumns.filter(col => this.selectedColumns.includes(col.key));
+  }
+
+  getColumnValue(lead: Lead, column: any): string {
+    switch (column.key) {
+      case 'currentPhase':
+        return this.getColumnName(lead.columnId);
+      case 'createdAt':
+        return this.formatDate(lead.createdAt);
+      case 'status':
+        if (this.isLeadConcluded(lead)) return 'Concluído';
+        if (this.isLeadOverdue(lead)) return 'Em Atraso';
+        return 'Ativo';
+      case 'responsibleUser':
+        return lead.responsibleUserName || lead.responsibleUserEmail || 'Não atribuído';
+      
+      // Form fields - using same logic as Kanban component
+      case 'contactName':
+        return this.readFieldValue(lead, 'contactName');
+      case 'contactEmail':
+        return this.readFieldValue(lead, 'contactEmail');
+      case 'contactPhone':
+        return this.readFieldValue(lead, 'contactPhone');
+      case 'companyName':
+        return this.readFieldValue(lead, 'companyName');
+      case 'cnpj':
+        return this.readFieldValue(lead, 'cnpj');
+      
+      default:
+        // For dynamic form fields, try to get from fields object
+        const value = lead.fields?.[column.key];
+        if (value !== undefined && value !== null && value !== '') {
+          return String(value);
+        }
+        
+        // Fallback to nested property access
+        const nestedValue = this.getNestedProperty(lead, column.field);
+        return nestedValue ? String(nestedValue) : '-';
+    }
+  }
+
+  // Method inspired by the Kanban component's readFieldValue
+  private readFieldValue(lead: Lead, key: string): string {
+    if (!lead.fields) return '-';
+
+    // Synonyms mapping based on Kanban component
+    const synonymsGroup: Record<string, string[]> = {
+      companyName: ['companyName','empresa','nomeEmpresa','nameCompany','company','company_name','empresa_nome','nameComapny'],
+      contactName: ['contactName','name','nome','nomeLead','nameLead','leadName'],
+      contactEmail: ['contactEmail','email','emailLead','contatoEmail','leadEmail'],
+      contactPhone: ['contactPhone','phone','telefone','celular','phoneLead','telefoneContato'],
+      cnpj: ['cnpj','cnpjCompany','cnpjEmpresa','companyCnpj']
+    };
+
+    // Get all possible field names for this key
+    const candidates = synonymsGroup[key] || [key];
+    
+    // Try each candidate until we find a value
+    for (const candidate of candidates) {
+      const value = lead.fields[candidate];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        return String(value);
+      }
+    }
+    
+    return '-';
+  }
+
+  private getNestedProperty(obj: any, path: string): any {
+    return path.split('.').reduce((current, prop) => {
+      return current && current[prop] !== undefined ? current[prop] : null;
+    }, obj);
+  }
+
+  // Helper methods for template
+  getSystemColumns() {
+    return this.availableColumns.filter(col => col.type === 'system');
+  }
+
+  getFormColumns() {
+    return this.availableColumns.filter(col => col.type === 'form');
+  }
+
+  hasFormColumns(): boolean {
+    return this.availableColumns.filter(col => col.type === 'form').length > 0;
+  }
+
+  // Método de debug temporário
+  debugLeadStructure() {
+    if (this.records.length === 0) {
+      alert('Nenhum registro disponível para debug');
+      return;
+    }
+
+    const lead = this.records[0];
+    console.log('🐛 DEBUG COMPLETO DO LEAD:');
+    console.log('🐛 Lead completo:', lead);
+    console.log('🐛 Lead.fields:', lead.fields);
+    console.log('🐛 Chaves dos fields:', lead.fields ? Object.keys(lead.fields) : 'sem fields');
+    console.log('🐛 Valores dos fields:', lead.fields ? Object.entries(lead.fields) : 'sem entries');
+
+    // Testar especificamente os campos problemáticos
+    console.log('🐛 TESTANDO CAMPOS PROBLEMÁTICOS:');
+    console.log('🐛 contactName tentativas:', [
+      lead.fields?.['contactName'],
+      lead.fields?.['name'], 
+      lead.fields?.['nome']
+    ]);
+    console.log('🐛 contactEmail tentativas:', [
+      lead.fields?.['contactEmail'],
+      lead.fields?.['email']
+    ]);
+
+    // Mostrar resultado do método readFieldValue
+    console.log('🐛 RESULTADO DOS MÉTODOS:');
+    console.log('🐛 readFieldValue(contactName):', this.readFieldValue(lead, 'contactName'));
+    console.log('🐛 readFieldValue(contactEmail):', this.readFieldValue(lead, 'contactEmail'));
+    console.log('🐛 readFieldValue(companyName):', this.readFieldValue(lead, 'companyName'));
+
+    // Mostrar no alerta também
+    const debugInfo = {
+      leadId: lead.id,
+      fieldsKeys: lead.fields ? Object.keys(lead.fields) : 'no fields',
+      contactNameResult: this.readFieldValue(lead, 'contactName'),
+      contactEmailResult: this.readFieldValue(lead, 'contactEmail'),
+      companyNameResult: this.readFieldValue(lead, 'companyName'),
+      allFields: lead.fields
+    };
+
+    alert('DEBUG INFO (veja console para detalhes):\n' + JSON.stringify(debugInfo, null, 2));
   }
 }

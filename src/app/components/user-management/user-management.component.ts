@@ -28,10 +28,19 @@ export class UserManagementComponent implements OnInit {
   // Invite user form
   showInviteForm = signal(false);
   inviteEmail = signal('');
+  inviteName = signal('');
   inviteRole = signal<'admin' | 'manager' | 'user'>('user');
   inviteLoading = signal(false);
   inviteError = signal<string | null>(null);
   inviteSuccess = signal<string | null>(null);
+  
+  // Confirmation modals
+  showConfirmModal = signal(false);
+  confirmAction = signal<(() => void) | null>(null);
+  confirmTitle = signal('');
+  confirmMessage = signal('');
+  confirmButtonText = signal('Confirmar');
+  confirmButtonClass = signal('btn-danger');
 
 
   async ngOnInit() {
@@ -163,7 +172,8 @@ export class UserManagementComponent implements OnInit {
             permissions: [],
             joinedAt: new Date(),
             photoURL: currentUser.photoURL,
-            emailVerified: currentUser.emailVerified
+            emailVerified: currentUser.emailVerified,
+            inviteStatus: 'accepted' as const
           };
           
           users = [fakeUser];
@@ -188,22 +198,31 @@ export class UserManagementComponent implements OnInit {
             return {
               ...user,
               displayName: currentUser.displayName || user.displayName || this.extractNameFromEmail(user.email),
-              photoURL: currentUser.photoURL,
-              emailVerified: currentUser.emailVerified,
-              uid: currentUser.uid
+              photoURL: currentUser.photoURL || user.photoURL,
+              emailVerified: currentUser.emailVerified || user.emailVerified,
+              uid: currentUser.uid || user.uid,
+              // Preservar dados do convite se existirem
+              inviteStatus: user.inviteStatus || 'accepted',
+              inviteToken: user.inviteToken
             };
           }
           
           // Para outros usuários, usar dados disponíveis e inferir nome do email se necessário
           return {
             ...user,
-            displayName: user.displayName || this.extractNameFromEmail(user.email)
+            displayName: user.displayName || this.extractNameFromEmail(user.email),
+            // Preservar dados do convite
+            inviteStatus: user.inviteStatus || 'accepted',
+            inviteToken: user.inviteToken
           };
         } catch (error) {
           console.warn('Erro ao enriquecer dados do usuário:', user.email, error);
           return {
             ...user,
-            displayName: user.displayName || this.extractNameFromEmail(user.email)
+            displayName: user.displayName || this.extractNameFromEmail(user.email),
+            // Preservar dados do convite mesmo em erro
+            inviteStatus: user.inviteStatus || 'accepted',
+            inviteToken: user.inviteToken
           };
         }
       });
@@ -228,10 +247,22 @@ export class UserManagementComponent implements OnInit {
 
   async inviteUser() {
     const email = this.inviteEmail().trim();
+    const name = this.inviteName().trim();
     const role = this.inviteRole();
     const company = this.currentCompany();
 
     if (!email || !company) return;
+
+    // Validar nome
+    if (!name) {
+      this.inviteError.set('Nome é obrigatório');
+      return;
+    }
+
+    if (name.length < 2) {
+      this.inviteError.set('Nome deve ter pelo menos 2 caracteres');
+      return;
+    }
 
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -252,10 +283,11 @@ export class UserManagementComponent implements OnInit {
     this.inviteSuccess.set(null);
 
     try {
-      await this.companyService.addUserToCompany(company.id!, email, role);
+      await this.companyService.addUserToCompany(company.id!, email, role, name);
       
-      this.inviteSuccess.set(`Convite enviado para ${email}`);
+      this.inviteSuccess.set(`Convite enviado para ${name} (${email})`);
       this.inviteEmail.set('');
+      this.inviteName.set('');
       this.inviteRole.set('user');
       
       // Recarregar lista de usuários
@@ -288,29 +320,80 @@ export class UserManagementComponent implements OnInit {
     }
   }
 
-  async removeUser(userEmail: string) {
+  removeUser(userEmail: string) {
+    console.log('🚀 Debug - removeUser chamado para:', userEmail);
     const company = this.currentCompany();
     const currentUser = this.currentUser();
     
-    if (!company || !currentUser) return;
+    console.log('🏢 Debug - Company:', !!company);
+    console.log('👤 Debug - Current user:', !!currentUser);
+    
+    if (!company || !currentUser) {
+      console.log('❌ Debug - Company ou usuário não encontrado');
+      return;
+    }
     
     // Não permitir remover a si mesmo
     if (userEmail === currentUser.email) {
-      alert('Você não pode remover a si mesmo. Use a opção "Excluir Empresa" se deseja sair.');
+      this.showConfirmation(
+        'Ação não permitida',
+        'Você não pode remover a si mesmo. Use a opção "Excluir Empresa" se deseja sair.',
+        () => {},
+        'Entendi',
+        'btn-primary'
+      );
       return;
     }
 
-    if (!confirm(`Deseja remover o usuário ${userEmail} da empresa?`)) {
+    // Buscar informações do usuário para mostrar o nome
+    const user = this.users().find(u => u.email === userEmail);
+    const userName = user?.displayName || userEmail;
+
+    this.showConfirmation(
+      'Confirmar exclusão',
+      `Deseja realmente remover <strong>${userName}</strong> (${userEmail}) da empresa?<br><br>Esta ação não pode ser desfeita.`,
+      () => this.confirmRemoveUser(userEmail),
+      'Excluir Usuário',
+      'btn-danger'
+    );
+  }
+
+  async confirmRemoveUser(userEmail: string) {
+    const company = this.currentCompany();
+    if (!company) {
+      console.error('🚫 Debug - Empresa não encontrada');
       return;
     }
+
+    console.log('🗑️ Debug - Iniciando remoção do usuário:', { userEmail, companyId: company.id });
 
     this.isLoading.set(true);
     try {
+      console.log('🔄 Debug - Chamando removeUserFromCompany...');
       await this.companyService.removeUserFromCompany(company.id!, userEmail);
+      console.log('✅ Debug - Usuário removido do Firestore');
+      
+      console.log('🔄 Debug - Recarregando lista de usuários...');
       await this.loadCompanyUsers();
+      console.log('✅ Debug - Lista de usuários recarregada');
+      
+      // Mostrar mensagem de sucesso
+      this.inviteSuccess.set(`Usuário ${userEmail} removido com sucesso.`);
+      setTimeout(() => {
+        this.inviteSuccess.set(null);
+      }, 3000);
+      
     } catch (error) {
-      console.error('Erro ao remover usuário:', error);
-      alert('Erro ao remover usuário. Tente novamente.');
+      console.error('❌ Debug - Erro ao remover usuário:', error);
+      
+      // Mostrar erro com modal
+      this.showConfirmation(
+        'Erro ao remover usuário',
+        'Ocorreu um erro ao tentar remover o usuário. Tente novamente.',
+        () => {},
+        'Fechar',
+        'btn-primary'
+      );
     } finally {
       this.isLoading.set(false);
     }
@@ -327,7 +410,13 @@ export class UserManagementComponent implements OnInit {
       await this.loadCompanyUsers();
     } catch (error) {
       console.error('Erro ao alterar função do usuário:', error);
-      alert('Erro ao alterar função do usuário. Tente novamente.');
+      this.showConfirmation(
+        'Erro ao alterar função',
+        'Ocorreu um erro ao alterar a função do usuário. Tente novamente.',
+        () => {},
+        'Fechar',
+        'btn-primary'
+      );
     } finally {
       this.isLoading.set(false);
     }
@@ -337,16 +426,79 @@ export class UserManagementComponent implements OnInit {
     const company = this.currentCompany();
     if (!company) return;
 
+    this.isLoading.set(true);
     try {
       // Re-adicionar o usuário à empresa (que funciona como reenviar convite)
       const user = this.users().find(u => u.email === userEmail);
       if (user) {
-        await this.companyService.addUserToCompany(company.id!, userEmail, user.role);
-        alert(`Convite reenviado para ${userEmail}`);
+        await this.companyService.addUserToCompany(company.id!, userEmail, user.role, user.displayName);
+        this.inviteSuccess.set(`Convite reenviado para ${userEmail}`);
+        setTimeout(() => {
+          this.inviteSuccess.set(null);
+        }, 3000);
+        await this.loadCompanyUsers();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao reenviar convite:', error);
-      alert('Erro ao reenviar convite. Tente novamente.');
+      
+      let errorMessage = 'Erro ao reenviar convite. Tente novamente.';
+      if (error?.message && error.message.includes('Configuração SMTP')) {
+        errorMessage = `❌ ${error.message}. Configure o SMTP na seção de configurações antes de reenviar convites.`;
+      }
+      
+      this.inviteError.set(errorMessage);
+      setTimeout(() => {
+        this.inviteError.set(null);
+      }, 5000);
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  inactivateUser(userEmail: string) {
+    const company = this.currentCompany();
+    if (!company) return;
+
+    // Buscar informações do usuário para mostrar o nome
+    const user = this.users().find(u => u.email === userEmail);
+    const userName = user?.displayName || userEmail;
+
+    this.showConfirmation(
+      'Confirmar inativação',
+      `Deseja realmente inativar <strong>${userName}</strong> (${userEmail})?<br><br>O usuário não poderá mais acessar o sistema até ser reativado.`,
+      () => this.confirmInactivateUser(userEmail),
+      'Inativar Usuário',
+      'btn-danger'
+    );
+  }
+
+  async confirmInactivateUser(userEmail: string) {
+    const company = this.currentCompany();
+    if (!company) return;
+
+    this.isLoading.set(true);
+    try {
+      // Atualizar status para inativo
+      await this.companyService.updateUserInCompany(company.id!, userEmail, {
+        inviteStatus: 'inactive'
+      });
+      
+      await this.loadCompanyUsers();
+      this.inviteSuccess.set(`Usuário ${userEmail} foi inativado com sucesso.`);
+      setTimeout(() => {
+        this.inviteSuccess.set(null);
+      }, 3000);
+    } catch (error) {
+      console.error('Erro ao inativar usuário:', error);
+      this.showConfirmation(
+        'Erro ao inativar usuário',
+        'Ocorreu um erro ao tentar inativar o usuário. Tente novamente.',
+        () => {},
+        'Fechar',
+        'btn-primary'
+      );
+    } finally {
+      this.isLoading.set(false);
     }
   }
 
@@ -378,6 +530,39 @@ export class UserManagementComponent implements OnInit {
     this.inviteError.set(null);
     this.inviteSuccess.set(null);
     this.inviteEmail.set('');
+    this.inviteName.set('');
+  }
+
+  showConfirmation(title: string, message: string, action: () => void, buttonText: string = 'Confirmar', buttonClass: string = 'btn-danger') {
+    console.log('📱 Debug Modal - Mostrando confirmação:', { title, buttonText });
+    this.confirmTitle.set(title);
+    this.confirmMessage.set(message);
+    this.confirmAction.set(action);
+    this.confirmButtonText.set(buttonText);
+    this.confirmButtonClass.set(buttonClass);
+    this.showConfirmModal.set(true);
+    console.log('✅ Debug Modal - Modal configurado e aberto');
+  }
+
+  confirmModalAction() {
+    console.log('🔄 Debug Modal - Confirmando ação...');
+    const action = this.confirmAction();
+    console.log('🎯 Debug Modal - Ação encontrada:', !!action);
+    
+    if (action) {
+      console.log('▶️ Debug Modal - Executando ação...');
+      action();
+    } else {
+      console.log('❌ Debug Modal - Nenhuma ação para executar');
+    }
+    
+    this.showConfirmModal.set(false);
+    console.log('✅ Debug Modal - Modal fechado');
+  }
+
+  cancelModalAction() {
+    this.showConfirmModal.set(false);
+    this.confirmAction.set(null);
   }
 
 
@@ -392,15 +577,63 @@ export class UserManagementComponent implements OnInit {
 
   getRoleBadgeClass(role: string): string {
     switch (role) {
-      case 'admin': return 'badge-danger';
-      case 'manager': return 'badge-warning';
-      case 'user': return 'badge-info';
-      default: return 'badge-secondary';
+      case 'admin': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
+      case 'manager': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800';
+      case 'user': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800';
+      default: return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800';
+    }
+  }
+
+  getStatusLabel(status: string): string {
+    switch (status) {
+      case 'pending': return 'Convite Pendente';
+      case 'accepted': return 'Ativo';
+      case 'expired': return 'Convite Expirado';
+      case 'inactive': return 'Inativo';
+      default: return 'Desconhecido';
+    }
+  }
+
+  getStatusBadgeClass(status: string): string {
+    switch (status) {
+      case 'pending': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800';
+      case 'accepted': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800';
+      case 'expired': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
+      case 'inactive': return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800';
+      default: return 'inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800';
     }
   }
 
   getPrimaryColor(): string {
     const company = this.subdomainService.getCurrentCompany();
     return company?.primaryColor || company?.brandingConfig?.primaryColor || '#3B82F6';
+  }
+
+  formatJoinedDate(joinedAt: any): string {
+    if (!joinedAt) {
+      return 'Data não disponível';
+    }
+
+    try {
+      // Se for um Timestamp do Firestore, converter para Date
+      if (joinedAt && typeof joinedAt.toDate === 'function') {
+        return joinedAt.toDate().toLocaleDateString('pt-BR');
+      }
+      
+      // Se já for um Date
+      if (joinedAt instanceof Date) {
+        return joinedAt.toLocaleDateString('pt-BR');
+      }
+      
+      // Se for uma string, tentar converter
+      if (typeof joinedAt === 'string') {
+        return new Date(joinedAt).toLocaleDateString('pt-BR');
+      }
+      
+      return 'Data não disponível';
+    } catch (error) {
+      console.warn('Erro ao formatar data:', joinedAt, error);
+      return 'Data não disponível';
+    }
   }
 }

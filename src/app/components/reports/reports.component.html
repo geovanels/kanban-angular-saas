@@ -368,57 +368,115 @@
       </div>
 
       <!-- Registros List Tab -->
-      <div *ngIf="currentView === 'leads'">
+      <div *ngIf="currentView === 'registros'">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Lista Detalhada de Registros</h3>
-            <p class="text-sm text-gray-600 mt-1">{{ filteredRecords.length }} registros encontrados</p>
+          <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Lista Detalhada de Registros</h3>
+                <p class="text-sm text-gray-600 mt-1">{{ filteredRecords.length }} registros encontrados</p>
+              </div>
+              <!-- Debug button (temporário) -->
+              <button (click)="debugLeadStructure()" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">
+                🐛 DEBUG
+              </button>
+            </div>
+            
+            <!-- Column selector button -->
+            <div class="relative">
+              <button
+                (click)="toggleColumnSelector()"
+                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <i class="fas fa-columns mr-2"></i>
+                Colunas ({{ selectedColumns.length }})
+                <i class="fas fa-chevron-down ml-2"></i>
+              </button>
+
+              <!-- Column selector dropdown -->
+              <div *ngIf="showColumnSelector" class="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <div class="px-4 py-3 border-b border-gray-200">
+                  <h4 class="text-sm font-semibold text-gray-900">Selecionar Colunas</h4>
+                  <p class="text-xs text-gray-600 mt-1">Escolha as colunas que deseja exibir na tabela</p>
+                </div>
+                
+                <div class="max-h-80 overflow-y-auto">
+                  <!-- System columns -->
+                  <div class="px-4 py-2">
+                    <h5 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Colunas do Sistema</h5>
+                    <div class="space-y-2">
+                      <label *ngFor="let column of getSystemColumns()" 
+                             class="flex items-center cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                        <input 
+                          type="checkbox" 
+                          [checked]="isColumnSelected(column.key)"
+                          (change)="toggleColumn(column.key)"
+                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <span class="ml-3 text-sm text-gray-700">{{ column.label }}</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <!-- Form fields -->
+                  <div *ngIf="hasFormColumns()" class="px-4 py-2 border-t border-gray-100">
+                    <h5 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Campos do Formulário</h5>
+                    <div class="space-y-2">
+                      <label *ngFor="let column of getFormColumns()" 
+                             class="flex items-center cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                        <input 
+                          type="checkbox" 
+                          [checked]="isColumnSelected(column.key)"
+                          (change)="toggleColumn(column.key)"
+                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <span class="ml-3 text-sm text-gray-700">{{ column.label }}</span>
+                        <span class="ml-auto text-xs text-gray-400">{{ column.fieldType }}</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                  <button
+                    (click)="toggleColumnSelector()"
+                    class="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
           
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase Atual</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th *ngFor="let column of getSelectedColumns()" 
+                      class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    {{ column.label }}
+                  </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <tr *ngFor="let lead of filteredRecords; let i = index" [class.bg-gray-50]="i % 2 === 1">
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">
-                      {{ lead.fields?.contactName || lead.fields?.companyName || 'Registro sem nome' }}
-                    </div>
-                    <div class="text-sm text-gray-500">
-                      {{ lead.fields?.contactEmail || 'Email não informado' }}
-                    </div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="flex items-center">
+                  <td *ngFor="let column of getSelectedColumns()" class="px-6 py-4 whitespace-nowrap">
+                    <div *ngIf="column.key === 'currentPhase'" class="flex items-center">
                       <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
-                      <span class="text-sm text-gray-900">{{ getColumnName(lead.columnId) }}</span>
+                      <span class="text-sm text-gray-900">{{ getColumnValue(lead, column) }}</span>
                     </div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ lead.responsibleUserId ? getResponsibleName(lead.responsibleUserId) : 'Não atribuído' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {{ formatDate(lead.createdAt) }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span 
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      [class.bg-green-100]="isRegistroConcluded(lead)"
-                      [class.text-green-800]="isRegistroConcluded(lead)"
-                      [class.bg-red-100]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
-                      [class.text-red-800]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
-                      [class.bg-blue-100]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)"
-                      [class.text-blue-800]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)">
-                      {{ isRegistroConcluded(lead) ? 'Concluído' : (isRegistroOverdue(lead) ? 'Em Atraso' : 'Ativo') }}
-                    </span>
+                    <div *ngIf="column.key === 'status'">
+                      <span 
+                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        [class.bg-green-100]="isLeadConcluded(lead)"
+                        [class.text-green-800]="isLeadConcluded(lead)"
+                        [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                        [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                        [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
+                        [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
+                        {{ getColumnValue(lead, column) }}
+                      </span>
+                    </div>
+                    <div *ngIf="column.key !== 'currentPhase' && column.key !== 'status'" class="text-sm text-gray-900">
+                      {{ getColumnValue(lead, column) }}
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -439,7 +497,7 @@
           <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Registros ao Longo do Tempo</h3>
             <div class="h-64 flex items-end space-x-2">
-              <div *ngFor="let item of chartData.leadsOverTime" 
+              <div *ngFor="let item of chartData.registrosOverTime" 
                    class="flex-1 bg-blue-500 rounded-t flex flex-col justify-end items-center relative"
                    [style.height.%]="getChartBarHeight(item.registros)">
                 <span class="text-white text-xs font-medium mb-2">{{ item.registros }}</span>
@@ -742,46 +800,112 @@
         </div>
 
         <!-- Registros List Tab -->
-        <div *ngIf="currentView === 'leads'">
+        <div *ngIf="currentView === 'registros'">
           <div class="bg-white">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Lista de Registros ({{ filteredRecords.length }})</h3>
+            <div class="flex justify-between items-center mb-4">
+              <div class="flex items-center gap-3">
+                <h3 class="text-lg font-semibold text-gray-900">Lista de Registros ({{ filteredRecords.length }})</h3>
+                <!-- Debug button (temporário) -->
+                <button (click)="debugLeadStructure()" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">
+                  🐛 DEBUG
+                </button>
+              </div>
+              
+              <!-- Column selector button -->
+              <div class="relative">
+                <button
+                  (click)="toggleColumnSelector()"
+                  class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                  <i class="fas fa-columns mr-2"></i>
+                  Colunas ({{ selectedColumns.length }})
+                  <i class="fas fa-chevron-down ml-2"></i>
+                </button>
+
+                <!-- Column selector dropdown (shared with standalone version) -->
+                <div *ngIf="showColumnSelector" class="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <div class="px-4 py-3 border-b border-gray-200">
+                    <h4 class="text-sm font-semibold text-gray-900">Selecionar Colunas</h4>
+                    <p class="text-xs text-gray-600 mt-1">Escolha as colunas que deseja exibir na tabela</p>
+                  </div>
+                  
+                  <div class="max-h-80 overflow-y-auto">
+                    <!-- System columns -->
+                    <div class="px-4 py-2">
+                      <h5 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Colunas do Sistema</h5>
+                      <div class="space-y-2">
+                        <label *ngFor="let column of getSystemColumns()" 
+                               class="flex items-center cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                          <input 
+                            type="checkbox" 
+                            [checked]="isColumnSelected(column.key)"
+                            (change)="toggleColumn(column.key)"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                          <span class="ml-3 text-sm text-gray-700">{{ column.label }}</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <!-- Form fields -->
+                    <div *ngIf="hasFormColumns()" class="px-4 py-2 border-t border-gray-100">
+                      <h5 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Campos do Formulário</h5>
+                      <div class="space-y-2">
+                        <label *ngFor="let column of getFormColumns()" 
+                               class="flex items-center cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                          <input 
+                            type="checkbox" 
+                            [checked]="isColumnSelected(column.key)"
+                            (change)="toggleColumn(column.key)"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                          <span class="ml-3 text-sm text-gray-700">{{ column.label }}</span>
+                          <span class="ml-auto text-xs text-gray-400">{{ column.fieldType }}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                    <button
+                      (click)="toggleColumnSelector()"
+                      class="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registro</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fase Atual</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th *ngFor="let column of getSelectedColumns()" 
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      {{ column.label }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <tr *ngFor="let lead of filteredRecords | slice:0:50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm font-medium text-gray-900">{{ lead.fields?.contactName || lead.fields?.contactEmail || 'Registro sem nome' }}</div>
-                      <div class="text-sm text-gray-500" *ngIf="lead.fields?.contactEmail">{{ lead.fields?.contactEmail }}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="flex items-center">
+                    <td *ngFor="let column of getSelectedColumns()" class="px-6 py-4 whitespace-nowrap">
+                      <div *ngIf="column.key === 'currentPhase'" class="flex items-center">
                         <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
-                        <span class="text-sm text-gray-900">{{ getColumnName(lead.columnId) }}</span>
+                        <span class="text-sm text-gray-900">{{ getColumnValue(lead, column) }}</span>
                       </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {{ formatDate(lead.createdAt) }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                            [class.bg-green-100]="isRegistroConcluded(lead)"
-                            [class.text-green-800]="isRegistroConcluded(lead)"
-                            [class.bg-red-100]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
-                            [class.text-red-800]="isRegistroOverdue(lead) && !isRegistroConcluded(lead)"
-                            [class.bg-blue-100]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)"
-                            [class.text-blue-800]="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)">
-                        <span *ngIf="isRegistroConcluded(lead)">Concluído</span>
-                        <span *ngIf="!isRegistroConcluded(lead) && isRegistroOverdue(lead)">Atrasado</span>
-                        <span *ngIf="!isRegistroConcluded(lead) && !isRegistroOverdue(lead)">Ativo</span>
-                      </span>
+                      <div *ngIf="column.key === 'status'">
+                        <span 
+                          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                          [class.bg-green-100]="isLeadConcluded(lead)"
+                          [class.text-green-800]="isLeadConcluded(lead)"
+                          [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                          [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                          [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
+                          [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
+                          {{ getColumnValue(lead, column) }}
+                        </span>
+                      </div>
+                      <div *ngIf="column.key !== 'currentPhase' && column.key !== 'status'" class="text-sm text-gray-900">
+                        {{ getColumnValue(lead, column) }}
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -811,7 +935,7 @@
             <div class="bg-white rounded-lg p-6">
               <h3 class="text-lg font-semibold text-gray-900 mb-4">Registros ao Longo do Tempo</h3>
               <div class="h-64 flex items-end space-x-2">
-                <div *ngFor="let item of chartData.leadsOverTime" 
+                <div *ngFor="let item of chartData.registrosOverTime" 
                      class="flex-1 bg-blue-500 rounded-t flex flex-col justify-end items-center relative"
                      [style.height.%]="getChartBarHeight(item.registros)">
                   <span class="text-white text-xs font-medium mb-2">{{ item.registros }}</span>

@@ -106,6 +106,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
     
     if (this.currentUser && this.boardId && this.ownerId) {
+      // Load saved filters first
+      this.loadFilterState();
       this.loadBoardData();
       this.subscribeToRealtimeUpdates();
       this.initializeApiEndpoint();
@@ -1516,17 +1518,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const value = prompt('Filtrar por palavra: (nome, contato, email...)', this.filterQuery || '');
     if (value !== null) {
       this.filterQuery = value.trim();
+      this.applyFilters();
     }
   }
 
   toggleOnlyMine() {
     this.filterOnlyMine = !this.filterOnlyMine;
+    this.applyFilters();
   }
 
   setTagFilter() {
     const value = prompt('Filtrar por etiqueta (tag):', this.filterTag || '');
     if (value !== null) {
       this.filterTag = value.trim() || null;
+      this.applyFilters();
     }
   }
 
@@ -1534,38 +1539,129 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.filterQuery = '';
     this.filterOnlyMine = false;
     this.filterTag = null;
+    this.applyFilters();
   }
 
   private leadMatchesFilters(lead: Lead): boolean {
-    // Only mine
+    // Only mine filter
     if (this.filterOnlyMine) {
-      const me = this.currentUser?.email || this.currentUser?.uid;
-      const owner = lead.responsibleUserEmail || (lead as any).responsibleUserId;
-      if (me && owner && `${owner}`.toLowerCase() !== `${me}`.toLowerCase()) return false;
+      const currentUserEmail = this.currentUser?.email;
+      const currentUserId = this.currentUser?.uid;
+      const leadResponsibleEmail = lead.responsibleUserEmail;
+      const leadResponsibleId = (lead as any).responsibleUserId;
+      
+      // Check if lead is assigned to current user by email or ID
+      const isAssignedToMe = 
+        (currentUserEmail && leadResponsibleEmail && leadResponsibleEmail.toLowerCase() === currentUserEmail.toLowerCase()) ||
+        (currentUserId && leadResponsibleId && leadResponsibleId === currentUserId);
+      
+      if (!isAssignedToMe) return false;
     }
-    // Text query
-    if (this.filterQuery) {
-      const q = this.filterQuery.toLowerCase();
+    
+    // Text query filter
+    if (this.filterQuery && this.filterQuery.trim()) {
+      const q = this.filterQuery.toLowerCase().trim();
       const fields = (lead as any).fields || {};
-      const haystack = [
-        fields['companyName'], fields['contactName'], fields['contactEmail'], fields['contactPhone'],
-        lead['responsibleUserName'], lead['responsibleUserEmail']
-      ]
-        .filter(Boolean)
-        .map((v: any) => `${v}`.toLowerCase())
+      
+      // Build searchable text from all relevant fields
+      const searchableFields = [
+        fields.companyName,
+        fields.contactName, 
+        fields.contactEmail,
+        fields.contactPhone,
+        fields.description,
+        lead.responsibleUserName,
+        lead.responsibleUserEmail
+      ];
+      
+      const haystack = searchableFields
+        .filter(field => field != null && field !== '')
+        .map(field => String(field).toLowerCase())
         .join(' ');
-      if (!haystack.includes(q)) return false;
+      
+      // Split query into words for better matching
+      const queryWords = q.split(' ').filter(word => word.length > 0);
+      const matchesAll = queryWords.every(word => haystack.includes(word));
+      
+      if (!matchesAll) return false;
     }
-    // Tag filter (supports fields.tags as array or comma-separated string)
-    if (this.filterTag) {
+    
+    // Tag filter
+    if (this.filterTag && this.filterTag.trim()) {
       const fields = (lead as any).fields || {};
-      const tags = (fields['tags'] || fields['etiquetas'] || []) as any;
-      let list: string[] = [];
-      if (Array.isArray(tags)) list = tags.map(t => `${t}`.toLowerCase());
-      else if (typeof tags === 'string') list = tags.split(',').map(s => s.trim().toLowerCase());
-      if (!list.includes(this.filterTag.toLowerCase())) return false;
+      const tags = fields.tags || fields.etiquetas || [];
+      const filterTagLower = this.filterTag.toLowerCase().trim();
+      
+      let tagList: string[] = [];
+      
+      if (Array.isArray(tags)) {
+        tagList = tags.map(tag => String(tag).toLowerCase().trim());
+      } else if (typeof tags === 'string' && tags.trim()) {
+        tagList = tags.split(',').map(tag => tag.toLowerCase().trim()).filter(tag => tag.length > 0);
+      }
+      
+      if (!tagList.some(tag => tag.includes(filterTagLower))) return false;
     }
+    
     return true;
+  }
+
+  /**
+   * Apply filters and update the displayed leads
+   */
+  private applyFilters() {
+    // Rebuild displayed leads with current filters
+    this.rebuildDisplayedLeads();
+    
+    // Trigger change detection to update the UI
+    this.cdr.detectChanges();
+    
+    // Save filter state to localStorage
+    this.saveFilterState();
+  }
+
+  /**
+   * Save filter state to localStorage
+   */
+  private saveFilterState() {
+    if (!this.boardId) return;
+    
+    try {
+      const filterState = {
+        filterQuery: this.filterQuery,
+        filterOnlyMine: this.filterOnlyMine,
+        filterTag: this.filterTag
+      };
+      localStorage.setItem(`kanban-filters-${this.boardId}`, JSON.stringify(filterState));
+    } catch (error) {
+      console.warn('Could not save filter state to localStorage:', error);
+    }
+  }
+
+  /**
+   * Load filter state from localStorage
+   */
+  private loadFilterState() {
+    if (!this.boardId) return;
+    
+    try {
+      const saved = localStorage.getItem(`kanban-filters-${this.boardId}`);
+      if (saved) {
+        const filterState = JSON.parse(saved);
+        this.filterQuery = filterState.filterQuery || '';
+        this.filterOnlyMine = filterState.filterOnlyMine || false;
+        this.filterTag = filterState.filterTag || null;
+      }
+    } catch (error) {
+      console.warn('Could not load filter state from localStorage:', error);
+    }
+  }
+
+  /**
+   * Check if any filters are active
+   */
+  hasActiveFilters(): boolean {
+    return !!(this.filterQuery || this.filterOnlyMine || this.filterTag);
   }
 
   // (mantido apenas a versão acima)

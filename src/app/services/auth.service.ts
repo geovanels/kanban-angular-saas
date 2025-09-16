@@ -1,6 +1,6 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-         signOut, signInWithPopup, onAuthStateChanged, updateProfile } from '@angular/fire/auth';
+         signOut, signInWithPopup, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from '@angular/fire/auth';
 import { GoogleAuthProvider } from 'firebase/auth';
 import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
@@ -75,10 +75,32 @@ export class AuthService {
     }
   }
 
+  async sendPasswordReset(email: string) {
+    try {
+      // Configurações personalizadas para o email de recuperação
+      const actionCodeSettings = {
+        url: `${window.location.origin}/login?recovered=true`, // URL para onde o usuário será redirecionado após redefinir a senha
+        handleCodeInApp: false, // Usar a página padrão do Firebase para redefinir senha
+      };
+      
+      await sendPasswordResetEmail(this.auth, email, actionCodeSettings);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
   async signInWithGoogle() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await runInInjectionContext(this.injector, () => signInWithPopup(this.auth, provider));
+      
+      // Verificar se o usuário está cadastrado em alguma empresa
+      if (!await this.isUserRegistered(result.user.email)) {
+        // Fazer logout do usuário se não estiver cadastrado
+        await signOut(this.auth);
+        throw new Error('Usuário não está cadastrado no sistema. Entre em contato com o administrador para receber um convite.');
+      }
       
       // Criar ou atualizar usuário no Firestore
       await this.createOrUpdateUser(result.user);
@@ -87,6 +109,21 @@ export class AuthService {
     } catch (error) {
       console.error('Erro no login com Google:', error);
       throw error;
+    }
+  }
+
+  private async isUserRegistered(email: string): Promise<boolean> {
+    try {
+      // Importar CompanyService dinamicamente para evitar dependência circular
+      const { CompanyService } = await import('./company.service');
+      const companyService = this.injector.get(CompanyService);
+      
+      // Verificar se o usuário pertence a alguma empresa
+      const company = await companyService.getCompanyByUserEmail(email);
+      return company !== null;
+    } catch (error) {
+      console.error('Erro ao verificar usuário cadastrado:', error);
+      return false;
     }
   }
 
@@ -156,6 +193,60 @@ export class AuthService {
     } catch (error) {
       console.error('Erro ao associar usuário à empresa:', error);
       throw error;
+    }
+  }
+
+  // Processar convite pendente após login completo
+  async processPendingInvite(companyId: string, email: string, token: string): Promise<boolean> {
+    try {
+      console.log('🔄 Debug Auth - Processando convite pendente...', { companyId, email });
+      
+      // Aguardar um pouco para garantir que o usuário foi autenticado corretamente
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Importar CompanyService dinamicamente para evitar dependência circular
+      const { CompanyService } = await import('./company.service');
+      const companyService = this.injector.get(CompanyService);
+      
+      // Validar convite
+      const validation = await companyService.validateInviteWithCompanyId(companyId, email, token);
+      
+      if (!validation.valid) {
+        console.log('❌ Debug Auth - Convite inválido');
+        return false;
+      }
+
+      const { company, companyUser } = validation;
+      if (!company || !companyUser) {
+        console.log('❌ Debug Auth - Dados do convite não encontrados');
+        return false;
+      }
+
+      // Atualizar status do convite
+      const currentUser = this.getCurrentUser();
+      if (!currentUser) {
+        console.log('❌ Debug Auth - Usuário não autenticado');
+        return false;
+      }
+
+      console.log('👤 Debug Auth - Atualizando status do convite para o usuário:', currentUser.uid);
+      await companyService.updateUserInCompany(company.id!, email, {
+        uid: currentUser.uid,
+        displayName: currentUser.displayName || companyUser.displayName,
+        inviteStatus: 'accepted',
+        inviteToken: null,
+        acceptedAt: new Date()
+      });
+
+      // Associar usuário à empresa no documento users
+      await this.linkUserToCompany(currentUser.uid, company.id!);
+
+      console.log('✅ Debug Auth - Convite processado com sucesso');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Debug Auth - Erro ao processar convite:', error);
+      return false;
     }
   }
 }

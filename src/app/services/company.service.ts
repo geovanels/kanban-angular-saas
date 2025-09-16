@@ -159,22 +159,27 @@ export class CompanyService {
 
   // ===== COMPANY USERS =====
   
-  async addUserToCompany(companyId: string, userEmail: string, role: 'admin' | 'manager' | 'user'): Promise<void> {
+  async addUserToCompany(companyId: string, userEmail: string, role: 'admin' | 'manager' | 'user', displayName?: string): Promise<void> {
     try {
       const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      // Usar nome fornecido ou extrair do email como fallback
+      const userName = displayName?.trim() || this.extractNameFromEmail(userEmail);
+      
       const companyUser: CompanyUser = {
-        uid: '',
+        uid: '', // Será preenchido quando o usuário fizer login
         email: userEmail,
-        displayName: '',
+        displayName: userName,
         role,
         permissions: this.getPermissionsByRole(role),
-        joinedAt: new Date()
+        joinedAt: new Date(),
+        inviteStatus: 'pending', // Novo campo para controlar status do convite
+        inviteToken: this.generateInviteToken() // Token único para o convite
       };
       
       await setDoc(userRef, companyUser);
       
       try {
-        await this.sendInvitationEmail(userEmail, role, companyId);
+        await this.sendInvitationEmail(userEmail, role, companyId, companyUser.inviteToken!, userName);
       } catch (emailError: any) {
         console.error('Erro ao enviar email de convite:', emailError);
         let errorMessage = 'Usuário adicionado com sucesso, mas houve erro ao enviar email de convite.';
@@ -195,8 +200,22 @@ export class CompanyService {
     }
   }
 
-  private async sendInvitationEmail(userEmail: string, role: string, companyId: string): Promise<void> {
+  private extractNameFromEmail(email: string): string {
+    const name = email.split('@')[0];
+    return name
+      .split(/[._-]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  private generateInviteToken(): string {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
+
+  private async sendInvitationEmail(userEmail: string, role: string, companyId: string, inviteToken: string, displayName?: string): Promise<void> {
     try {
+      console.log('📧 Debug Email - Enviando convite:', { userEmail, role, companyId, inviteToken, displayName });
+      
       // Importar SmtpService dinamicamente para evitar dependência circular
       const { SmtpService } = await import('./smtp.service');
       const smtpService = this.injector.get(SmtpService);
@@ -210,42 +229,84 @@ export class CompanyService {
         'user': 'Usuário'
       };
 
-      const inviteLink = `${window.location.origin}/login`;
+      const inviteLink = `${window.location.origin}/accept-invite?token=${inviteToken}&email=${encodeURIComponent(userEmail)}&companyId=${companyId}`;
+      console.log('🔗 Debug Email - Link do convite:', inviteLink);
       const subject = `Convite para participar da ${company.name}`;
       
       const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            ${company.brandingConfig?.logo ? `<img src="${company.brandingConfig.logo}" alt="${company.name}" style="max-height: 80px;">` : ''}
-            <h1 style="color: ${company.brandingConfig?.primaryColor || '#3B82F6'}; margin-top: 20px;">
-              Convite para ${company.name}
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
+          <!-- Header do TaskBoard -->
+          <div style="background: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <div style="display: inline-block; background: ${company.brandingConfig?.primaryColor || '#3B82F6'}; color: white; padding: 15px; border-radius: 50%; margin-bottom: 15px;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 3H5c-1.11 0-2 .89-2 2v14c0 1.11.89 2 2 2h14c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+              </svg>
+            </div>
+            ${company.brandingConfig?.logo ? `<img src="${company.brandingConfig.logo}" alt="${company.name}" style="max-height: 60px; margin-bottom: 15px;">` : ''}
+            <h1 style="color: ${company.brandingConfig?.primaryColor || '#3B82F6'}; margin: 10px 0 5px 0; font-size: 28px;">
+              TaskBoard
             </h1>
+            <p style="color: #666; margin: 0; font-size: 14px;">Sistema de Gestão Kanban</p>
           </div>
           
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h2 style="color: #333; margin-top: 0;">Você foi convidado!</h2>
-            <p>Olá,</p>
-            <p>Você foi convidado para fazer parte da <strong>${company.name}</strong> com a função de <strong>${roleTranslations[role]}</strong>.</p>
-            <p>Para aceitar o convite e começar a usar a plataforma, clique no botão abaixo:</p>
+          <!-- Conteúdo do convite -->
+          <div style="background: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; margin-top: 0; font-size: 24px;">🎉 Você foi convidado!</h2>
+            <p style="color: #555; font-size: 16px; line-height: 1.6;">Olá${displayName ? ` ${displayName}` : ''},</p>
+            <p style="color: #555; font-size: 16px; line-height: 1.6;">
+              Você foi convidado para fazer parte da empresa <strong>${company.name}</strong> no <strong>TaskBoard</strong> 
+              com a função de <strong>${roleTranslations[role]}</strong>.
+            </p>
+            <p style="color: #555; font-size: 16px; line-height: 1.6;">
+              O TaskBoard é um sistema de gestão Kanban que permite organizar e acompanhar projetos de forma visual e colaborativa.
+            </p>
+            <p style="color: #555; font-size: 16px; line-height: 1.6;">
+              Para aceitar o convite e criar sua conta, clique no botão abaixo:
+            </p>
+            
+            <div style="text-align: center; margin: 35px 0;">
+              <a href="${inviteLink}" 
+                 style="background: linear-gradient(135deg, ${company.brandingConfig?.primaryColor || '#3B82F6'} 0%, #5a67d8 100%); 
+                        color: white; 
+                        padding: 16px 32px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        font-weight: 600;
+                        font-size: 16px;
+                        display: inline-block;
+                        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+                        transition: transform 0.2s ease;">
+                🚀 Aceitar Convite e Criar Conta
+              </a>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid ${company.brandingConfig?.primaryColor || '#3B82F6'};">
+              <p style="margin: 0; color: #666; font-size: 14px;">
+                <strong>💡 Sobre o TaskBoard:</strong><br>
+                • Organize projetos em quadros Kanban visuais<br>
+                • Colabore em tempo real com sua equipe<br>
+                • Acompanhe o progresso de leads e projetos<br>
+                • Gerencie usuários e permissões
+              </p>
+            </div>
           </div>
           
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${inviteLink}" 
-               style="background-color: ${company.brandingConfig?.primaryColor || '#3B82F6'}; 
-                      color: white; 
-                      padding: 12px 30px; 
-                      text-decoration: none; 
-                      border-radius: 6px; 
-                      font-weight: bold;
-                      display: inline-block;">
-              Aceitar Convite
-            </a>
-          </div>
-          
-          <div style="font-size: 12px; color: #666; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+          <!-- Footer -->
+          <div style="text-align: center; color: #888; font-size: 13px; line-height: 1.6;">
             <p>Se você não conseguir clicar no botão, copie e cole este link no seu navegador:</p>
-            <p><a href="${inviteLink}" style="color: #3B82F6;">${inviteLink}</a></p>
-            <p>Este convite foi enviado por ${company.name}.</p>
+            <p style="background: white; padding: 10px; border-radius: 6px; word-break: break-all; border: 1px solid #e1e5e9;">
+              <a href="${inviteLink}" style="color: #3B82F6;">${inviteLink}</a>
+            </p>
+            <p style="margin-top: 20px;">
+              Este convite foi enviado por <strong>${company.name}</strong> através do <strong>TaskBoard</strong>.<br>
+              <em>Se você já possui uma conta, faça login normalmente em vez de usar este link.</em>
+            </p>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e1e5e9;">
+              <p style="margin: 0; color: #aaa; font-size: 12px;">
+                © 2024 TaskBoard - Sistema de Gestão Kanban<br>
+                Transformando a gestão de projetos em uma experiência visual
+              </p>
+            </div>
           </div>
         </div>
       `;
@@ -266,14 +327,21 @@ export class CompanyService {
       const usersRef = collection(this.firestore, 'companies', companyId, 'users');
       const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
       
-      const users = querySnapshot.docs.map((doc: any) => ({
-        uid: doc.id,
-        ...doc.data()
-      } as CompanyUser));
+      const users = querySnapshot.docs.map((doc: any) => {
+        const userData = doc.data();
+        return {
+          ...userData,
+          // Preservar o UID do documento se existir, senão manter vazio
+          uid: userData.uid || '',
+          // Garantir que o email seja sempre o ID do documento
+          email: doc.id
+        } as CompanyUser;
+      });
       
       return users;
       
     } catch (error) {
+      console.warn('Erro ao buscar usuários da empresa:', error);
       // Silenciar erro de permissões - é esperado
       return [];
     }
@@ -281,9 +349,14 @@ export class CompanyService {
 
   async removeUserFromCompany(companyId: string, userEmail: string): Promise<void> {
     try {
+      console.log('🗑️ Debug Service - Removendo usuário:', { companyId, userEmail });
       const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
-      await deleteDoc(userRef);
+      console.log('📄 Debug Service - Referência do documento:', userRef.path);
+      
+      await runInInjectionContext(this.injector, () => deleteDoc(userRef));
+      console.log('✅ Debug Service - Documento deletado com sucesso');
     } catch (error) {
+      console.error('❌ Debug Service - Erro ao deletar documento:', error);
       throw error;
     }
   }
@@ -295,6 +368,15 @@ export class CompanyService {
         role: newRole,
         permissions: this.getPermissionsByRole(newRole)
       });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async updateUserInCompany(companyId: string, userEmail: string, updates: Partial<CompanyUser>): Promise<void> {
+    try {
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      await updateDoc(userRef, updates);
     } catch (error) {
       throw error;
     }
@@ -326,14 +408,14 @@ export class CompanyService {
       const usersSnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
       
       for (const userDoc of usersSnapshot.docs) {
-        await deleteDoc(userDoc.ref);
+        await runInInjectionContext(this.injector, () => deleteDoc(userDoc.ref));
       }
 
       // Excluir configurações da empresa
       const settingsRef = doc(this.firestore, 'companies', companyId, 'settings', 'general');
       const settingsDoc = await runInInjectionContext(this.injector, () => getDoc(settingsRef));
       if (settingsDoc.exists()) {
-        await deleteDoc(settingsRef);
+        await runInInjectionContext(this.injector, () => deleteDoc(settingsRef));
       }
 
       // Excluir todos os quadros da empresa (e seus dados relacionados)
@@ -347,23 +429,23 @@ export class CompanyService {
         const columnsRef = collection(this.firestore, 'companies', companyId, 'boards', boardId, 'columns');
         const columnsSnapshot = await runInInjectionContext(this.injector, () => getDocs(columnsRef));
         for (const colDoc of columnsSnapshot.docs) {
-          await deleteDoc(colDoc.ref);
+          await runInInjectionContext(this.injector, () => deleteDoc(colDoc.ref));
         }
         
         // Excluir leads do quadro
         const leadsRef = collection(this.firestore, 'companies', companyId, 'boards', boardId, 'leads');
         const leadsSnapshot = await runInInjectionContext(this.injector, () => getDocs(leadsRef));
         for (const leadDoc of leadsSnapshot.docs) {
-          await deleteDoc(leadDoc.ref);
+          await runInInjectionContext(this.injector, () => deleteDoc(leadDoc.ref));
         }
         
         // Excluir o quadro
-        await deleteDoc(boardDoc.ref);
+        await runInInjectionContext(this.injector, () => deleteDoc(boardDoc.ref));
       }
 
       // Finalmente, excluir a empresa
       const companyRef = doc(this.firestore, 'companies', companyId);
-      await deleteDoc(companyRef);
+      await runInInjectionContext(this.injector, () => deleteDoc(companyRef));
       
     } catch (error) {
       throw error;
@@ -458,34 +540,94 @@ export class CompanyService {
 
   async getCompanyByUserEmail(userEmail: string): Promise<Company | null> {
     try {
+      console.log('🔍 Debug Service - Buscando empresa para email:', userEmail);
+      
       return await runInInjectionContext(this.injector, async () => {
         // 1) Procurar por owner
+        console.log('👑 Debug Service - Procurando como proprietário...');
         const companiesRef = collection(this.firestore, 'companies');
         const ownerQuery = query(companiesRef, where('ownerEmail', '==', userEmail), limit(1));
-        const ownerSnap = await getDocs(ownerQuery);
+        const ownerSnap = await runInInjectionContext(this.injector, () => getDocs(ownerQuery));
+        console.log('👑 Debug Service - Documentos encontrados como owner:', ownerSnap.size);
+        
         if (!ownerSnap.empty) {
           const d = ownerSnap.docs[0];
+          console.log('✅ Debug Service - Empresa encontrada como owner:', d.id);
           return { id: d.id, ...d.data() } as Company;
         }
 
         // 2) Procurar por usuário em qualquer empresa via collectionGroup('users')
+        console.log('👥 Debug Service - Procurando como usuário da empresa...');
         const usersGroup = collectionGroup(this.firestore, 'users');
-        const usersSnap = await getDocs(query(usersGroup, where('email', '==', userEmail), limit(1)));
+        const usersSnap = await runInInjectionContext(this.injector, () => getDocs(query(usersGroup, where('email', '==', userEmail), limit(1))));
+        console.log('👥 Debug Service - Documentos encontrados como usuário:', usersSnap.size);
+        
         if (!usersSnap.empty) {
           const userDoc = usersSnap.docs[0];
+          console.log('👤 Debug Service - Usuário encontrado no documento:', userDoc.ref.path);
+          console.log('👤 Debug Service - Dados do usuário:', userDoc.data());
+          
           const companyRef = userDoc.ref.parent?.parent; // companies/{companyId}
           if (companyRef) {
-            const companyDoc = await getDoc(companyRef);
+            console.log('🏢 Debug Service - Referência da empresa:', companyRef.path);
+            const companyDoc = await runInInjectionContext(this.injector, () => getDoc(companyRef));
             if (companyDoc.exists()) {
+              console.log('✅ Debug Service - Empresa encontrada:', companyDoc.id);
               return { id: companyDoc.id, ...companyDoc.data() } as Company;
+            } else {
+              console.log('❌ Debug Service - Documento da empresa não existe');
             }
+          } else {
+            console.log('❌ Debug Service - Referência da empresa é null');
           }
         }
 
+        console.log('❌ Debug Service - Nenhuma empresa encontrada');
         return null;
       });
     } catch (error) {
+      console.error('❌ Debug Service - Erro na busca:', error);
       return null;
+    }
+  }
+
+  // Método específico para validação de convites sem dependência de consultas complexas
+  async validateInviteWithCompanyId(companyId: string, email: string, token: string): Promise<{ valid: boolean; company?: Company; companyUser?: CompanyUser }> {
+    try {
+      console.log('🔍 Debug - Validando convite com ID da empresa:', { companyId, email, token });
+      
+      // Buscar empresa diretamente pelo ID
+      const company = await this.getCompany(companyId);
+      if (!company) {
+        console.log('❌ Debug - Empresa não encontrada');
+        return { valid: false };
+      }
+
+      // Buscar usuário na empresa
+      const companyUser = await this.getCompanyUser(companyId, email);
+      if (!companyUser) {
+        console.log('❌ Debug - Usuário não encontrado na empresa');
+        return { valid: false };
+      }
+
+      // Validar token
+      if (companyUser.inviteToken !== token) {
+        console.log('❌ Debug - Token inválido');
+        return { valid: false };
+      }
+
+      // Validar status
+      if (companyUser.inviteStatus !== 'pending') {
+        console.log('❌ Debug - Status inválido:', companyUser.inviteStatus);
+        return { valid: false };
+      }
+
+      console.log('✅ Debug - Convite válido!');
+      return { valid: true, company, companyUser };
+      
+    } catch (error) {
+      console.error('❌ Debug - Erro na validação:', error);
+      return { valid: false };
     }
   }
 
