@@ -8,12 +8,11 @@ import { SubdomainService } from '../../services/subdomain.service';
 import { CreateBoardModalComponent } from '../create-board-modal/create-board-modal.component';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
 import { CompanyBreadcrumbComponent } from '../company-breadcrumb/company-breadcrumb.component';
-import { ReportsComponent } from '../reports/reports.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, CreateBoardModalComponent, MainLayoutComponent, CompanyBreadcrumbComponent, ReportsComponent],
+  imports: [CommonModule, CreateBoardModalComponent, MainLayoutComponent, CompanyBreadcrumbComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
@@ -36,8 +35,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   // Tabs
   activeTab: string = 'boards';
   tabs = [
-    { id: 'boards', name: 'Meus Quadros', icon: 'fa-th-large' },
-    { id: 'reports', name: 'Relatórios', icon: 'fa-chart-bar' }
+    { id: 'boards', name: 'Meus Quadros', icon: 'fa-th-large' }
   ];
   
   // Estatísticas dos boards
