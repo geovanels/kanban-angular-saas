@@ -201,13 +201,6 @@ export class BrandingService {
 
   // Aplicar branding completo da empresa
   applyCompanyBranding(company: Company): void {
-    console.log('🎨 Aplicando branding para empresa:', company.name);
-    console.log('🎨 Cores da empresa:', {
-      primaryColor: company.primaryColor,
-      secondaryColor: company.secondaryColor,
-      brandingConfig: company.brandingConfig
-    });
-
     const primaryColor = company.brandingConfig?.primaryColor || company.primaryColor;
     const secondaryColor = company.brandingConfig?.secondaryColor || company.secondaryColor;
 
@@ -221,13 +214,10 @@ export class BrandingService {
 
     // Aplicar cores
     if (primaryColor || secondaryColor) {
-      console.log('🎨 Aplicando cores:', { primaryColor, secondaryColor });
       this.applyColors({
         primaryColor: primaryColor,
         secondaryColor: secondaryColor
       });
-    } else {
-      console.log('⚠️ Nenhuma cor encontrada para aplicar');
     }
 
     // Atualizar título da página
@@ -342,10 +332,7 @@ export class BrandingService {
 
   // Apply dynamic styles that override hardcoded colors
   private applyDynamicStyles(colors: { primaryColor?: string; secondaryColor?: string; accentColor?: string }): void {
-    console.log('🎨 Aplicando estilos dinâmicos:', colors);
-    
     if (!colors.primaryColor) {
-      console.log('⚠️ Nenhuma cor primária fornecida');
       return;
     }
 
@@ -353,7 +340,6 @@ export class BrandingService {
     const existingStyle = document.getElementById('dynamic-branding-styles');
     if (existingStyle) {
       existingStyle.remove();
-      console.log('🗑️ Removeu estilos dinâmicos anteriores');
     }
 
     // Create new dynamic styles
@@ -516,8 +502,6 @@ export class BrandingService {
     }
     
     document.head.appendChild(style);
-    console.log('✅ Estilos dinâmicos aplicados com sucesso!');
-    console.log('🎨 Cor primária aplicada:', colors.primaryColor);
   }
 
   // Aplicar favicon

@@ -43,8 +43,6 @@ export class AutomationService {
 
   // Processar automações quando um novo lead é criado
   async processNewLeadAutomations(lead: Lead, boardId: string, ownerId: string): Promise<void> {
-    console.log('🤖 Processando automações para novo lead:', lead.id);
-    
     try {
       // Buscar automações ativas do quadro
       const automations = await this.firestoreService.getAutomations(ownerId, boardId);
@@ -61,86 +59,39 @@ export class AutomationService {
         return type === 'new-lead-created';
       });
 
-      console.log(`📋 Encontradas ${newLeadAutomations.length} automações para novo lead`);
-
       // Executar cada automação
       for (const automation of newLeadAutomations) {
         await this.executeAutomation(automation, lead, boardId, ownerId);
       }
     } catch (error) {
-      console.error('❌ Erro ao processar automações de novo lead:', error);
+      console.error('Erro ao processar automações de novo lead:', error);
     }
   }
 
   // Processar automações quando um lead muda de fase
   async processPhaseChangeAutomations(lead: Lead, newColumnId: string, oldColumnId: string, boardId: string, ownerId: string): Promise<void> {
-    console.log('🔄 PROCESSANDO automações para mudança de fase:', { 
-      leadId: lead.id, 
-      leadName: lead.fields.contactName || lead.fields.companyName,
-      oldColumnId, 
-      newColumnId,
-      timestamp: new Date().toLocaleString('pt-BR')
-    });
-    
     try {
       // Buscar automações ativas do quadro
       const automations = await this.firestoreService.getAutomations(ownerId, boardId);
-      
-      console.log('🤖 Todas as automações do quadro:', {
-        totalAutomations: automations?.length || 0,
-        automations: (automations as Automation[])?.map(a => ({
-          id: a.id,
-          name: a.name,
-          active: a.active,
-          triggerType: a.triggerType,
-          triggerPhase: a.triggerPhase,
-          actions: a.actions?.map(action => action.type)
-        })) || []
-      });
 
       const phaseChangeAutomations = (automations as Automation[]).filter(automation => {
         const isActive = automation.active;
         const isCardEntersPhase = automation.triggerType === 'card-enters-phase';
         const matchesPhase = automation.triggerPhase === newColumnId;
-        
-        console.log(`🔍 Avaliando automação "${automation.name}":`, {
-          isActive,
-          isCardEntersPhase,
-          triggerPhase: automation.triggerPhase,
-          targetPhase: newColumnId,
-          matchesPhase
-        });
-        
         return isActive && isCardEntersPhase && matchesPhase;
-      });
-
-      console.log(`📋 Automações que serão executadas:`, {
-        count: phaseChangeAutomations.length,
-        automations: phaseChangeAutomations.map(a => ({
-          id: a.id,
-          name: a.name,
-          actions: a.actions?.map(action => ({ 
-            type: action.type, 
-            phaseId: action.phaseId,
-            templateId: action.templateId 
-          }))
-        }))
       });
 
       // Executar cada automação
       for (const automation of phaseChangeAutomations) {
-        console.log(`🚀 EXECUTANDO automação de mudança de fase: ${automation.name}`);
         await this.executeAutomation(automation, lead, boardId, ownerId);
       }
     } catch (error) {
-      console.error('❌ Erro ao processar automações de mudança de fase:', error);
+      console.error('Erro ao processar automações de mudança de fase:', error);
     }
   }
 
   // Executar uma automação específica
   private async executeAutomation(automation: Automation, lead: Lead, boardId: string, ownerId: string): Promise<void> {
-    console.log(`🚀 Executando automação: ${automation.name}`, automation);
-
     try {
       // Executar cada ação da automação
       for (const action of automation.actions) {
@@ -149,10 +100,8 @@ export class AutomationService {
 
       // Registrar no histórico
       await this.addAutomationHistory(automation, lead, boardId, ownerId, 'success');
-      
-      console.log(`✅ Automação executada com sucesso: ${automation.name}`);
     } catch (error) {
-      console.error(`❌ Erro ao executar automação ${automation.name}:`, error);
+      console.error(`Erro ao executar automação ${automation.name}:`, error);
       
       // Registrar erro no histórico
       await this.addAutomationHistory(automation, lead, boardId, ownerId, 'error', (error as Error).message);
@@ -161,8 +110,6 @@ export class AutomationService {
 
   // Executar uma ação específica
   private async executeAction(action: AutomationAction, lead: Lead, boardId: string, ownerId: string, automation: Automation): Promise<void> {
-    console.log(`🎯 Executando ação: ${action.type}`, action);
-
     switch (action.type) {
       case 'send-email':
         await this.executeSendEmailAction(action, lead, boardId, ownerId);
@@ -181,7 +128,7 @@ export class AutomationService {
         break;
       
       default:
-        console.warn(`⚠️ Tipo de ação não reconhecido: ${action.type}`);
+        console.warn(`Tipo de ação não reconhecido: ${action.type}`);
     }
   }
 
@@ -284,25 +231,11 @@ export class AutomationService {
       throw new Error('Fase de destino não especificada');
     }
 
-    console.log('➡️ EXECUTANDO ação de mover para fase:', { 
-      leadId: lead.id,
-      leadName: lead.fields.contactName || lead.fields.companyName,
-      currentPhase: lead.columnId,
-      targetPhase: action.phaseId,
-      timestamp: new Date().toLocaleString('pt-BR')
-    });
-
     try {
       // Atualizar lead para nova fase e phaseHistory
       const now = new Date();
       const phaseHistory: any = { ...((lead as any).phaseHistory || {}) };
       const oldColumnId = lead.columnId;
-      
-      console.log('📊 Estado atual do lead antes da movimentação:', {
-        leadId: lead.id,
-        currentColumnId: oldColumnId,
-        phaseHistory: phaseHistory
-      });
 
       // Finalizar fase anterior
       if (oldColumnId && phaseHistory[oldColumnId]) {
@@ -317,20 +250,11 @@ export class AutomationService {
         enteredAt: now
       };
 
-      console.log('📝 Atualizando lead no Firestore:', {
-        leadId: lead.id,
-        newColumnId: action.phaseId,
-        movedToCurrentColumnAt: now,
-        phaseHistoryKeys: Object.keys(phaseHistory)
-      });
-
       await this.firestoreService.updateLead(ownerId, boardId, lead.id!, {
         columnId: action.phaseId,
         movedToCurrentColumnAt: now,
         phaseHistory
       });
-
-      console.log('✅ Lead movido com sucesso para a fase:', action.phaseId);
 
       // Registrar no histórico do lead
       try {
@@ -339,13 +263,12 @@ export class AutomationService {
           text: `Moveu automaticamente para outra fase`,
           user: 'Automação'
         });
-        console.log('📝 Histórico de movimentação registrado com sucesso');
       } catch (historyError) {
-        console.warn('⚠️ Erro ao registrar histórico de movimentação:', historyError);
+        console.warn('Erro ao registrar histórico de movimentação:', historyError);
       }
       
     } catch (error) {
-      console.error('❌ Erro ao executar ação de mover para fase:', error);
+      console.error('Erro ao executar ação de mover para fase:', error);
       throw error;
     }
   }
@@ -355,8 +278,6 @@ export class AutomationService {
     if (!action.userId) {
       throw new Error('Usuário não especificado');
     }
-
-    console.log('👤 Executando ação de atribuir usuário:', { leadId: lead.id, userId: action.userId });
 
     // Buscar dados do usuário para preencher nome e email
     const companyId = this.subdomainService.getCurrentCompany()?.id;
@@ -397,8 +318,6 @@ export class AutomationService {
     if (!action.note) {
       throw new Error('Nota não especificada');
     }
-
-    console.log('📝 Executando ação de adicionar nota:', { leadId: lead.id, note: action.note });
 
     // Processar nota com dados do lead
     const processedNote = this.processEmailTemplate(action.note, lead, boardId, ownerId);
@@ -513,9 +432,8 @@ export class AutomationService {
 
     try {
       await this.firestoreService.addAutomationHistoryItem(ownerId, boardId, historyItem);
-      console.log('📊 Item adicionado ao histórico de automação:', historyItem);
     } catch (error) {
-      console.error('❌ Erro ao adicionar ao histórico de automação:', error);
+      console.error('Erro ao adicionar ao histórico de automação:', error);
     }
   }
 
@@ -537,37 +455,15 @@ export class AutomationService {
 
   // Método para processar automações de tempo (SLA, tempo em fase)
   async processTimeBasedAutomations(leads: Lead[], columns: Column[], boardId: string, ownerId: string): Promise<void> {
-    console.log('🕐 EXECUTANDO processTimeBasedAutomations:', {
-      timestamp: new Date().toLocaleString('pt-BR'),
-      leadsCount: leads?.length || 0,
-      columnsCount: columns?.length || 0,
-      boardId,
-      ownerId
-    });
-    
     try {
       if (!leads || leads.length === 0) {
-        console.log('⚠️ Nenhum lead encontrado - encerrando processTimeBasedAutomations');
         return;
       }
       
       const automations = await this.firestoreService.getAutomations(ownerId, boardId);
       const list = (automations as Automation[]).filter(a => a && a.active);
       
-      console.log('🤖 Automações ativas encontradas:', {
-        totalAutomations: automations?.length || 0,
-        activeAutomations: list.length,
-        automations: list.map(a => ({
-          id: a.id,
-          name: a.name,
-          triggerType: a.triggerType,
-          triggerPhase: a.triggerPhase,
-          triggerDays: a.triggerDays
-        }))
-      });
-      
       if (list.length === 0) {
-        console.log('⚠️ Nenhuma automação ativa - encerrando processTimeBasedAutomations');
         return;
       }
 
@@ -591,8 +487,6 @@ export class AutomationService {
         if (!type) continue;
 
         // Avaliar cada lead
-        console.log(`📊 Avaliando ${leads.length} leads para automação "${automation.name}" (tipo: ${type})`);
-        
         for (const lead of leads) {
           // Filtrar por fase se definido
           if (phaseId && lead.columnId !== phaseId) continue;
@@ -600,13 +494,6 @@ export class AutomationService {
           const movedTs = (lead.movedToCurrentColumnAt as any);
           const moved = movedTs?.toDate ? movedTs.toDate().getTime() : (movedTs?.seconds ? movedTs.seconds * 1000 : (new Date(movedTs)).getTime());
           const daysPassed = moved ? Math.floor((now - moved) / DAY) : 'N/A';
-          
-          console.log(`👤 Lead ${lead.id} (${lead.fields.contactName || lead.fields.companyName}):`, {
-            fase: lead.columnId,
-            diasNaFase: daysPassed,
-            isRetroativo: typeof daysPassed === 'number' ? daysPassed > 1 : false,
-            hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY)
-          });
 
           try {
             if (type === 'card-in-phase-for-time') {
@@ -631,37 +518,15 @@ export class AutomationService {
                 await this.markExecuted(ownerId, boardId, lead, automation.id);
               }
             } else if (type === 'form-not-answered') {
-              console.log(`🤖 Avaliando automação form-not-answered para lead ${lead.id}:`, {
-                leadId: lead.id,
-                currentPhase: lead.columnId,
-                targetPhase: phaseId,
-                waitDays: days,
-                leadName: lead.fields?.contactName || lead.fields?.companyName || 'Nome não informado',
-                automationId: automation.id,
-                automationName: automation.name
-              });
-
               // Verificar se a automação é para a fase atual ou uma fase específica
               const targetPhase = phaseId || lead.columnId;
               if (phaseId && lead.columnId !== phaseId) {
-                console.log(`⚠️ Lead não está na fase alvo ${phaseId} (está em ${lead.columnId}) - pulando automação`);
                 continue;
               }
 
               const fields = await getFormFieldsForPhase(targetPhase);
               
-              console.log(`📋 Campos do formulário na fase ${targetPhase}:`, {
-                fieldsCount: fields?.length || 0,
-                fields: fields?.map((f: any) => ({ 
-                  name: f.name, 
-                  apiFieldName: f.apiFieldName, 
-                  type: f.type,
-                  required: f.required 
-                })) || []
-              });
-              
               if (!fields || fields.length === 0) {
-                console.log(`⚠️ Sem formulário configurado na fase ${targetPhase} - pulando automação`);
                 continue; // sem formulário, não dispara
               }
 
@@ -699,20 +564,8 @@ export class AutomationService {
               }
               
               const daysPassed = moved ? Math.floor((now - moved) / DAY) : 0;
-              
-              console.log(`⏰ Análise temporal:`, {
-                movedToCurrentColumnAt: lead.movedToCurrentColumnAt,
-                createdAt: lead.createdAt,
-                movedTimestamp: moved,
-                now: now,
-                waitDays: waitDays,
-                daysPassed: daysPassed,
-                shouldWait: !moved || now - moved < waitDays * DAY,
-                timeElapsed: moved ? `${Math.round((now - moved) / (1000 * 60 * 60))}h` : 'N/A'
-              });
 
               if (!moved || now - moved < waitDays * DAY) {
-                console.log(`⏳ Ainda não passou tempo suficiente (${waitDays} dias, atual: ${daysPassed} dias) - pulando`);
                 continue;
               }
 
@@ -742,31 +595,13 @@ export class AutomationService {
                 return isEmpty;
               });
 
-              console.log(`📝 Análise DETALHADA dos campos:`, {
-                targetPhase: targetPhase,
-                totalFields: fields.length,
-                fieldAnalysis: fieldAnalysis,
-                allEmpty: allEmpty,
-                leadFields: (lead as any).fields,
-                hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY)
-              });
-
               if (allEmpty && !this.hasRecentlyExecuted(lead, automation.id, DAY)) {
-                console.log(`🚀 EXECUTANDO automação form-not-answered para lead ${lead.id} - todos os ${fields.length} campos estão vazios após ${daysPassed} dias`);
                 try {
                   await this.executeAutomation(automation, lead, boardId, ownerId);
                   await this.markExecuted(ownerId, boardId, lead, automation.id);
-                  console.log(`✅ Automação form-not-answered executada com sucesso para lead ${lead.id}`);
                 } catch (executeError) {
-                  console.error(`❌ Erro ao executar automação form-not-answered para lead ${lead.id}:`, executeError);
+                  console.error(`Erro ao executar automação form-not-answered para lead ${lead.id}:`, executeError);
                 }
-              } else {
-                console.log(`❌ NÃO executando automação form-not-answered:`, { 
-                  allEmpty: allEmpty,
-                  fieldsWithData: fieldAnalysis.filter(f => !f.isEmpty).map(f => `${f.fieldName}="${f.value}"`),
-                  hasRecentlyExecuted: this.hasRecentlyExecuted(lead, automation.id, DAY),
-                  reason: !allEmpty ? 'Formulário já foi respondido' : 'Automação já foi executada recentemente'
-                });
               }
             }
           } catch (e) {
@@ -785,7 +620,6 @@ export class AutomationService {
       const record = executedAutomations[automationId];
       
       if (!record) {
-        console.log(`🔍 Automação ${automationId} nunca foi executada para lead ${lead.id}`);
         return false;
       }
 
@@ -805,26 +639,15 @@ export class AutomationService {
       }
 
       if (!timestamp) {
-        console.log(`🔍 Timestamp inválido para automação ${automationId} no lead ${lead.id}:`, lastExecutedAt);
         return false;
       }
 
       const elapsed = Date.now() - timestamp;
       const isRecent = elapsed < withinMs;
       
-      console.log(`🔍 Verificação de execução recente para automação ${automationId}:`, {
-        leadId: lead.id,
-        lastExecutedAt: new Date(timestamp).toLocaleString('pt-BR'),
-        elapsedMs: elapsed,
-        elapsedHours: Math.round(elapsed / (1000 * 60 * 60)),
-        withinMs: withinMs,
-        withinHours: Math.round(withinMs / (1000 * 60 * 60)),
-        isRecent: isRecent
-      });
-
       return isRecent;
     } catch (error) {
-      console.error(`❌ Erro ao verificar execução recente para automação ${automationId}:`, error);
+      console.error(`Erro ao verificar execução recente para automação ${automationId}:`, error);
       return false;
     }
   }
@@ -834,19 +657,10 @@ export class AutomationService {
       const exec = { ...((lead as any).executedAutomations || {}) };
       const now = new Date();
       exec[automationId] = { lastExecutedAt: now };
-      
-      console.log(`📝 Marcando automação ${automationId} como executada para lead ${lead.id}:`, {
-        leadId: lead.id,
-        automationId: automationId,
-        timestamp: now.toLocaleString('pt-BR'),
-        previousExecutions: Object.keys((lead as any).executedAutomations || {})
-      });
 
       await this.firestoreService.updateLead(ownerId, boardId, lead.id!, { executedAutomations: exec } as any);
-      
-      console.log(`✅ Automação ${automationId} marcada como executada com sucesso para lead ${lead.id}`);
     } catch (error) {
-      console.error(`❌ Erro ao marcar automação ${automationId} como executada para lead ${lead.id}:`, error);
+      console.error(`Erro ao marcar automação ${automationId} como executada para lead ${lead.id}:`, error);
     }
   }
 }

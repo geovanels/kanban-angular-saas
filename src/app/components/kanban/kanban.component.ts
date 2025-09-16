@@ -291,6 +291,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
         console.log('Colunas recebidas:', columns);
         this.columns = columns;
         this.loadCardFieldConfigs();
+        // Carregar configurações de formulários de todas as fases
+        this.loadAllPhaseFormConfigs();
         // Sincronizar editor de fluxo: garantir que novas fases entrem na ordem
         try { this.syncFlowOrderWithColumns(); } catch {}
       }
@@ -424,17 +426,25 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async loadCardFieldConfigs() {
     try {
+      console.log('🔧 loadCardFieldConfigs: Iniciando carregamento');
       const map: Record<string, any[]> = {};
       for (const col of this.columns) {
         try {
+          console.log(`🔧 Carregando config para fase: ${col.name} (${col.id})`);
           const cfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, col.id!);
+          console.log(`🔧 Config recebida para ${col.name}:`, cfg);
           const fields = (cfg as any)?.fields || [];
-          map[col.id!] = fields.filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
-        } catch {
+          console.log(`🔧 Fields brutos para ${col.name}:`, fields);
+          const filteredFields = fields.filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases);
+          console.log(`🔧 Fields filtrados para ${col.name}:`, filteredFields);
+          map[col.id!] = filteredFields.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+        } catch (error) {
+          console.log(`🔧 Erro para ${col.name}:`, error);
           map[col.id!] = [];
         }
       }
       this.phaseCardFields = map;
+      console.log('🔧 phaseCardFields final:', this.phaseCardFields);
     } catch {
       this.phaseCardFields = {};
     }
@@ -527,24 +537,73 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return undefined;
   }
 
-  getCardFieldsForLead(lead: Lead): Array<{ label: string; value: any; type?: string }> {
-    // SOLUÇÃO: Usar APENAS campos do formulário inicial que estão marcados para exibir
-    // Os campos marcados com showInCard/showInAllPhases devem aparecer em TODAS as fases
-    // Logs de debug removidos
+  async loadAllPhaseFormConfigs() {
+    for (const column of this.columns) {
+      try {
+        const config = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
+        if (config?.fields) {
+          this.phaseFormConfigs[column.id!] = config;
+        }
+      } catch (e) {
+        // Ignorar erro se não houver configuração para esta fase
+      }
+    }
+  }
 
-    console.log('🔍 TODOS OS 5 CAMPOS DETALHADOS:');
-    this.initialFormFields?.forEach((f: any, index: number) => {
-      console.log(`Campo ${index + 1}: ${f.name} (${f.type}) - showInCard: ${f.showInCard}, showInAllPhases: ${f.showInAllPhases}`);
+  getAllFieldsForDisplay(): any[] {
+    const initialFields: any[] = [];
+    const phaseFields: any[] = [];
+    
+    // 1. Campos do formulário inicial (aparecem primeiro)
+    console.log('🔍 VERIFICANDO CAMPOS INICIAIS:');
+    (this.initialFormFields || []).forEach(f => {
+      const showInCard = f?.showInCard;
+      const showInAllPhases = f?.showInAllPhases;
+      console.log(`${f.name}: showInCard=${showInCard} (${typeof showInCard}), showInAllPhases=${showInAllPhases} (${typeof showInAllPhases})`);
+      
+      // Filtrar nameContact e emailContact que podem ter valores antigos no banco
+      if (f.name === 'nameContact' || f.name === 'emailContact') {
+        console.log(`❌ REJEITADO: ${f.name} - campo excluído especificamente`);
+        return;
+      }
+      
+      if (showInCard === true || showInAllPhases === true) {
+        initialFields.push(f);
+        console.log(`✅ INCLUÍDO: ${f.name} - motivo: showInCard=${showInCard === true} showInAllPhases=${showInAllPhases === true}`);
+      } else {
+        console.log(`❌ REJEITADO: ${f.name} - showInCard não é true E showInAllPhases não é true`);
+      }
     });
+    
+    // 2. Campos de configurações de fases (aparecem depois)
+    console.log('🔍 VERIFICANDO CAMPOS DE FASES:');
+    Object.values(this.phaseFormConfigs).forEach((config: any) => {
+      if (config?.fields) {
+        config.fields.forEach((f: any) => {
+          console.log(`FASE - ${f.name}: showInAllPhases=${f.showInAllPhases}`);
+          if (f?.showInAllPhases === true) {
+            phaseFields.push(f);
+            console.log(`✅ INCLUÍDO DA FASE: ${f.name}`);
+          }
+        });
+      }
+    });
+    
+    // 3. Remover duplicatas (manter a primeira ocorrência)
+    const allFields = [...initialFields, ...phaseFields];
+    const uniqueFields = allFields.filter((field, index, array) => 
+      array.findIndex(f => f.name === field.name) === index
+    );
+    
+    console.log('📋 RESULTADO FINAL:', uniqueFields.map(f => f.name));
+    return uniqueFields;
+  }
 
-    const fieldsToShow = (this.initialFormFields || [])
-      .filter((f: any) => {
-        const shouldShow = !!f?.showInCard || !!f?.showInAllPhases;
-        return shouldShow;
-      })
-      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
-
-    console.log('📋 CAMPOS MARCADOS PARA EXIBIR:', fieldsToShow.map((f: any) => f.name));
+  getCardFieldsForLead(lead: Lead): Array<{ label: string; value: any; type?: string }> {
+    // NOVA SOLUÇÃO: Buscar campos globais de uma vez só
+    const allFieldsForDisplay = this.getAllFieldsForDisplay();
+    
+    const fieldsToShow = allFieldsForDisplay.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     // Logs removidos
 
@@ -576,27 +635,39 @@ export class KanbanComponent implements OnInit, OnDestroy {
   getTemperatureGlobalItem(lead: Lead): { label: string; value: any } | null {
     try {
       // procurar um campo com type temperatura no form inicial
+      console.log('🌡️ phaseCardFields para coluna', lead.columnId, ':', this.phaseCardFields[lead.columnId]);
+      console.log('🌡️ initialFormFields:', this.initialFormFields);
+      
       const sources = [
         ...(this.phaseCardFields[lead.columnId] || []),
         ...(this.initialFormFields || [])
       ];
       
-      // Removido log desnecessário
+      console.log('🌡️ Verificando sources:', sources.map(f => ({
+        name: f.name,
+        type: f.type,
+        showInCard: f.showInCard,
+        showInAllPhases: f.showInAllPhases
+      })));
       
       const tempField = (sources as any[]).find(f => {
         const isTemperatura = (f.type || '').toLowerCase() === 'temperatura';
         const hasVisibilityFlag = f.showInCard || f.showInAllPhases;
-        // Removido log desnecessário
+        console.log(`🌡️ Verificando campo ${f.name}: type=${f.type}, isTemperatura=${isTemperatura}, hasVisibilityFlag=${hasVisibilityFlag}`);
         return isTemperatura && hasVisibilityFlag;
       });
       
-      // Removido log desnecessário
+      if (!tempField) {
+        console.log('🌡️ Nenhum tempField encontrado para lead:', lead.id);
+        return null;
+      }
       
-      if (!tempField) return null;
       const val = this.readFieldValue(lead, tempField.apiFieldName || tempField.name, tempField.label || tempField.name);
-      // Removido log desnecessário
+      console.log('🌡️ Valor lido para temperatura:', val);
       if (val === undefined || val === null || `${val}`.trim() === '') return null;
-      return { label: tempField.label || 'Temperatura', value: val };
+      const result = { label: tempField.label || 'Temperatura', value: val };
+      console.log('🌡️ Retornando resultado:', result);
+      return result;
     } catch (error) {
       console.error('🌡️ getTemperatureGlobalItem error:', error);
       return null;
@@ -976,6 +1047,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   // Formulário inicial (aba nova)
   initialFormFields: any[] = [];
+  phaseFormConfigs: {[key: string]: any} = {};
   apiExampleJson: string = '';
 
   // Fluxo (transitions) config

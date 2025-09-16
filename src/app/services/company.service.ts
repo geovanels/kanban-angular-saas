@@ -78,31 +78,22 @@ export class CompanyService {
 
   private async queryCompanyBySubdomain(subdomain: string): Promise<Company | null> {
     try {
-      console.log('🔍 Buscando empresa por subdomínio:', subdomain);
       return await runInInjectionContext(this.injector, async () => {
         const companiesRef = collection(this.firestore, 'companies');
         const q = query(companiesRef, where('subdomain', '==', subdomain));
         const querySnapshot = await getDocs(q);
         
-        console.log('📊 Resultado da query:', {
-          empty: querySnapshot.empty,
-          size: querySnapshot.size,
-          docs: querySnapshot.docs.map((doc: any) => ({ id: doc.id, subdomain: doc.data()['subdomain'] }))
-        });
-        
         if (querySnapshot.empty) {
-          console.log('❌ Nenhuma empresa encontrada para subdomínio:', subdomain);
           return null;
         }
         
         const docData = querySnapshot.docs[0];
         const company = { id: docData.id, ...docData.data() } as Company;
-        console.log('✅ Empresa encontrada:', { id: company.id, subdomain: company.subdomain, name: company.name });
         return company;
       });
     } catch (error) {
       // Erro silencioso para segurança
-      console.error('❌ Erro ao buscar empresa por subdomínio:', subdomain, error);
+      console.error('Erro ao buscar empresa por subdomínio:', subdomain, error);
       return null;
     }
   }
@@ -214,8 +205,6 @@ export class CompanyService {
 
   private async sendInvitationEmail(userEmail: string, role: string, companyId: string, inviteToken: string, displayName?: string): Promise<void> {
     try {
-      console.log('📧 Debug Email - Enviando convite:', { userEmail, role, companyId, inviteToken, displayName });
-      
       // Importar SmtpService dinamicamente para evitar dependência circular
       const { SmtpService } = await import('./smtp.service');
       const smtpService = this.injector.get(SmtpService);
@@ -230,7 +219,6 @@ export class CompanyService {
       };
 
       const inviteLink = `${window.location.origin}/accept-invite?token=${inviteToken}&email=${encodeURIComponent(userEmail)}&companyId=${companyId}`;
-      console.log('🔗 Debug Email - Link do convite:', inviteLink);
       const subject = `Convite para participar da ${company.name}`;
       
       const html = `
@@ -349,14 +337,10 @@ export class CompanyService {
 
   async removeUserFromCompany(companyId: string, userEmail: string): Promise<void> {
     try {
-      console.log('🗑️ Debug Service - Removendo usuário:', { companyId, userEmail });
       const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
-      console.log('📄 Debug Service - Referência do documento:', userRef.path);
-      
       await runInInjectionContext(this.injector, () => deleteDoc(userRef));
-      console.log('✅ Debug Service - Documento deletado com sucesso');
     } catch (error) {
-      console.error('❌ Debug Service - Erro ao deletar documento:', error);
+      console.error('Erro ao deletar documento:', error);
       throw error;
     }
   }
@@ -540,53 +524,36 @@ export class CompanyService {
 
   async getCompanyByUserEmail(userEmail: string): Promise<Company | null> {
     try {
-      console.log('🔍 Debug Service - Buscando empresa para email:', userEmail);
-      
       return await runInInjectionContext(this.injector, async () => {
         // 1) Procurar por owner
-        console.log('👑 Debug Service - Procurando como proprietário...');
         const companiesRef = collection(this.firestore, 'companies');
         const ownerQuery = query(companiesRef, where('ownerEmail', '==', userEmail), limit(1));
         const ownerSnap = await runInInjectionContext(this.injector, () => getDocs(ownerQuery));
-        console.log('👑 Debug Service - Documentos encontrados como owner:', ownerSnap.size);
         
         if (!ownerSnap.empty) {
           const d = ownerSnap.docs[0];
-          console.log('✅ Debug Service - Empresa encontrada como owner:', d.id);
           return { id: d.id, ...d.data() } as Company;
         }
 
         // 2) Procurar por usuário em qualquer empresa via collectionGroup('users')
-        console.log('👥 Debug Service - Procurando como usuário da empresa...');
         const usersGroup = collectionGroup(this.firestore, 'users');
         const usersSnap = await runInInjectionContext(this.injector, () => getDocs(query(usersGroup, where('email', '==', userEmail), limit(1))));
-        console.log('👥 Debug Service - Documentos encontrados como usuário:', usersSnap.size);
         
         if (!usersSnap.empty) {
           const userDoc = usersSnap.docs[0];
-          console.log('👤 Debug Service - Usuário encontrado no documento:', userDoc.ref.path);
-          console.log('👤 Debug Service - Dados do usuário:', userDoc.data());
-          
           const companyRef = userDoc.ref.parent?.parent; // companies/{companyId}
           if (companyRef) {
-            console.log('🏢 Debug Service - Referência da empresa:', companyRef.path);
             const companyDoc = await runInInjectionContext(this.injector, () => getDoc(companyRef));
             if (companyDoc.exists()) {
-              console.log('✅ Debug Service - Empresa encontrada:', companyDoc.id);
               return { id: companyDoc.id, ...companyDoc.data() } as Company;
-            } else {
-              console.log('❌ Debug Service - Documento da empresa não existe');
             }
-          } else {
-            console.log('❌ Debug Service - Referência da empresa é null');
           }
         }
 
-        console.log('❌ Debug Service - Nenhuma empresa encontrada');
         return null;
       });
     } catch (error) {
-      console.error('❌ Debug Service - Erro na busca:', error);
+      console.error('Erro na busca:', error);
       return null;
     }
   }
@@ -594,39 +561,32 @@ export class CompanyService {
   // Método específico para validação de convites sem dependência de consultas complexas
   async validateInviteWithCompanyId(companyId: string, email: string, token: string): Promise<{ valid: boolean; company?: Company; companyUser?: CompanyUser }> {
     try {
-      console.log('🔍 Debug - Validando convite com ID da empresa:', { companyId, email, token });
-      
       // Buscar empresa diretamente pelo ID
       const company = await this.getCompany(companyId);
       if (!company) {
-        console.log('❌ Debug - Empresa não encontrada');
         return { valid: false };
       }
 
       // Buscar usuário na empresa
       const companyUser = await this.getCompanyUser(companyId, email);
       if (!companyUser) {
-        console.log('❌ Debug - Usuário não encontrado na empresa');
         return { valid: false };
       }
 
       // Validar token
       if (companyUser.inviteToken !== token) {
-        console.log('❌ Debug - Token inválido');
         return { valid: false };
       }
 
       // Validar status
       if (companyUser.inviteStatus !== 'pending') {
-        console.log('❌ Debug - Status inválido:', companyUser.inviteStatus);
         return { valid: false };
       }
 
-      console.log('✅ Debug - Convite válido!');
       return { valid: true, company, companyUser };
       
     } catch (error) {
-      console.error('❌ Debug - Erro na validação:', error);
+      console.error('Erro na validação:', error);
       return { valid: false };
     }
   }

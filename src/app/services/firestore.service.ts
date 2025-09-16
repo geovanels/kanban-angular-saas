@@ -256,7 +256,6 @@ export class FirestoreService {
         throw new Error('Contexto da empresa não inicializado');
       }
 
-      console.log('🗑️ Iniciando exclusão completa do quadro:', boardId);
       
       // 1. Excluir todas as subcoleções primeiro
       await this.deleteBoardSubcollections(boardId);
@@ -265,7 +264,6 @@ export class FirestoreService {
       const boardRef = doc(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId);
       await deleteDoc(boardRef);
       
-      console.log('✅ Quadro excluído completamente:', boardId);
     } catch (error) {
       console.error('❌ Erro ao excluir quadro:', error);
       throw error;
@@ -276,7 +274,6 @@ export class FirestoreService {
     if (!this.currentCompanyId) return;
 
     const basePath = `companies/${this.currentCompanyId}/boards/${boardId}`;
-    console.log('🔄 Excluindo subcoleções do quadro:', basePath);
 
     try {
       // Excluir em lotes para melhor performance
@@ -295,7 +292,6 @@ export class FirestoreService {
         await this.deleteCollection(`${basePath}/${subcollection}`);
       }
       
-      console.log('✅ Subcoleções excluídas com sucesso');
     } catch (error) {
       console.error('❌ Erro ao excluir subcoleções:', error);
       throw error;
@@ -308,11 +304,9 @@ export class FirestoreService {
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(collectionRef));
       
       if (snapshot.empty) {
-        console.log(`📭 Coleção ${collectionPath} já está vazia`);
         return;
       }
 
-      console.log(`🗑️ Excluindo ${snapshot.docs.length} documentos de ${collectionPath}`);
       
       // Excluir em lotes de 500 documentos (limite do Firestore)
       const batchSize = 500;
@@ -330,7 +324,6 @@ export class FirestoreService {
       }
       
       await Promise.all(batches);
-      console.log(`✅ ${snapshot.docs.length} documentos excluídos de ${collectionPath}`);
       
     } catch (error) {
       console.warn(`⚠️ Erro ao excluir coleção ${collectionPath}:`, error);
@@ -345,7 +338,6 @@ export class FirestoreService {
     }
     
     if (!this.currentCompanyId) {
-      console.log('Contexto da empresa não inicializado - retornando array vazio');
       return [];
     }
 
@@ -572,12 +564,6 @@ export class FirestoreService {
         enteredAt: now
       };
 
-      console.log('📝 Atualizando histórico de fases:', {
-        leadId,
-        from: currentColumnId,
-        to: newColumnId,
-        phaseHistoryKeys: Object.keys(phaseHistory)
-      });
 
       const updates = {
         columnId: newColumnId,
@@ -961,7 +947,6 @@ export class FirestoreService {
       await this.initializeCompanyContext();
     }
     if (!this.currentCompanyId) {
-      console.log('Contexto da empresa não inicializado - retornando array vazio');
       return [];
     }
 
@@ -1085,9 +1070,8 @@ export class FirestoreService {
       );
       
       await Promise.all(deletePromises);
-      console.log(`✅ Excluídos ${deletePromises.length} emails da caixa de saída`);
     } catch (error) {
-      console.error('❌ Erro ao limpar caixa de saída:', error);
+      console.error('Erro ao limpar caixa de saída:', error);
       throw error;
     }
   }
@@ -1104,18 +1088,15 @@ export class FirestoreService {
       }
 
       const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
-      console.log('Buscando templates em (multi-empresa):', templatesPath);
       
       const templatesRef = collection(this.firestore, templatesPath);
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(templatesRef));
       const templates = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
       
-      console.log(`Templates encontrados (multi-empresa): ${templates.length} itens`);
       return templates;
     } catch (error: any) {
       // Tratar erros de permissão silenciosamente
       if (error.code === 'permission-denied') {
-        console.log('Permissões de templates não configuradas - retornando array vazio');
         return [];
       }
       // Outros erros são mantidos para debug
@@ -1141,7 +1122,6 @@ export class FirestoreService {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
-    console.log('Criando template em:', templatesPath, newTemplate);
     return await addDoc(templatesRef, newTemplate);
   }
 
@@ -1161,7 +1141,6 @@ export class FirestoreService {
       companyId: this.currentCompanyId,
       updatedAt: serverTimestamp()
     };
-    console.log('Atualizando template em:', templatePath, updatedTemplate);
     return await updateDoc(templateRef, updatedTemplate);
   }
 
@@ -1179,17 +1158,13 @@ export class FirestoreService {
   }
 
   subscribeToEmailTemplates(userId: string, boardId: string, callback: (templates: any[]) => void) {
-    console.log(`Iniciando subscrição de templates para boardId: ${boardId}`);
-    
     if (!this.currentCompanyId) {
-      console.warn('Contexto da empresa não definido, retornando array vazio');
       callback([]);
       return () => {}; // Retorna função de limpeza vazia
     }
     
     // Usar apenas estrutura multi-empresa
     const templatesPath = `companies/${this.currentCompanyId}/boards/${boardId}/emailTemplates`;
-    console.log('Subscribing templates em:', templatesPath);
     
     const templatesRef = collection(this.firestore, templatesPath);
     
@@ -1201,13 +1176,11 @@ export class FirestoreService {
             path: doc.ref.path, 
             ...doc.data() 
           }));
-          console.log(`Templates encontrados (multi-empresa) para boardId: ${boardId}:`, templates.length);
           callback(templates);
         },
         (error: any) => {
           // Tratar erros de permissão silenciosamente em desenvolvimento
           if (error.code === 'permission-denied') {
-            console.log('Permissões de templates não configuradas - retornando array vazio');
             callback([]);
             return;
           }
@@ -1222,36 +1195,28 @@ export class FirestoreService {
   // AUTOMATIONS MANAGEMENT
   async getAutomations(userId: string, boardId: string) {
     try {
-      console.log('Buscando automações para boardId:', boardId);
-      
       // Usar estrutura multi-empresa se há contexto de empresa
       if (this.currentCompanyId) {
         const automationsPath = `companies/${this.currentCompanyId}/boards/${boardId}/automations`;
-        console.log('Buscando automações em (multi-empresa):', automationsPath);
         
         const automationsRef = collection(this.firestore, automationsPath);
         const snapshot = await runInInjectionContext(this.injector, () => getDocs(automationsRef));
         const automations = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         
-        console.log(`Automações encontradas (multi-empresa): ${automations.length} itens`);
         return automations;
       }
       
       // Fallback para estrutura antiga se não há contexto de empresa
-      console.log('Contexto de empresa não definido, usando estrutura antiga');
       const automationsPath = `users/${userId}/boards/${boardId}/automations`;
-      console.log('Buscando automações em (estrutura antiga):', automationsPath);
       
       const automationsRef = collection(this.firestore, automationsPath);
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(automationsRef));
       const automations = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
       
-      console.log(`Automações encontradas (estrutura antiga): ${automations.length} itens`);
       return automations;
     } catch (error: any) {
       // Tratar erros de permissão silenciosamente
       if (error.code === 'permission-denied') {
-        console.log('Permissões de automações não configuradas - retornando array vazio');
         return [];
       }
       // Outros erros são mantidos para debug
@@ -1277,7 +1242,6 @@ export class FirestoreService {
       updatedAt: serverTimestamp(),
       active: true
     };
-    console.log('Criando automação em (multi-empresa):', `companies/${this.currentCompanyId}/boards/${boardId}/automations`, newAutomation);
     return await addDoc(automationsRef, newAutomation);
   }
 
@@ -1296,7 +1260,6 @@ export class FirestoreService {
       companyId: this.currentCompanyId,
       updatedAt: serverTimestamp()
     };
-    console.log('Atualizando automação em (multi-empresa):', `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`, updatedAutomation);
     return await updateDoc(automationRef, updatedAutomation);
   }
 
@@ -1310,16 +1273,12 @@ export class FirestoreService {
     }
 
     const automationRef = doc(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`);
-    console.log('Excluindo automação (multi-empresa):', `companies/${this.currentCompanyId}/boards/${boardId}/automations/${automationId}`);
     return await deleteDoc(automationRef);
   }
 
   // AUTOMATION HISTORY MANAGEMENT
   subscribeToAutomationHistory(userId: string, boardId: string, automationId: string, callback: (historyItems: any[]) => void) {
-    console.log('Subscribing to automation history for:', { userId, boardId, automationId });
-
     if (!this.currentCompanyId) {
-      console.warn('Contexto da empresa não definido, retornando array vazio');
       callback([]);
       return () => {};
     }
@@ -1331,7 +1290,6 @@ export class FirestoreService {
       onSnapshot(q,
         (snapshot: any) => {
           const historyItems = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-          console.log(`Histórico de automação (multi-empresa): ${historyItems.length} itens`);
           callback(historyItems);
         },
         (error: any) => {
@@ -1359,7 +1317,6 @@ export class FirestoreService {
         timestamp: serverTimestamp(),
         createdAt: serverTimestamp()
       });
-      console.log('Item de histórico de automação adicionado (multi-empresa):', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('Erro ao adicionar item de histórico de automação:', error);
@@ -1368,17 +1325,13 @@ export class FirestoreService {
   }
 
   subscribeToAutomations(userId: string, boardId: string, callback: (automations: any[]) => void) {
-    console.log(`Iniciando subscrição de automações para boardId: ${boardId}`);
-    
     if (!this.currentCompanyId) {
-      console.warn('Contexto da empresa não definido, retornando array vazio');
       callback([]);
       return () => {}; // Retorna função de limpeza vazia
     }
     
     // Usar apenas estrutura multi-empresa
     const automationsPath = `companies/${this.currentCompanyId}/boards/${boardId}/automations`;
-    console.log('Subscribing automações em:', automationsPath);
     
     const automationsRef = collection(this.firestore, automationsPath);
     
@@ -1390,13 +1343,11 @@ export class FirestoreService {
             path: doc.ref.path, 
             ...doc.data() 
           }));
-          console.log(`Automações encontradas (multi-empresa) para boardId: ${boardId}:`, automations.length);
           callback(automations);
         },
         (error: any) => {
           // Tratar erros de permissão silenciosamente em desenvolvimento
           if (error.code === 'permission-denied') {
-            console.log('Permissões de automações não configuradas - retornando array vazio');
             callback([]);
             return;
           }
