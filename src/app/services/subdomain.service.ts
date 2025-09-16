@@ -18,30 +18,24 @@ export class SubdomainService {
   async initializeFromSubdomain(): Promise<Company | null> {
     try {
       const subdomain = this.extractSubdomain();
-      console.log('🌐 Subdomínio extraído:', subdomain, 'from hostname:', window?.location?.hostname);
       
       if (!subdomain) {
-        console.log('❌ Nenhum subdomínio encontrado');
         this.isInitializedSubject.next(true);
         return null;
       }
 
-      console.log('🔄 Iniciando busca por empresa com subdomínio:', subdomain);
       let company = await this.companyService.getCompanyBySubdomain(subdomain);
       
-      
       if (company) {
-        console.log('✅ Empresa encontrada, definindo no contexto:', company.name);
         this.currentCompanySubject.next(company);
       } else {
-        console.log('❌ Empresa não encontrada, chamando handleInvalidSubdomain');
         this.handleInvalidSubdomain(subdomain);
       }
       
       this.isInitializedSubject.next(true);
       return company;
     } catch (error) {
-      console.error('❌ Erro em initializeFromSubdomain:', error);
+      console.error('Erro em initializeFromSubdomain:', error);
       this.isInitializedSubject.next(true);
       return null;
     }
@@ -104,24 +98,16 @@ export class SubdomainService {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       const isDev = this.isDevelopment();
-      console.log('🚨 handleInvalidSubdomain chamado:', { 
-        subdomain, 
-        hostname, 
-        isDevelopment: isDev 
-      });
       
       if (isDev) {
-        console.log('🔧 Ambiente de desenvolvimento - não exibindo alert');
         return;
       }
       
       if (hostname.includes(`${subdomain}.taskboard.com.br`)) {
-        console.log('⚠️ Exibindo alert para empresa não encontrada');
         alert(`Empresa '${subdomain}' não encontrada. Entre em contato com o suporte.`);
         return;
       }
       
-      console.log('🔄 Redirecionando para página de empresa não encontrada');
       window.location.href = 'https://taskboard.com.br/empresa-nao-encontrada?subdomain=' + encodeURIComponent(subdomain);
     }
   }
