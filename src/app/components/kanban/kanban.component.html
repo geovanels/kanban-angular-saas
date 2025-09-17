@@ -593,13 +593,27 @@
       <!-- Lista horizontal de fases com reordenação -->
       <div class="relative w-full">
         <div #flowScroller class="flow-scroll">
-          <div cdkDropList [cdkDropListData]="flowOrder" (cdkDropListDropped)="onFlowReorder($event)" class="inline-flex items-center gap-6 p-2 whitespace-nowrap min-w-max flow-row w-max">
+          <div cdkDropList [cdkDropListData]="flowOrder" (cdkDropListDropped)="onFlowReorder($event)" (cdkDropListEntered)="onDragEntered()" (cdkDropListExited)="onDragExited()" class="inline-flex items-center gap-6 p-2 whitespace-nowrap min-w-max flow-row w-max">
           <ng-container *ngFor="let phaseId of flowOrder; let i = index">
           <!-- Phase card -->
-          <div cdkDrag class="min-w-[300px] max-w-[340px] flow-phase-card cursor-pointer" [attr.id]="'phase-'+phaseId" [style.--phase-color]="getColumnById(phaseId)?.color || '#94a3b8'" (click)="onPhaseCardClick(phaseId, $event)">
+          <div cdkDrag (cdkDragStarted)="onDragStarted(phaseId)" (cdkDragEnded)="onDragEnded(phaseId)" class="min-w-[300px] max-w-[340px] flow-phase-card cursor-pointer" [attr.id]="'phase-'+phaseId" [style.--phase-color]="getColumnById(phaseId)?.color || '#94a3b8'" (click)="onPhaseCardClick(phaseId, $event)">
             <div class="px-3 py-2 bg-gray-50 rounded-t-lg flex items-center justify-between">
               <div class="font-medium text-gray-800 truncate">{{ getColumnById(phaseId)?.name }}</div>
               <div class="flex items-center gap-2">
+                <button 
+                  *ngIf="i > 0" 
+                  (click)="movePhaseUp(i, $event)" 
+                  class="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="Mover para esquerda">
+                  <i class="fas fa-chevron-left text-xs"></i>
+                </button>
+                <button 
+                  *ngIf="i < flowOrder.length - 1" 
+                  (click)="movePhaseDown(i, $event)" 
+                  class="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="Mover para direita">
+                  <i class="fas fa-chevron-right text-xs"></i>
+                </button>
                 <i class="fas fa-grip-vertical text-gray-400" cdkDragHandle title="Arraste para reordenar"></i>
               </div>
             </div>

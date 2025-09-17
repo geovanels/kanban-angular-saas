@@ -50,6 +50,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   flowThumbPercent = 10;
   flowThumbLeftPercent = 0;
   private isDraggingFlowBar = false;
+  private isManualReorder = false;
 
   board: Board | null = null;
   columns: Column[] = [];
@@ -280,7 +281,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
         // Carregar configurações de formulários de todas as fases
         this.loadAllPhaseFormConfigs();
         // Sincronizar editor de fluxo: garantir que novas fases entrem na ordem
-        try { this.syncFlowOrderWithColumns(); } catch {}
+        try { 
+          console.log('🔄 Columns subscription - Chamando syncFlowOrderWithColumns', {
+            columnsChanged: true,
+            isManualReorder: this.isManualReorder,
+            currentFlowOrder: [...this.flowOrder],
+            columnsCount: columns.length,
+            columnIds: columns.map(c => c.id),
+            columnNames: columns.map(c => c.name)
+          });
+          this.syncFlowOrderWithColumns(); 
+        } catch {}
       }
     );
     this.subscriptions.push({ unsubscribe: columnsUnsub } as Subscription);
@@ -1070,8 +1081,23 @@ export class KanbanComponent implements OnInit, OnDestroy {
     try {
       const cfg = await this.firestoreService.getFlowConfig(this.boardId);
       this.flowConfig = (cfg as any) || { allowed: {} };
-      // Inicializar ordem com a order das colunas
-      this.flowOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+      // Sempre sincronizar com a ordem atual das colunas do banco
+      const currentColumnOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+      
+      console.log('🔄 loadFlowConfig - Verificando inicialização', {
+        hasFlowOrder: Array.isArray(this.flowOrder) && this.flowOrder.length > 0,
+        currentFlowOrder: [...(this.flowOrder || [])],
+        columnOrderFromDB: currentColumnOrder,
+        isManualReorder: this.isManualReorder
+      });
+      
+      // Não sobrescrever flowOrder durante reordenação manual
+      if (!this.isManualReorder) {
+        this.flowOrder = currentColumnOrder;
+        console.log('🔄 loadFlowConfig - FlowOrder definido pela ordem das colunas:', [...this.flowOrder]);
+      } else {
+        console.log('🔄 loadFlowConfig - Mantendo flowOrder durante reordenação manual:', [...this.flowOrder]);
+      }
       // Inicializar toggles a partir do allowed atual
       this.flowTogglesByPhase = {};
       for (let i = 0; i < this.flowOrder.length; i++) {
@@ -1093,7 +1119,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.flowEdges = edges;
     } catch {
       this.flowConfig = { allowed: {} };
-      this.flowOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+      // Não sobrescrever flowOrder durante reordenação manual
+      if (!this.isManualReorder) {
+        this.flowOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+      }
     }
   }
 
@@ -1138,37 +1167,225 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return this.columns.filter(c => c.id !== fromId && !ids.includes(c.id!));
   }
 
-  onFlowDropToAllowed(fromId: string, event: CdkDragDrop<Column[]>) {
+  async onFlowDropToAllowed(fromId: string, event: CdkDragDrop<Column[]>) {
     const dropped: Column = event.item.data as Column;
     const list = this.flowConfig.allowed[fromId] || (this.flowConfig.allowed[fromId] = []);
-    if (!list.includes(dropped.id!)) list.push(dropped.id!);
+    
+    if (!list.includes(dropped.id!)) {
+      console.log('➕ Adicionando conexão:', {
+        from: this.getColumnById(fromId)?.name,
+        to: dropped.name,
+        beforeAdd: [...list]
+      });
+      
+      list.push(dropped.id!);
+      
+      console.log('➕ Após adição:', {
+        newList: [...list]
+      });
+      
+      // Salvar a configuração após adicionar
+      try {
+        await this.saveFlowConfig();
+        console.log('✅ Configuração salva após adição da conexão');
+      } catch (error) {
+        console.error('❌ Erro ao salvar configuração após adição:', error);
+      }
+    }
   }
 
-  onFlowDropToAvailable(fromId: string, event: CdkDragDrop<Column[]>) {
+  async onFlowDropToAvailable(fromId: string, event: CdkDragDrop<Column[]>) {
     const dropped: Column = event.item.data as Column;
     const list = this.flowConfig.allowed[fromId] || [];
+    
+    console.log('🗑️ Removendo conexão:', {
+      from: this.getColumnById(fromId)?.name,
+      to: dropped.name,
+      beforeRemoval: [...list],
+      droppedId: dropped.id
+    });
+    
     this.flowConfig.allowed[fromId] = list.filter(id => id !== dropped.id);
+    
+    console.log('🗑️ Após remoção:', {
+      newList: [...this.flowConfig.allowed[fromId]]
+    });
+    
+    // Salvar a configuração após remover
+    try {
+      await this.saveFlowConfig();
+      console.log('✅ Configuração salva após remoção da conexão');
+    } catch (error) {
+      console.error('❌ Erro ao salvar configuração após remoção:', error);
+    }
   }
 
   // Reordenação horizontal dos cartões de fases no editor de fluxo
-  onFlowReorder(event: CdkDragDrop<string[]>) {
-    if (event.previousIndex === event.currentIndex) return;
+  async onFlowReorder(event: CdkDragDrop<string[]>) {
+    console.log('🎯 onFlowReorder CHAMADO!', {
+      previousIndex: event.previousIndex,
+      currentIndex: event.currentIndex,
+      isEqual: event.previousIndex === event.currentIndex,
+      movedPhaseId: this.flowOrder[event.previousIndex],
+      allPhases: this.flowOrder.map((id, index) => ({ index, id, name: this.getColumnById(id)?.name })),
+      containerData: event.container.data,
+      previousContainer: event.previousContainer.data
+    });
+    
+    if (event.previousIndex === event.currentIndex) {
+      console.log('❌ onFlowReorder - Movimento aparentemente para o mesmo índice');
+      console.log('⚠️ Vamos investigar se realmente é o mesmo local...');
+      
+      // Verificar se há diferença real nos dados do container
+      const containerIds = event.container.data;
+      const previousContainerIds = event.previousContainer.data;
+      
+      console.log('🔍 Container atual:', containerIds);
+      console.log('🔍 Container anterior:', previousContainerIds);
+      console.log('🔍 Fases com nomes:', containerIds.map((id, index) => `${index}: ${this.getColumnById(id)?.name}`));
+      
+      // Se os containers são diferentes ou se há mudança real, continuar
+      if (event.container !== event.previousContainer || 
+          JSON.stringify(containerIds) !== JSON.stringify(previousContainerIds)) {
+        console.log('✅ Detectada mudança real, continuando reordenação...');
+      } else {
+        console.log('❌ Nenhuma mudança real detectada');
+        console.log('💡 Tentativa: Vou tentar forçar o movimento manualmente...');
+        
+        // Tentar detectar se há intenção de movimento baseado no local do mouse
+        // Se o usuário arrastou para uma posição diferente, vamos tentar processar
+        console.log('⚠️ FORÇANDO movimento para testar...');
+        // Não retornar aqui, deixar continuar para testar
+      }
+    }
+    
+    // Sinalizar que estamos fazendo reordenação manual
+    this.isManualReorder = true;
+    
+    console.log('🔄 Flow Reorder - Iniciando reordenação', {
+      from: event.previousIndex,
+      to: event.currentIndex,
+      previousOrder: [...this.flowOrder],
+      movedColumnId: this.flowOrder[event.previousIndex],
+      targetPosition: event.currentIndex
+    });
+    
+    // Criar uma cópia para comparação
+    const originalOrder = [...this.flowOrder];
+    
+    // Atualizar ordem local
     moveItemInArray(this.flowOrder, event.previousIndex, event.currentIndex);
+    
+    console.log('🔄 Flow Reorder - flowOrder imediatamente após moveItemInArray:', [...this.flowOrder]);
+    
+    // Forçar detecção de mudanças para atualizar DOM
+    this.cdr.detectChanges();
+    console.log('🔄 Flow Reorder - DOM atualizado, ordem visual deve refletir:', [...this.flowOrder]);
+    
+    console.log('🔄 Flow Reorder - Nova ordem local:', {
+      newOrder: [...this.flowOrder],
+      changes: this.flowOrder.map((id, index) => {
+        const originalIndex = originalOrder.indexOf(id);
+        return { id, from: originalIndex, to: index, changed: originalIndex !== index };
+      })
+    });
+    
+    try {
+      // Persistir nova ordem no banco de dados - atualizar TODOS os índices
+      const updatePromises = this.flowOrder.map(async (columnId, newIndex) => {
+        const column = this.columns.find(c => c.id === columnId);
+        const originalIndex = originalOrder.indexOf(columnId);
+        
+        if (column && originalIndex !== newIndex) {
+          console.log(`🔄 Atualizando coluna "${column.name}" - posição: ${originalIndex} → ${newIndex}`);
+          await this.firestoreService.updateColumn(this.ownerId, this.boardId, columnId, { order: newIndex });
+          // Atualizar também o objeto local
+          column.order = newIndex;
+        }
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // Reordenar array de colunas localmente para manter consistência
+      this.columns.sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      console.log('✅ Flow Reorder - Reordenação salva com sucesso', {
+        finalOrder: this.columns.map(c => ({ id: c.id, name: c.name, order: c.order }))
+      });
+      
+      console.log('✅ Flow Reorder - Aguardando para resetar flag isManualReorder');
+      // Aguardar menos tempo para permitir que subscriptions sejam processadas
+      setTimeout(() => {
+        console.log('🔄 Flow Reorder - Resetando flag isManualReorder para false');
+        this.isManualReorder = false;
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Flow Reorder - Erro ao salvar nova ordem:', error);
+      
+      // Reverter mudanças locais em caso de erro
+      this.flowOrder = originalOrder;
+      this.isManualReorder = false;
+      
+      // Mostrar erro para o usuário
+      alert('Erro ao reordenar fases. Tente novamente.');
+    }
   }
 
   private syncFlowOrderWithColumns() {
+    // Não interferir durante reordenação manual
+    if (this.isManualReorder) {
+      console.log('🔄 syncFlowOrderWithColumns - Pulando sincronização durante reordenação manual');
+      return;
+    }
+    
     const sortedIds = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
+    
+    console.log('🔄 syncFlowOrderWithColumns - Verificando sincronização', {
+      currentFlowOrder: [...this.flowOrder],
+      sortedByOrder: sortedIds,
+      flowOrderExists: Array.isArray(this.flowOrder) && this.flowOrder.length > 0
+    });
+    
     if (!Array.isArray(this.flowOrder) || this.flowOrder.length === 0) {
+      console.log('🔄 syncFlowOrderWithColumns - Inicializando flowOrder com ordem das colunas');
       this.flowOrder = sortedIds;
       return;
     }
-    // Inserir novas fases que não estão na ordem ainda
-    const existing = new Set(this.flowOrder);
-    for (const id of sortedIds) {
-      if (!existing.has(id)) this.flowOrder.push(id);
+    
+    // Verificar se flowOrder está sincronizado com a ordem atual das colunas
+    const flowOrderMatchesColumnOrder = this.flowOrder.every((id, index) => sortedIds[index] === id);
+    
+    if (flowOrderMatchesColumnOrder) {
+      console.log('🔄 syncFlowOrderWithColumns - FlowOrder já está sincronizado, não alterando');
+      return;
     }
+    
+    // Apenas adicionar novas fases ou remover fases deletadas, preservando ordem existente
+    const existing = new Set(this.flowOrder);
+    const validIds = new Set(sortedIds);
+    
     // Remover fases que foram apagadas
-    this.flowOrder = this.flowOrder.filter(id => sortedIds.includes(id));
+    this.flowOrder = this.flowOrder.filter(id => validIds.has(id));
+    
+    // Inserir novas fases que não estão na ordem ainda (no final)
+    for (const id of sortedIds) {
+      if (!existing.has(id)) {
+        const phaseName = this.getColumnById(id)?.name || 'Nome não encontrado';
+        this.flowOrder.push(id);
+        console.log(`🔄 syncFlowOrderWithColumns - Adicionada nova fase: ${id} (${phaseName})`);
+      }
+    }
+    
+    // Forçar atualização visual se houve mudanças
+    if (this.flowOrder.length !== existing.size) {
+      console.log('🔄 syncFlowOrderWithColumns - Forçando atualização visual após mudanças');
+      this.cdr.detectChanges();
+    }
+    
+    console.log('🔄 syncFlowOrderWithColumns - Sincronização concluída', {
+      finalFlowOrder: [...this.flowOrder]
+    });
   }
 
   // Fluxo: scroll helpers
@@ -2163,6 +2380,99 @@ export class KanbanComponent implements OnInit, OnDestroy {
     console.log('Fase excluída!');
     // Após exclusão, sincronizar ordem do fluxo para refletir a mudança
     try { this.syncFlowOrderWithColumns(); this.updateFlowThumb(); } catch {}
+  }
+
+  // Métodos para debugging de drag
+  onDragEntered() {
+    console.log('🔄 Drag entered flow area');
+  }
+
+  onDragExited() {
+    console.log('🔄 Drag exited flow area');
+  }
+
+  onDragStarted(phaseId: string) {
+    const phaseName = this.getColumnById(phaseId)?.name;
+    const currentIndex = this.flowOrder.indexOf(phaseId);
+    console.log('🔄 Drag started for phase:', phaseName, 'at index:', currentIndex);
+  }
+
+  onDragEnded(phaseId: string) {
+    console.log('🔄 Drag ended for phase:', this.getColumnById(phaseId)?.name);
+  }
+
+  // Funções de reordenação com botões
+  async movePhaseUp(currentIndex: number, event: Event) {
+    event.stopPropagation(); // Prevenir click na fase
+    
+    if (currentIndex <= 0) return;
+    
+    console.log('⬅️ Movendo fase para esquerda:', {
+      from: currentIndex,
+      to: currentIndex - 1,
+      phaseName: this.getColumnById(this.flowOrder[currentIndex])?.name
+    });
+    
+    await this.movePhase(currentIndex, currentIndex - 1);
+  }
+
+  async movePhaseDown(currentIndex: number, event: Event) {
+    event.stopPropagation(); // Prevenir click na fase
+    
+    if (currentIndex >= this.flowOrder.length - 1) return;
+    
+    console.log('➡️ Movendo fase para direita:', {
+      from: currentIndex,
+      to: currentIndex + 1,
+      phaseName: this.getColumnById(this.flowOrder[currentIndex])?.name
+    });
+    
+    await this.movePhase(currentIndex, currentIndex + 1);
+  }
+
+  private async movePhase(fromIndex: number, toIndex: number) {
+    this.isManualReorder = true;
+    
+    const originalOrder = [...this.flowOrder];
+    
+    // Mover no array local
+    const movedPhase = this.flowOrder.splice(fromIndex, 1)[0];
+    this.flowOrder.splice(toIndex, 0, movedPhase);
+    
+    console.log('🔄 Movimento executado:', {
+      originalOrder: originalOrder.map((id, i) => `${i}: ${this.getColumnById(id)?.name}`),
+      newOrder: this.flowOrder.map((id, i) => `${i}: ${this.getColumnById(id)?.name}`)
+    });
+    
+    // Forçar atualização visual
+    this.cdr.detectChanges();
+    
+    try {
+      // Salvar nova ordem no banco
+      const updatePromises = this.flowOrder.map(async (columnId, newIndex) => {
+        const column = this.columns.find(c => c.id === columnId);
+        if (column && column.order !== newIndex) {
+          console.log(`💾 Salvando ${column.name} na posição ${newIndex}`);
+          await this.firestoreService.updateColumn(this.ownerId, this.boardId, columnId, { order: newIndex });
+          column.order = newIndex;
+        }
+      });
+      
+      await Promise.all(updatePromises);
+      
+      console.log('✅ Reordenação salva com sucesso!');
+      
+      setTimeout(() => {
+        this.isManualReorder = false;
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar reordenação:', error);
+      // Reverter em caso de erro
+      this.flowOrder = originalOrder;
+      this.isManualReorder = false;
+      this.cdr.detectChanges();
+    }
   }
 
   async showColumnForm(column: Column) {
