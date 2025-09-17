@@ -115,13 +115,21 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // Carregar fluxo de transições
       this.loadFlowConfig();
       // Agendador periódico para automações de tempo (a cada 60s)
+      // Apenas uma instância por board deve executar as automações
       try {
         this.timeAutomationIntervalId = setInterval(async () => {
           try {
-            await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
-          } catch {}
+            // Só executar se tiver leads carregados e dados válidos
+            if (this.leads && this.leads.length > 0 && this.columns && this.columns.length > 0) {
+              await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
+            }
+          } catch (error) {
+            console.warn('Erro nas automações de tempo:', error);
+          }
         }, 60000);
-      } catch {}
+      } catch (error) {
+        console.error('Erro ao configurar automações de tempo:', error);
+      }
     } else {
       console.error('Parâmetros faltando:', { currentUser: !!this.currentUser, boardId: this.boardId, ownerId: this.ownerId });
     }
@@ -350,10 +358,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           historyCommentsCount: l.historyCommentsCount ?? 0,
           attachmentsCount: l.attachmentsCount ?? 0
         }));
-        // Processar automações baseadas em tempo sempre que os leads mudarem
-        try {
-          await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
-        } catch (e) { console.warn('Falha ao processar automações por tempo:', e); }
+        
         this.isLoading = false;
         this.ensureLeadOrderLoaded();
         this.rebuildDisplayedLeads();
