@@ -130,7 +130,8 @@ export class PhaseFormModalComponent {
             includeInApi: field.includeInApi !== false,
             showInCard: field.showInCard || false,
             requiredToAdvance: !!field.requiredToAdvance,
-            showInAllPhases: !!field.showInAllPhases
+            showInAllPhases: !!field.showInAllPhases,
+            showInFilters: !!field.showInFilters
           };
 
           // Só adicionar se não for undefined ou string vazia

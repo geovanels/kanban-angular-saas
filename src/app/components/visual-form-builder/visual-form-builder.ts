@@ -17,6 +17,7 @@ interface FormField {
   showInCard?: boolean; // Flag para indicar se o campo deve ser exibido no card
   requiredToAdvance?: boolean; // Obrigatório para avançar de fase
   showInAllPhases?: boolean; // Exibir em todas as fases
+  showInFilters?: boolean; // Exibir nos filtros avançados
 }
 
 @Component({
@@ -72,7 +73,8 @@ export class VisualFormBuilderComponent implements OnInit {
       apiFieldName: [''], // Nome personalizado na API
       showInCard: [false], // Por padrão, não exibir no card
       requiredToAdvance: [false],
-      showInAllPhases: [false]
+      showInAllPhases: [false],
+      showInFilters: [false] // Por padrão, não exibir nos filtros
     });
 
     // Listener para automaticamente marcar "showInAllPhases" quando "showInCard" for marcado
@@ -154,7 +156,12 @@ export class VisualFormBuilderComponent implements OnInit {
   private resetForm() {
     this.fieldsForm.reset({
       type: 'text',
-      required: false
+      required: false,
+      includeInApi: true,
+      showInCard: false,
+      requiredToAdvance: false,
+      showInAllPhases: false,
+      showInFilters: false
     });
   }
 
@@ -177,6 +184,7 @@ export class VisualFormBuilderComponent implements OnInit {
         type: field.type,
         showInCard: field.showInCard,
         showInAllPhases: field.showInAllPhases,
+        showInFilters: field.showInFilters,
         completeField: field
       });
     });
@@ -284,6 +292,7 @@ export class VisualFormBuilderComponent implements OnInit {
       showInCard: showInCard,
       requiredToAdvance: formValue.requiredToAdvance || false,
       showInAllPhases: showInAllPhases,
+      showInFilters: formValue.showInFilters || false,
       // Só incluir propriedades que não sejam undefined
       ...(formValue.placeholder && formValue.placeholder.trim() && { placeholder: formValue.placeholder.trim() }),
       ...(formValue.apiFieldName && formValue.apiFieldName.trim() && { apiFieldName: formValue.apiFieldName.trim() })
@@ -347,7 +356,8 @@ export class VisualFormBuilderComponent implements OnInit {
       apiFieldName: field.apiFieldName || '',
       showInCard: field.showInCard || false, // Default false se não especificado
       requiredToAdvance: field.requiredToAdvance || false,
-      showInAllPhases: field.showInAllPhases || false
+      showInAllPhases: field.showInAllPhases || false,
+      showInFilters: field.showInFilters || false
     });
   }
 

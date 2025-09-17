@@ -62,6 +62,185 @@
     </div>
   </nav>
 
+  <!-- Desktop Filters Bar -->
+  <div *ngIf="!isLoading && activeTab === 'kanban'" class="hidden md:block bg-white border-b border-gray-200 px-4 py-3">
+    <div class="flex items-center justify-between">
+      <!-- Filtros básicos -->
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <input
+            type="text"
+            placeholder="Buscar leads..."
+            [(ngModel)]="filterQuery"
+            (input)="applyFilters()"
+            class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+            [class.border-blue-200]="filterQuery"
+            [class.bg-blue-50]="filterQuery">
+          <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+          <button 
+            *ngIf="filterQuery"
+            (click)="filterQuery = ''; applyFilters()"
+            class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-times text-xs"></i>
+          </button>
+        </div>
+        
+        <button (click)="toggleOnlyMine()" 
+                class="px-3 py-2 rounded-lg text-sm transition-colors border flex items-center gap-2"
+                [class.bg-blue-50]="filterOnlyMine"
+                [class.text-blue-700]="filterOnlyMine"
+                [class.border-blue-200]="filterOnlyMine"
+                [class.bg-gray-50]="!filterOnlyMine"
+                [class.text-gray-600]="!filterOnlyMine"
+                [class.border-gray-200]="!filterOnlyMine">
+          <i class="fas fa-user" [class.fa-user-check]="filterOnlyMine"></i>
+          Meus cards
+        </button>
+        
+        
+        <!-- Filtros avançados -->
+        <button (click)="showAdvancedFilters = !showAdvancedFilters" 
+                class="px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors border"
+                [class.bg-purple-50]="getActiveDynamicFiltersCount() > 0"
+                [class.text-purple-700]="getActiveDynamicFiltersCount() > 0"
+                [class.border-purple-200]="getActiveDynamicFiltersCount() > 0"
+                [class.bg-gray-50]="getActiveDynamicFiltersCount() === 0"
+                [class.text-gray-600]="getActiveDynamicFiltersCount() === 0"
+                [class.border-gray-200]="getActiveDynamicFiltersCount() === 0">
+          <i class="fas fa-sliders-h"></i>
+          <span>Filtros Avançados</span>
+          <span *ngIf="getActiveDynamicFiltersCount() > 0" class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs">
+            {{ getActiveDynamicFiltersCount() }}
+          </span>
+        </button>
+      </div>
+      
+      <!-- Status e ações -->
+      <div class="flex items-center gap-3">
+        <div *ngIf="hasActiveFilters()" class="text-sm text-blue-600 flex items-center gap-2">
+          <i class="fas fa-filter"></i>
+          <span>{{ (filterQuery ? 1 : 0) + (filterOnlyMine ? 1 : 0) + getActiveDynamicFiltersCount() }} filtro(s) ativo(s)</span>
+        </div>
+        
+        <button *ngIf="hasActiveFilters()" 
+                (click)="clearFilters()" 
+                class="px-3 py-2 bg-red-50 text-red-700 rounded-lg text-sm hover:bg-red-100 transition-colors flex items-center gap-2 border border-red-200">
+          <i class="fas fa-times"></i>
+          Limpar filtros
+        </button>
+      </div>
+    </div>
+    
+    
+    <!-- Painel de filtros avançados desktop -->
+    <div *ngIf="showAdvancedFilters && availableFilterFields.length > 0" 
+         class="mt-4 bg-gray-50 rounded-lg p-4 border">
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <i class="fas fa-filter text-purple-600"></i>
+          Filtros por Campos Dinâmicos
+        </h4>
+        <button (click)="showAdvancedFilters = false" 
+                class="text-gray-400 hover:text-gray-600 p-1">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div *ngFor="let field of availableFilterFields" 
+             class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-gray-600">
+            {{ field.label }}
+            <span class="text-xs text-gray-400 ml-1">({{ field.type }})</span>
+          </label>
+          
+          <!-- Campo de texto/email/tel -->
+          <div *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel'" 
+               class="flex items-center gap-2">
+            <input type="text"
+                   [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
+                   [value]="getDynamicFilterValue(field.name)"
+                   (input)="setDynamicFilter(field.name, $event.target.value)"
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            <button *ngIf="getDynamicFilterValue(field.name)"
+                    (click)="removeDynamicFilter(field.name)"
+                    class="p-2 text-red-400 hover:text-red-600 transition-colors">
+              <i class="fas fa-times text-sm"></i>
+            </button>
+          </div>
+          
+          <!-- Campo de número -->
+          <div *ngIf="field.type === 'number'" 
+               class="flex items-center gap-2">
+            <input type="number"
+                   [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
+                   [value]="getDynamicFilterValue(field.name)"
+                   (input)="setDynamicFilter(field.name, $event.target.value)"
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            <button *ngIf="getDynamicFilterValue(field.name)"
+                    (click)="removeDynamicFilter(field.name)"
+                    class="p-2 text-red-400 hover:text-red-600 transition-colors">
+              <i class="fas fa-times text-sm"></i>
+            </button>
+          </div>
+          
+          <!-- Campo de data -->
+          <div *ngIf="field.type === 'date'" 
+               class="flex items-center gap-2">
+            <input type="date"
+                   [value]="getDynamicFilterValue(field.name)"
+                   (change)="setDynamicFilter(field.name, $event.target.value)"
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            <button *ngIf="getDynamicFilterValue(field.name)"
+                    (click)="removeDynamicFilter(field.name)"
+                    class="p-2 text-red-400 hover:text-red-600 transition-colors">
+              <i class="fas fa-times text-sm"></i>
+            </button>
+          </div>
+          
+          <!-- Checkbox -->
+          <label *ngIf="field.type === 'checkbox'" 
+                 class="flex items-center gap-3">
+            <input type="checkbox"
+                   [checked]="getDynamicFilterValue(field.name)"
+                   (change)="setDynamicFilter(field.name, $event.target.checked)"
+                   class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+            <span class="text-sm text-gray-600">Apenas marcados</span>
+            <button *ngIf="getDynamicFilterValue(field.name)"
+                    (click)="removeDynamicFilter(field.name)"
+                    class="p-1 text-red-400 hover:text-red-600 transition-colors ml-auto">
+              <i class="fas fa-times text-xs"></i>
+            </button>
+          </label>
+          
+          <!-- Select/Radio/Temperatura -->
+          <div *ngIf="field.type === 'select' || field.type === 'radio' || field.type === 'temperatura'" 
+               class="flex items-center gap-2">
+            <select [value]="getDynamicFilterValue(field.name)"
+                    (change)="onDynamicFilterChange(field.name, $event)"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+              <option value="">Todos os valores</option>
+              <option *ngFor="let option of getFieldOptions(field)" [value]="option">
+                {{ option }}
+              </option>
+            </select>
+            <button *ngIf="getDynamicFilterValue(field.name)"
+                    (click)="removeDynamicFilter(field.name)"
+                    class="p-2 text-red-400 hover:text-red-600 transition-colors">
+              <i class="fas fa-times text-sm"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div *ngIf="getActiveDynamicFiltersCount() > 0" 
+           class="mt-4 text-sm text-purple-600 flex items-center gap-2 pt-3 border-t">
+        <i class="fas fa-info-circle"></i>
+        <span>{{ getActiveDynamicFiltersCount() }} filtro(s) ativo(s) por campos</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Desktop Kanban Board Tab -->
   <div *ngIf="!isLoading && activeTab === 'kanban'" class="kanban-board desktop-board">
     <div 
@@ -779,16 +958,23 @@ Authorization: Bearer {{ apiToken }}
     <div class="p-4 space-y-3">
       <!-- Mobile filters -->
       <div class="flex gap-2 overflow-x-auto pb-2">
-        <button (click)="setTextFilter()" 
-                class="px-3 py-2 rounded-full text-sm flex items-center gap-2 transition-colors"
-                [class.bg-blue-100]="filterQuery"
-                [class.text-blue-700]="filterQuery" 
-                [class.bg-gray-100]="!filterQuery"
-                [class.text-gray-600]="!filterQuery">
-          <i class="fas fa-search"></i>
-          <span *ngIf="!filterQuery">Filtrar por palavra</span>
-          <span *ngIf="filterQuery" class="max-w-24 truncate">"{{ filterQuery }}"</span>
-        </button>
+        <div class="relative flex-1 max-w-xs">
+          <input
+            type="text"
+            placeholder="Buscar..."
+            [(ngModel)]="filterQuery"
+            (input)="applyFilters()"
+            class="w-full pl-8 pr-8 py-2 border border-gray-200 rounded-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            [class.border-blue-200]="filterQuery"
+            [class.bg-blue-50]="filterQuery">
+          <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs"></i>
+          <button 
+            *ngIf="filterQuery"
+            (click)="filterQuery = ''; applyFilters()"
+            class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-times text-xs"></i>
+          </button>
+        </div>
         
         <button (click)="toggleOnlyMine()" 
                 class="px-3 py-2 rounded-full text-sm transition-colors flex items-center gap-1"
@@ -800,15 +986,19 @@ Authorization: Bearer {{ apiToken }}
           Meus cards
         </button>
         
-        <button (click)="setTagFilter()" 
+        
+        <!-- Botão para mostrar filtros avançados -->
+        <button (click)="showAdvancedFilters = !showAdvancedFilters" 
                 class="px-3 py-2 rounded-full text-sm flex items-center gap-2 transition-colors"
-                [class.bg-blue-100]="filterTag"
-                [class.text-blue-700]="filterTag"
-                [class.bg-gray-100]="!filterTag"
-                [class.text-gray-600]="!filterTag">
-          <i class="fas fa-tag"></i>
-          <span *ngIf="!filterTag">Etiqueta</span>
-          <span *ngIf="filterTag" class="max-w-20 truncate">{{ filterTag }}</span>
+                [class.bg-purple-100]="getActiveDynamicFiltersCount() > 0"
+                [class.text-purple-700]="getActiveDynamicFiltersCount() > 0"
+                [class.bg-gray-100]="getActiveDynamicFiltersCount() === 0"
+                [class.text-gray-600]="getActiveDynamicFiltersCount() === 0">
+          <i class="fas fa-sliders-h"></i>
+          <span>Avançado</span>
+          <span *ngIf="getActiveDynamicFiltersCount() > 0" class="bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded-full text-xs">
+            {{ getActiveDynamicFiltersCount() }}
+          </span>
         </button>
         
         <button *ngIf="hasActiveFilters()" 
@@ -819,12 +1009,93 @@ Authorization: Bearer {{ apiToken }}
         </button>
       </div>
       
+      <!-- Filtros Avançados (Campos Dinâmicos) -->
+      <div *ngIf="showAdvancedFilters && availableFilterFields.length > 0" 
+           class="bg-gray-50 rounded-lg p-4 space-y-3 border">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <i class="fas fa-filter text-purple-600"></i>
+            Filtros por Campos
+          </h4>
+          <button (click)="showAdvancedFilters = false" 
+                  class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-3">
+          <div *ngFor="let field of availableFilterFields" 
+               class="flex items-center gap-3">
+            <label class="text-sm text-gray-600 min-w-0 flex-1">
+              {{ field.label }}
+            </label>
+            
+            <!-- Campo de texto/email/tel -->
+            <input *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel'"
+                   type="text"
+                   [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
+                   [value]="getDynamicFilterValue(field.name)"
+                   (input)="setDynamicFilter(field.name, $event.target.value)"
+                   class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            
+            <!-- Campo de número -->
+            <input *ngIf="field.type === 'number'"
+                   type="number"
+                   [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
+                   [value]="getDynamicFilterValue(field.name)"
+                   (input)="setDynamicFilter(field.name, $event.target.value)"
+                   class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            
+            <!-- Campo de data -->
+            <input *ngIf="field.type === 'date'"
+                   type="date"
+                   [value]="getDynamicFilterValue(field.name)"
+                   (change)="setDynamicFilter(field.name, $event.target.value)"
+                   class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            
+            <!-- Checkbox -->
+            <label *ngIf="field.type === 'checkbox'" 
+                   class="flex items-center gap-2 flex-1">
+              <input type="checkbox"
+                     [checked]="getDynamicFilterValue(field.name)"
+                     (change)="setDynamicFilter(field.name, $event.target.checked)"
+                     class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+              <span class="text-sm text-gray-600">Apenas marcados</span>
+            </label>
+            
+            <!-- Select/Radio/Temperatura (dropdown com opções) -->
+            <select *ngIf="field.type === 'select' || field.type === 'radio' || field.type === 'temperatura'"
+                    [value]="getDynamicFilterValue(field.name)"
+                    (change)="onDynamicFilterChange(field.name, $event)"
+                    class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+              <option value="">Todos</option>
+              <option *ngFor="let option of getFieldOptions(field)" [value]="option">
+                {{ option }}
+              </option>
+            </select>
+            
+            <!-- Botão para remover filtro específico -->
+            <button *ngIf="getDynamicFilterValue(field.name)"
+                    (click)="removeDynamicFilter(field.name)"
+                    class="p-1 text-red-400 hover:text-red-600 transition-colors">
+              <i class="fas fa-times text-xs"></i>
+            </button>
+          </div>
+        </div>
+        
+        <div *ngIf="getActiveDynamicFiltersCount() > 0" 
+             class="text-xs text-purple-600 flex items-center gap-1 pt-2 border-t">
+          <i class="fas fa-info-circle"></i>
+          <span>{{ getActiveDynamicFiltersCount() }} filtro(s) ativo(s) por campos</span>
+        </div>
+      </div>
+      
       <!-- Filter status indicator -->
       <div *ngIf="hasActiveFilters()" class="mt-2 text-xs text-blue-600 flex items-center gap-1">
         <i class="fas fa-filter"></i>
         <span>Filtros ativos</span>
         <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-          {{ (filterQuery ? 1 : 0) + (filterOnlyMine ? 1 : 0) + (filterTag ? 1 : 0) }}
+          {{ (filterQuery ? 1 : 0) + (filterOnlyMine ? 1 : 0) + getActiveDynamicFiltersCount() }}
         </span>
       </div>
 

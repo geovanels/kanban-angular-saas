@@ -199,7 +199,11 @@ export class AuthService {
   // Processar convite pendente após login completo
   async processPendingInvite(companyId: string, email: string, token: string): Promise<boolean> {
     try {
-      console.log('🔄 Debug Auth - Processando convite pendente...', { companyId, email });
+      console.log('🔄 Debug processPendingInvite - Iniciando processamento', {
+        companyId,
+        email,
+        token: token?.substring(0, 8) + '...'
+      });
       
       // Aguardar um pouco para garantir que o usuário foi autenticado corretamente
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -209,43 +213,57 @@ export class AuthService {
       const companyService = this.injector.get(CompanyService);
       
       // Validar convite
+      console.log('🔍 Debug processPendingInvite - Validando convite...');
       const validation = await companyService.validateInviteWithCompanyId(companyId, email, token);
       
       if (!validation.valid) {
-        console.log('❌ Debug Auth - Convite inválido');
+        console.log('❌ Debug processPendingInvite - Validação falhou');
         return false;
       }
 
       const { company, companyUser } = validation;
       if (!company || !companyUser) {
-        console.log('❌ Debug Auth - Dados do convite não encontrados');
+        console.log('❌ Debug processPendingInvite - Empresa ou usuário não encontrado', {
+          hasCompany: !!company,
+          hasCompanyUser: !!companyUser
+        });
         return false;
       }
 
       // Atualizar status do convite
       const currentUser = this.getCurrentUser();
       if (!currentUser) {
-        console.log('❌ Debug Auth - Usuário não autenticado');
+        console.log('❌ Debug processPendingInvite - Usuário atual não encontrado');
         return false;
       }
-
-      console.log('👤 Debug Auth - Atualizando status do convite para o usuário:', currentUser.uid);
-      await companyService.updateUserInCompany(company.id!, email, {
+      
+      console.log('📝 Debug processPendingInvite - Atualizando status do convite...', {
+        currentUserUid: currentUser.uid,
+        currentUserDisplayName: currentUser.displayName,
+        companyUserDisplayName: companyUser.displayName,
+        companyUserStatus: companyUser.inviteStatus
+      });
+      
+      const updateData = {
         uid: currentUser.uid,
         displayName: currentUser.displayName || companyUser.displayName,
-        inviteStatus: 'accepted',
+        inviteStatus: 'accepted' as const,
         inviteToken: null,
         acceptedAt: new Date()
-      });
+      };
+      
+      await companyService.updateUserInCompany(company.id!, email, updateData);
+      console.log('✅ Debug processPendingInvite - Status do convite atualizado com sucesso');
 
       // Associar usuário à empresa no documento users
+      console.log('🔗 Debug processPendingInvite - Associando usuário à empresa...');
       await this.linkUserToCompany(currentUser.uid, company.id!);
+      console.log('✅ Debug processPendingInvite - Usuário associado à empresa com sucesso');
 
-      console.log('✅ Debug Auth - Convite processado com sucesso');
       return true;
       
     } catch (error) {
-      console.error('❌ Debug Auth - Erro ao processar convite:', error);
+      console.error('❌ Debug processPendingInvite - Erro ao processar convite pendente:', error);
       return false;
     }
   }
