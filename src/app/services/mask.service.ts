@@ -127,28 +127,32 @@ export class MaskService {
     // Verifica se tem 14 dígitos
     if (cleaned.length !== 14) return false;
     
-    // Verifica sequências iguais
+    // Verifica sequências iguais (todos os dígitos iguais)
     if (/^(\d)\1+$/.test(cleaned)) return false;
     
+    // Convertemos para array de números para facilitar os cálculos
+    const digits = cleaned.split('').map(Number);
+    
     // Validação do primeiro dígito verificador
-    let sum = 0;
+    let sum1 = 0;
     const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     for (let i = 0; i < 12; i++) {
-      sum += parseInt(cleaned.charAt(i)) * weights1[i];
+      sum1 += digits[i] * weights1[i];
     }
-    let digit1 = 11 - (sum % 11);
-    if (digit1 < 2) digit1 = 0;
+    const remainder1 = sum1 % 11;
+    const digit1 = remainder1 < 2 ? 0 : 11 - remainder1;
     
     // Validação do segundo dígito verificador
-    sum = 0;
+    let sum2 = 0;
     const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     for (let i = 0; i < 13; i++) {
-      sum += parseInt(cleaned.charAt(i)) * weights2[i];
+      sum2 += digits[i] * weights2[i];
     }
-    let digit2 = 11 - (sum % 11);
-    if (digit2 < 2) digit2 = 0;
+    const remainder2 = sum2 % 11;
+    const digit2 = remainder2 < 2 ? 0 : 11 - remainder2;
     
-    return parseInt(cleaned.charAt(12)) === digit1 && parseInt(cleaned.charAt(13)) === digit2;
+    // Verifica se os dígitos calculados coincidem com os fornecidos
+    return digits[12] === digit1 && digits[13] === digit2;
   }
 
   // Validar email
@@ -224,4 +228,5 @@ export class MaskService {
   validateCNPJ(value: string): boolean {
     return this.isValidCnpj(value);
   }
+
 }

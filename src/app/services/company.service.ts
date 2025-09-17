@@ -219,19 +219,26 @@ export class CompanyService {
       };
 
       const inviteLink = `${window.location.origin}/accept-invite?token=${inviteToken}&email=${encodeURIComponent(userEmail)}&companyId=${companyId}`;
-      const subject = `Convite para participar da ${company.name}`;
+      const subject = `Convite para participar da ${company.name || 'TaskBoard'}`;
+      
+      // Garantir valores padrão para evitar undefined no template
+      const companyName = company.name || 'TaskBoard';
+      const primaryColor = company.brandingConfig?.primaryColor || '#3B82F6';
+      const logoImg = company.brandingConfig?.logo ? `<img src="${company.brandingConfig.logo}" alt="${companyName}" style="max-height: 60px; margin-bottom: 15px;">` : '';
+      const roleDisplay = roleTranslations[role] || 'Usuário';
+      const userDisplayName = displayName || userEmail.split('@')[0];
       
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
           <!-- Header do TaskBoard -->
           <div style="background: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="display: inline-block; background: ${company.brandingConfig?.primaryColor || '#3B82F6'}; color: white; padding: 15px; border-radius: 50%; margin-bottom: 15px;">
+            <div style="display: inline-block; background: ${primaryColor}; color: white; padding: 15px; border-radius: 50%; margin-bottom: 15px;">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 3H5c-1.11 0-2 .89-2 2v14c0 1.11.89 2 2 2h14c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
               </svg>
             </div>
-            ${company.brandingConfig?.logo ? `<img src="${company.brandingConfig.logo}" alt="${company.name}" style="max-height: 60px; margin-bottom: 15px;">` : ''}
-            <h1 style="color: ${company.brandingConfig?.primaryColor || '#3B82F6'}; margin: 10px 0 5px 0; font-size: 28px;">
+            ${logoImg}
+            <h1 style="color: ${primaryColor}; margin: 10px 0 5px 0; font-size: 28px;">
               TaskBoard
             </h1>
             <p style="color: #666; margin: 0; font-size: 14px;">Sistema de Gestão Kanban</p>
@@ -240,10 +247,10 @@ export class CompanyService {
           <!-- Conteúdo do convite -->
           <div style="background: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <h2 style="color: #333; margin-top: 0; font-size: 24px;">🎉 Você foi convidado!</h2>
-            <p style="color: #555; font-size: 16px; line-height: 1.6;">Olá${displayName ? ` ${displayName}` : ''},</p>
+            <p style="color: #555; font-size: 16px; line-height: 1.6;">Olá ${userDisplayName},</p>
             <p style="color: #555; font-size: 16px; line-height: 1.6;">
-              Você foi convidado para fazer parte da empresa <strong>${company.name}</strong> no <strong>TaskBoard</strong> 
-              com a função de <strong>${roleTranslations[role]}</strong>.
+              Você foi convidado para fazer parte da empresa <strong>${companyName}</strong> no <strong>TaskBoard</strong> 
+              com a função de <strong>${roleDisplay}</strong>.
             </p>
             <p style="color: #555; font-size: 16px; line-height: 1.6;">
               O TaskBoard é um sistema de gestão Kanban que permite organizar e acompanhar projetos de forma visual e colaborativa.
@@ -254,7 +261,7 @@ export class CompanyService {
             
             <div style="text-align: center; margin: 35px 0;">
               <a href="${inviteLink}" 
-                 style="background: linear-gradient(135deg, ${company.brandingConfig?.primaryColor || '#3B82F6'} 0%, #5a67d8 100%); 
+                 style="background: linear-gradient(135deg, ${primaryColor} 0%, #5a67d8 100%); 
                         color: white; 
                         padding: 16px 32px; 
                         text-decoration: none; 
@@ -268,7 +275,7 @@ export class CompanyService {
               </a>
             </div>
             
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid ${company.brandingConfig?.primaryColor || '#3B82F6'};">
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid ${primaryColor};">
               <p style="margin: 0; color: #666; font-size: 14px;">
                 <strong>💡 Sobre o TaskBoard:</strong><br>
                 • Organize projetos em quadros Kanban visuais<br>
@@ -286,7 +293,7 @@ export class CompanyService {
               <a href="${inviteLink}" style="color: #3B82F6;">${inviteLink}</a>
             </p>
             <p style="margin-top: 20px;">
-              Este convite foi enviado por <strong>${company.name}</strong> através do <strong>TaskBoard</strong>.<br>
+              Este convite foi enviado por <strong>${companyName}</strong> através do <strong>TaskBoard</strong>.<br>
               <em>Se você já possui uma conta, faça login normalmente em vez de usar este link.</em>
             </p>
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e1e5e9;">
@@ -299,11 +306,36 @@ export class CompanyService {
         </div>
       `;
 
-      await smtpService.sendEmail({
-        to: userEmail,
-        subject: subject,
-        html: html
-      }).toPromise();
+      // Tentar enviar primeiro com HTML, se falhar, enviar versão texto simples
+      try {
+        await smtpService.sendEmail({
+          to: userEmail,
+          subject: subject,
+          html: html
+        }).toPromise();
+      } catch (htmlError) {
+        // Versão texto simples como fallback
+        const simpleText = `
+Olá ${userDisplayName},
+
+Você foi convidado para fazer parte da empresa ${companyName} no TaskBoard com a função de ${roleDisplay}.
+
+Para aceitar o convite e criar sua conta, acesse o link abaixo:
+${inviteLink}
+
+Este convite foi enviado por ${companyName} através do TaskBoard.
+
+---
+TaskBoard - Sistema de Gestão Kanban
+© 2024 TaskBoard
+        `;
+        
+        await smtpService.sendEmail({
+          to: userEmail,
+          subject: subject,
+          text: simpleText
+        }).toPromise();
+      }
       
     } catch (error) {
       throw error;
@@ -326,11 +358,68 @@ export class CompanyService {
         } as CompanyUser;
       });
       
-      return users;
+      // Filtrar apenas usuários ativos (aceitos ou que não tenham status de convite)
+      const activeUsers = users.filter(user => {
+        // Usuário é ativo se:
+        // 1. Não tem inviteStatus (usuário antigo/ativo)
+        // 2. Ou tem inviteStatus === 'accepted'
+        // 3. Ou tem uid preenchido (usuário logado)
+        return !user.inviteStatus || 
+               user.inviteStatus === 'accepted' || 
+               (user.uid && user.uid.trim() !== '');
+      });
+      
+      console.log(`🔍 Debug Users - Total: ${users.length}, Ativos: ${activeUsers.length}`, {
+        total: users.length,
+        active: activeUsers.length,
+        users: users.map(u => ({ 
+          email: u.email, 
+          name: u.displayName, 
+          status: u.inviteStatus, 
+          uid: u.uid 
+        }))
+      });
+      
+      return activeUsers;
       
     } catch (error) {
       console.warn('Erro ao buscar usuários da empresa:', error);
       // Silenciar erro de permissões - é esperado
+      return [];
+    }
+  }
+
+  async getAllCompanyUsers(companyId: string): Promise<CompanyUser[]> {
+    try {
+      const usersRef = collection(this.firestore, 'companies', companyId, 'users');
+      const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
+      
+      const users = querySnapshot.docs.map((doc: any) => {
+        const userData = doc.data();
+        return {
+          ...userData,
+          // Preservar o UID do documento se existir, senão manter vazio
+          uid: userData.uid || '',
+          // Garantir que o email seja sempre o ID do documento
+          email: doc.id
+        } as CompanyUser;
+      });
+      
+      console.log(`🔍 Debug All Users - Total: ${users.length}`, {
+        users: users.map(u => ({ 
+          email: u.email, 
+          name: u.displayName, 
+          status: u.inviteStatus, 
+          uid: u.uid,
+          createdAt: u.createdAt,
+          acceptedAt: u.acceptedAt
+        }))
+      });
+      
+      return users;
+      
+    } catch (error) {
+      console.warn('Erro ao buscar todos os usuários da empresa:', error);
       return [];
     }
   }
@@ -360,8 +449,17 @@ export class CompanyService {
   async updateUserInCompany(companyId: string, userEmail: string, updates: Partial<CompanyUser>): Promise<void> {
     try {
       const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      
+      // Verificar se o documento existe antes de atualizar
+      const userDoc = await runInInjectionContext(this.injector, () => getDoc(userRef));
+      if (!userDoc.exists()) {
+        throw new Error(`Usuário ${userEmail} não encontrado na empresa ${companyId}`);
+      }
+      
       await updateDoc(userRef, updates);
+      
     } catch (error) {
+      console.error('❌ Erro ao atualizar usuário na empresa:', error);
       throw error;
     }
   }
@@ -561,32 +659,56 @@ export class CompanyService {
   // Método específico para validação de convites sem dependência de consultas complexas
   async validateInviteWithCompanyId(companyId: string, email: string, token: string): Promise<{ valid: boolean; company?: Company; companyUser?: CompanyUser }> {
     try {
+      console.log('🔍 Debug validateInvite - Iniciando validação', {
+        companyId,
+        email,
+        token: token?.substring(0, 8) + '...'
+      });
+      
       // Buscar empresa diretamente pelo ID
       const company = await this.getCompany(companyId);
       if (!company) {
+        console.log('❌ Debug validateInvite - Empresa não encontrada');
         return { valid: false };
       }
+      console.log('✅ Debug validateInvite - Empresa encontrada:', company.name);
 
       // Buscar usuário na empresa
       const companyUser = await this.getCompanyUser(companyId, email);
       if (!companyUser) {
+        console.log('❌ Debug validateInvite - Usuário não encontrado na empresa');
         return { valid: false };
       }
+      console.log('✅ Debug validateInvite - Usuário encontrado:', {
+        email: companyUser.email,
+        displayName: companyUser.displayName,
+        inviteStatus: companyUser.inviteStatus,
+        hasToken: !!companyUser.inviteToken,
+        uid: companyUser.uid
+      });
 
       // Validar token
       if (companyUser.inviteToken !== token) {
+        console.log('❌ Debug validateInvite - Token inválido', {
+          expected: companyUser.inviteToken?.substring(0, 8) + '...',
+          received: token?.substring(0, 8) + '...'
+        });
         return { valid: false };
       }
+      console.log('✅ Debug validateInvite - Token válido');
 
       // Validar status
       if (companyUser.inviteStatus !== 'pending') {
+        console.log('❌ Debug validateInvite - Status inválido:', companyUser.inviteStatus);
         return { valid: false };
       }
+      console.log('✅ Debug validateInvite - Status válido (pending)');
 
+      console.log('🎉 Debug validateInvite - Validação concluída com sucesso');
       return { valid: true, company, companyUser };
       
     } catch (error) {
-      console.error('Erro na validação:', error);
+      console.error('❌ Debug validateInvite - Erro na validação:', error);
       return { valid: false };
     }
   }

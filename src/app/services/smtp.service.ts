@@ -83,12 +83,6 @@ export class SmtpService {
           return throwError(() => new Error('Contexto da empresa não inicializado'));
         }
 
-        console.log('📧 Preparando envio de email via HTTP Firebase Functions:', {
-          to: emailData.to,
-          subject: emailData.subject,
-          fromEmail: (company as any).smtpConfig?.fromEmail,
-          fromName: (company as any).smtpConfig?.fromName
-        });
 
         // Usar HTTP Function para melhor controle de CORS
         const httpFunctionUrl = 'https://us-central1-kanban-gobuyer.cloudfunctions.net/sendEmailHttp';
@@ -115,15 +109,10 @@ export class SmtpService {
           }
         };
 
-        console.log('📤 Enviando para HTTP Firebase Function:', {
-          url: httpFunctionUrl,
-          payload: { ...payload }
-        });
 
         return this.http.post<EmailResponse>(httpFunctionUrl, payload);
       }),
       map((result: any) => {
-        console.log('✅ Email enviado com sucesso via HTTP Function:', result);
         return {
           success: result.success || true,
           messageId: result.messageId || 'sent',
@@ -262,7 +251,6 @@ export class SmtpService {
       return throwError(() => new Error(`Configuração SMTP incompleta. Campos faltantes: ${missingFields.join(', ')}`));
     }
 
-    console.log('🧪 Testando configuração SMTP via Firebase Functions');
 
     // Usar Firebase Callable Function para teste de configuração
     const testSmtpCallable = httpsCallable(this.functions, 'testSmtpConfig');
@@ -282,7 +270,6 @@ export class SmtpService {
 
     return from(testSmtpCallable(payload)).pipe(
       map((result: any) => {
-        console.log('✅ Teste SMTP realizado com sucesso:', result.data);
         return {
           success: result.data.success || true,
           messageId: result.data.messageId || 'test-sent',

@@ -21,6 +21,7 @@ export class UserManagementComponent implements OnInit {
   private subdomainService = inject(SubdomainService);
 
   users = signal<CompanyUser[]>([]);
+  pendingInvites = signal<CompanyUser[]>([]);
   currentCompany = signal<Company | null>(null);
   currentUser = signal<any>(null);
   isLoading = signal(false);
@@ -154,7 +155,21 @@ export class UserManagementComponent implements OnInit {
 
     this.isLoading.set(true);
     try {
-      let users = await this.companyService.getCompanyUsers(company.id);
+      // Carregar TODOS os usuários (ativos e pendentes)
+      let allUsers = await this.companyService.getAllCompanyUsers(company.id);
+      
+      // Separar usuários ativos e convites pendentes
+      const activeUsers = allUsers.filter(user => {
+        return !user.inviteStatus || 
+               user.inviteStatus === 'accepted' || 
+               (user.uid && user.uid.trim() !== '');
+      });
+      
+      const pendingUsers = allUsers.filter(user => {
+        return user.inviteStatus === 'pending';
+      });
+      
+      let users = activeUsers;
       
       // Se falhou por permissões, criar usuário fake baseado no usuário atual
       if (users.length === 0) {
@@ -228,8 +243,24 @@ export class UserManagementComponent implements OnInit {
       });
       
       this.users.set(enrichedUsers);
+      this.pendingInvites.set(pendingUsers);
+      
+      console.log('📊 Debug Users Loaded:', {
+        total: allUsers.length,
+        active: enrichedUsers.length,
+        pending: pendingUsers.length,
+        pendingDetails: pendingUsers.map(u => ({ 
+          email: u.email, 
+          name: u.displayName, 
+          status: u.inviteStatus,
+          joinedAt: u.joinedAt,
+          token: u.inviteToken ? 'present' : 'missing'
+        }))
+      });
+      
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
+      this.pendingInvites.set([]);
     } finally {
       this.isLoading.set(false);
     }
@@ -499,6 +530,85 @@ export class UserManagementComponent implements OnInit {
       );
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  async deletePendingInvite(userEmail: string) {
+    const company = this.currentCompany();
+    if (!company?.id) return;
+
+    this.showConfirmation(
+      'Excluir Convite Pendente',
+      `Tem certeza que deseja excluir o convite pendente para ${userEmail}? Esta ação não pode ser desfeita.`,
+      async () => {
+        try {
+          await this.companyService.removeUserFromCompany(company.id!, userEmail);
+          await this.loadCompanyUsers();
+          
+          this.inviteSuccess.set(`Convite para ${userEmail} foi excluído com sucesso.`);
+          setTimeout(() => {
+            this.inviteSuccess.set(null);
+          }, 3000);
+        } catch (error) {
+          console.error('Erro ao excluir convite:', error);
+          this.inviteError.set('Erro ao excluir convite. Tente novamente.');
+          setTimeout(() => {
+            this.inviteError.set(null);
+          }, 3000);
+        }
+      },
+      'Excluir',
+      'btn-danger'
+    );
+  }
+
+  async markInviteAsAccepted(userEmail: string) {
+    const company = this.currentCompany();
+    if (!company?.id) return;
+
+    this.showConfirmation(
+      'Marcar Convite como Aceito',
+      `Deseja marcar o convite de ${userEmail} como aceito? Isso irá ativar o usuário na empresa.`,
+      async () => {
+        try {
+          await this.companyService.updateUserInCompany(company.id!, userEmail, {
+            inviteStatus: 'accepted',
+            inviteToken: null,
+            acceptedAt: new Date()
+          });
+          await this.loadCompanyUsers();
+          
+          this.inviteSuccess.set(`Convite de ${userEmail} marcado como aceito com sucesso.`);
+          setTimeout(() => {
+            this.inviteSuccess.set(null);
+          }, 3000);
+        } catch (error) {
+          console.error('Erro ao marcar convite como aceito:', error);
+          this.inviteError.set('Erro ao atualizar convite. Tente novamente.');
+          setTimeout(() => {
+            this.inviteError.set(null);
+          }, 3000);
+        }
+      },
+      'Marcar como Aceito',
+      'btn-success'
+    );
+  }
+
+  formatDate(date: any): string {
+    if (!date) return 'N/A';
+    
+    try {
+      const d = date.toDate ? date.toDate() : new Date(date);
+      return d.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Data inválida';
     }
   }
 

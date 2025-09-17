@@ -94,12 +94,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     try { localStorage.setItem('last-board-id', this.boardId); } catch {}
     this.ownerId = this.route.snapshot.queryParamMap.get('ownerId') || this.currentUser?.uid || '';
     
-    console.log('KanbanComponent - boardId:', this.boardId, 'ownerId:', this.ownerId);
     
     // Definir contexto da empresa no FirestoreService
     const company = this.subdomainService.getCurrentCompany();
     if (company) {
-      console.log('Definindo contexto da empresa no FirestoreService:', company.name, company.id);
       this.firestoreService.setCompanyContext(company);
     } else {
       console.warn('Empresa não encontrada no contexto');
@@ -236,26 +234,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async debugFirestoreCollections() {
     try {
-      console.log('=== DEBUG: Testando acesso às coleções ===');
-      console.log('ownerId:', this.ownerId, 'boardId:', this.boardId);
       
       // Testar estrutura atual
-      console.log('Testando: users/' + this.ownerId + '/boards/' + this.boardId + '/emailTemplates');
       const templates = await this.firestoreService.getEmailTemplates(this.ownerId, this.boardId);
-      console.log('Templates encontrados (método direto):', templates);
       
-      console.log('Testando: users/' + this.ownerId + '/boards/' + this.boardId + '/automations');
       const automations = await this.firestoreService.getAutomations(this.ownerId, this.boardId);
-      console.log('Automações encontradas (método direto):', automations);
 
       // Testar estrutura alternativa - talvez os dados estejam direto na coleção boards/{boardId}/
-      console.log('=== Testando estrutura alternativa ===');
-      console.log('Testando: boards/' + this.boardId + '/emailTemplates');
       try {
         const alternativeTemplates = await this.firestoreService.getEmailTemplates('', this.boardId);
-        console.log('Templates encontrados (estrutura alternativa):', alternativeTemplates);
       } catch (error) {
-        console.log('Erro na estrutura alternativa para templates:', error);
       }
 
       // Debug removal - method was removed
@@ -281,14 +269,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   private subscribeToRealtimeUpdates() {
-    console.log('Subscribing to updates with ownerId:', this.ownerId, 'boardId:', this.boardId);
     
     // Subscrever colunas
     const columnsUnsub = this.firestoreService.subscribeToColumns(
       this.ownerId,
       this.boardId,
       (columns) => {
-        console.log('Colunas recebidas:', columns);
         this.columns = columns;
         this.loadCardFieldConfigs();
         // Carregar configurações de formulários de todas as fases
@@ -304,7 +290,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.ownerId,
       this.boardId,
       async (leads) => {
-        console.log('Leads recebidos:', leads);
         // Detectar novos leads e mudanças de fase para acionar automações
         const currentById: Record<string, Lead> = Object.create(null);
         for (const l of leads as any) currentById[l.id!] = l as any;
@@ -370,7 +355,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.ownerId,
       this.boardId,
       (emails) => {
-        console.log('Emails da caixa de saída recebidos:', emails);
         this.outboxEmails = emails;
         this.updateEmailStatusCounts();
       }
@@ -382,43 +366,30 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.ownerId,
       this.boardId,
       (templates) => {
-        console.log('Templates recebidos:', templates);
         this.emailTemplates = templates;
       }
     );
     this.subscriptions.push({ unsubscribe: templatesUnsub } as Subscription);
 
     // Subscrever automações
-    console.log('=== SUBSCRIÇÃO DE AUTOMAÇÕES ===');
-    console.log('ownerId:', this.ownerId, 'boardId:', this.boardId);
-    console.log('Iniciando subscrição...');
     
     const automationsUnsub = this.firestoreService.subscribeToAutomations(
       this.ownerId,
       this.boardId,
       (automations) => {
-        console.log('=== CALLBACK DE AUTOMAÇÕES EXECUTADO ===');
-        console.log('Automações recebidas:', automations);
-        console.log('Número de automações:', automations.length);
-        console.log('Tipo dos dados:', typeof automations, Array.isArray(automations));
         
         if (automations && automations.length > 0) {
-          console.log('Primeira automação completa:', automations[0]);
-          console.log('Campos da primeira automação:', Object.keys(automations[0]));
         } else {
-          console.log('Nenhuma automação encontrada ou array vazio');
         }
         
         // Atribuir as automações (mesmo se for array vazio)
         this.automations = automations || [];
-        console.log('this.automations definido como:', this.automations);
         
         // Limpar automações inválidas se existirem
         this.cleanupInvalidAutomations();
         
         // Automações carregadas do banco de dados
         
-        console.log('=== FIM CALLBACK AUTOMAÇÕES ===');
       }
     );
     this.subscriptions.push({ unsubscribe: automationsUnsub } as Subscription);
@@ -426,25 +397,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async loadCardFieldConfigs() {
     try {
-      console.log('🔧 loadCardFieldConfigs: Iniciando carregamento');
       const map: Record<string, any[]> = {};
       for (const col of this.columns) {
         try {
-          console.log(`🔧 Carregando config para fase: ${col.name} (${col.id})`);
           const cfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, col.id!);
-          console.log(`🔧 Config recebida para ${col.name}:`, cfg);
           const fields = (cfg as any)?.fields || [];
-          console.log(`🔧 Fields brutos para ${col.name}:`, fields);
           const filteredFields = fields.filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases);
-          console.log(`🔧 Fields filtrados para ${col.name}:`, filteredFields);
           map[col.id!] = filteredFields.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
         } catch (error) {
-          console.log(`🔧 Erro para ${col.name}:`, error);
           map[col.id!] = [];
         }
       }
       this.phaseCardFields = map;
-      console.log('🔧 phaseCardFields final:', this.phaseCardFields);
     } catch {
       this.phaseCardFields = {};
     }
@@ -548,6 +512,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
         // Ignorar erro se não houver configuração para esta fase
       }
     }
+    
+    // Recarregar campos disponíveis para filtro após carregar configurações de fases
+    this.loadAvailableFilterFields();
   }
 
   getAllFieldsForDisplay(): any[] {
@@ -555,35 +522,26 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const phaseFields: any[] = [];
     
     // 1. Campos do formulário inicial (aparecem primeiro)
-    console.log('🔍 VERIFICANDO CAMPOS INICIAIS:');
     (this.initialFormFields || []).forEach(f => {
       const showInCard = f?.showInCard;
       const showInAllPhases = f?.showInAllPhases;
-      console.log(`${f.name}: showInCard=${showInCard} (${typeof showInCard}), showInAllPhases=${showInAllPhases} (${typeof showInAllPhases})`);
       
       // Filtrar nameContact e emailContact que podem ter valores antigos no banco
       if (f.name === 'nameContact' || f.name === 'emailContact') {
-        console.log(`❌ REJEITADO: ${f.name} - campo excluído especificamente`);
         return;
       }
       
       if (showInCard === true || showInAllPhases === true) {
         initialFields.push(f);
-        console.log(`✅ INCLUÍDO: ${f.name} - motivo: showInCard=${showInCard === true} showInAllPhases=${showInAllPhases === true}`);
-      } else {
-        console.log(`❌ REJEITADO: ${f.name} - showInCard não é true E showInAllPhases não é true`);
       }
     });
     
     // 2. Campos de configurações de fases (aparecem depois)
-    console.log('🔍 VERIFICANDO CAMPOS DE FASES:');
     Object.values(this.phaseFormConfigs).forEach((config: any) => {
       if (config?.fields) {
         config.fields.forEach((f: any) => {
-          console.log(`FASE - ${f.name}: showInAllPhases=${f.showInAllPhases}`);
           if (f?.showInAllPhases === true) {
             phaseFields.push(f);
-            console.log(`✅ INCLUÍDO DA FASE: ${f.name}`);
           }
         });
       }
@@ -595,17 +553,47 @@ export class KanbanComponent implements OnInit, OnDestroy {
       array.findIndex(f => f.name === field.name) === index
     );
     
-    console.log('📋 RESULTADO FINAL:', uniqueFields.map(f => f.name));
     return uniqueFields;
   }
 
   getCardFieldsForLead(lead: Lead): Array<{ label: string; value: any; type?: string }> {
-    // NOVA SOLUÇÃO: Buscar campos globais de uma vez só
+    // NOVA SOLUÇÃO: Buscar campos globais + campos específicos da fase atual
     const allFieldsForDisplay = this.getAllFieldsForDisplay();
     
-    const fieldsToShow = allFieldsForDisplay.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    // Adicionar campos específicos da fase atual com showInCard
+    const currentPhaseFields: any[] = [];
+    if (lead.columnId && this.phaseFormConfigs[lead.columnId]) {
+      const phaseConfig = this.phaseFormConfigs[lead.columnId];
+      if (phaseConfig?.fields) {
+        phaseConfig.fields.forEach((f: any) => {
+          if (f?.showInCard === true) {
+            currentPhaseFields.push(f);
+          }
+        });
+      }
+    }
+    
+    // Combinar campos globais e da fase atual
+    const allFields = [...allFieldsForDisplay, ...currentPhaseFields];
+    
+    // Remover duplicatas (manter a primeira ocorrência)
+    const uniqueFields = allFields.filter((field, index, array) => 
+      array.findIndex(f => f.name === field.name) === index
+    );
+    
+    const fieldsToShow = uniqueFields.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
-    // Logs removidos
+    console.log(`🃏 Debug Card Fields - Lead ${lead.id} (Column: ${lead.columnId})`, {
+      globalFields: allFieldsForDisplay.length,
+      currentPhaseFields: currentPhaseFields.length,
+      totalUnique: uniqueFields.length,
+      fieldsToShow: fieldsToShow.map(f => ({ 
+        name: f.name, 
+        label: f.label, 
+        showInCard: f.showInCard, 
+        showInAllPhases: f.showInAllPhases 
+      }))
+    });
 
     const out: Array<{ label: string; value: any; type?: string }> = [];
     const isTitleField = (f: any): boolean => {
@@ -634,39 +622,58 @@ export class KanbanComponent implements OnInit, OnDestroy {
   // Exibir temperatura em todas as fases quando marcada em qualquer config
   getTemperatureGlobalItem(lead: Lead): { label: string; value: any } | null {
     try {
-      // procurar um campo com type temperatura no form inicial
-      console.log('🌡️ phaseCardFields para coluna', lead.columnId, ':', this.phaseCardFields[lead.columnId]);
-      console.log('🌡️ initialFormFields:', this.initialFormFields);
-      
-      const sources = [
-        ...(this.phaseCardFields[lead.columnId] || []),
-        ...(this.initialFormFields || [])
+      // Buscar campo temperatura em TODAS as configurações possíveis
+      const allSources = [
+        // Campos do formulário inicial
+        ...(this.initialFormFields || []),
+        // Campos da fase atual
+        ...(this.phaseCardFields[lead.columnId] || [])
       ];
       
-      console.log('🌡️ Verificando sources:', sources.map(f => ({
-        name: f.name,
-        type: f.type,
-        showInCard: f.showInCard,
-        showInAllPhases: f.showInAllPhases
-      })));
+      // Adicionar campos de todas as outras fases que têm showInAllPhases
+      Object.values(this.phaseFormConfigs).forEach((config: any) => {
+        if (config?.fields) {
+          config.fields.forEach((f: any) => {
+            if (f?.showInAllPhases === true) {
+              allSources.push(f);
+            }
+          });
+        }
+      });
       
-      const tempField = (sources as any[]).find(f => {
+      console.log('🌡️ Debug Temperature Search:', {
+        leadId: lead.id,
+        columnId: lead.columnId,
+        totalSources: allSources.length,
+        temperatureFields: allSources.filter(f => (f.type || '').toLowerCase() === 'temperatura')
+      });
+      
+      const tempField = (allSources as any[]).find(f => {
         const isTemperatura = (f.type || '').toLowerCase() === 'temperatura';
         const hasVisibilityFlag = f.showInCard || f.showInAllPhases;
-        console.log(`🌡️ Verificando campo ${f.name}: type=${f.type}, isTemperatura=${isTemperatura}, hasVisibilityFlag=${hasVisibilityFlag}`);
         return isTemperatura && hasVisibilityFlag;
       });
       
       if (!tempField) {
-        console.log('🌡️ Nenhum tempField encontrado para lead:', lead.id);
+        console.log('🌡️ No temperature field found with visibility flags');
         return null;
       }
       
+      console.log('🌡️ Found temperature field:', {
+        name: tempField.name,
+        label: tempField.label,
+        showInCard: tempField.showInCard,
+        showInAllPhases: tempField.showInAllPhases
+      });
+      
       const val = this.readFieldValue(lead, tempField.apiFieldName || tempField.name, tempField.label || tempField.name);
-      console.log('🌡️ Valor lido para temperatura:', val);
-      if (val === undefined || val === null || `${val}`.trim() === '') return null;
+      if (val === undefined || val === null || `${val}`.trim() === '') {
+        console.log('🌡️ Temperature field has no value');
+        return null;
+      }
+      
       const result = { label: tempField.label || 'Temperatura', value: val };
-      console.log('🌡️ Retornando resultado:', result);
+      console.log('🌡️ Temperature result:', result);
       return result;
     } catch (error) {
       console.error('🌡️ getTemperatureGlobalItem error:', error);
@@ -894,7 +901,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // String or number format
       return new Date(timestamp).toLocaleDateString('pt-BR');
     } catch (error) {
-      console.log('formatDate error:', error, 'timestamp:', timestamp);
       return 'Data inválida';
     }
   }
@@ -1423,24 +1429,32 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async loadInitialForm() {
     try {
+      console.log('📥 loadInitialForm INICIADO');
       const cfg = await this.firestoreService.getInitialFormConfig(this.boardId);
-      console.log('🔍 RAW CONFIG from database:', cfg);
+      console.log('📥 Configuração carregada do Firestore:', cfg);
+      
       this.initialFormFields = (cfg as any)?.fields || [];
-      console.log('🔍 loadInitialForm loaded fields:', this.initialFormFields.map(f => ({
-        name: f.name,
-        type: f.type,
-        showInCard: f.showInCard,
-        showInAllPhases: f.showInAllPhases
-      })));
-      console.log('🔍 ALL FIELD DETAILS:', this.initialFormFields);
+      console.log('📥 initialFormFields após carregamento:', this.initialFormFields);
+      
+      // Log detalhado de cada campo carregado
+      this.initialFormFields.forEach((field, index) => {
+        console.log(`📥 Campo ${index + 1} carregado:`, {
+          name: field.name,
+          type: field.type,
+          showInFilters: field.showInFilters,
+          hasShowInFilters: 'showInFilters' in field,
+          completeField: field
+        });
+      });
       
       // Verificar especificamente por campos de temperatura
       const tempFields = this.initialFormFields.filter(f => f.type === 'temperatura' || f.name?.toLowerCase().includes('temp'));
-      console.log('🌡️ CAMPOS DE TEMPERATURA ENCONTRADOS:', tempFields);
       
       this.buildApiExampleFromFields();
+      
+      // Carregar campos disponíveis para filtro
+      this.loadAvailableFilterFields();
     } catch (error) {
-      console.log('🔍 loadInitialForm error:', error);
       this.initialFormFields = [];
       this.buildApiExampleFromFields();
     }
@@ -1449,28 +1463,28 @@ export class KanbanComponent implements OnInit, OnDestroy {
   async saveInitialForm() {
     try {
       console.log('💾 saveInitialForm INICIADO');
-      console.log('💾 boardId:', this.boardId);
-      console.log('💾 initialFormFields:', this.initialFormFields);
-      console.log('💾 Total de campos:', this.initialFormFields?.length);
+      console.log('💾 this.initialFormFields antes de salvar:', this.initialFormFields);
       
-      // Log detalhado de cada campo
+      // Log detalhado de cada campo que será salvo
       this.initialFormFields?.forEach((field, index) => {
-        console.log(`💾 Campo ${index + 1}:`, {
+        console.log(`💾 Campo ${index + 1} a ser salvo:`, {
           name: field.name,
-          label: field.label,
           type: field.type,
-          showInCard: field.showInCard,
-          showInAllPhases: field.showInAllPhases,
+          showInFilters: field.showInFilters,
+          hasShowInFilters: 'showInFilters' in field,
           completeField: field
         });
       });
       
       const dataToSave = { fields: this.initialFormFields };
-      console.log('💾 Dados que serão salvos:', dataToSave);
+      console.log('💾 Dados que serão enviados ao Firestore:', dataToSave);
       
       await this.firestoreService.saveInitialFormConfig(this.boardId, dataToSave);
       
-      console.log('💾 saveInitialForm SUCESSO - dados salvos no Firestore');
+      // Recarregar campos disponíveis para filtro após salvar
+      console.log('💾 Recarregando filtros após salvar formulário inicial...');
+      this.loadAvailableFilterFields();
+      
       this.toast.success('Formulário inicial salvo.');
     } catch (error) {
       console.error('💾 saveInitialForm ERRO:', error);
@@ -1479,26 +1493,26 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   onInitialFieldsChanged(fields: any[]) {
-    console.log('🔄 onInitialFieldsChanged CHAMADO');
-    console.log('🔄 Campos recebidos:', fields);
-    console.log('🔄 Número de campos:', fields?.length);
+    console.log('🔄 onInitialFieldsChanged CHAMADO com:', fields);
     
-    // Log detalhado dos campos recebidos
-    fields?.forEach((field, index) => {
+    // Log detalhado de cada campo recebido
+    fields.forEach((field, index) => {
       console.log(`🔄 Campo recebido ${index + 1}:`, {
         name: field.name,
         label: field.label,
         type: field.type,
-        showInCard: field.showInCard,
-        showInAllPhases: field.showInAllPhases
+        showInFilters: field.showInFilters,
+        completeField: field
       });
     });
     
     this.initialFormFields = fields;
-    console.log('🔄 initialFormFields atualizado:', this.initialFormFields);
+    
+    // Recarregar filtros quando campos mudam
+    console.log('🔄 Recarregando filtros após mudança de campos...');
+    this.loadAvailableFilterFields();
     
     this.buildApiExampleFromFields();
-    console.log('🔄 onInitialFieldsChanged CONCLUÍDO');
   }
 
   private buildApiExampleFromFields() {
@@ -1541,34 +1555,210 @@ export class KanbanComponent implements OnInit, OnDestroy {
   // Filtros
   filterQuery: string = '';
   filterOnlyMine: boolean = false;
-  filterTag: string | null = null;
+  // Novos filtros dinâmicos baseados em campos do formulário
+  dynamicFilters: Record<string, any> = {};
+  availableFilterFields: any[] = [];
+  showAdvancedFilters: boolean = false;
 
-  setTextFilter() {
-    const value = prompt('Filtrar por palavra: (nome, contato, email...)', this.filterQuery || '');
-    if (value !== null) {
-      this.filterQuery = value.trim();
-      this.applyFilters();
-    }
-  }
 
   toggleOnlyMine() {
     this.filterOnlyMine = !this.filterOnlyMine;
     this.applyFilters();
   }
 
-  setTagFilter() {
-    const value = prompt('Filtrar por etiqueta (tag):', this.filterTag || '');
-    if (value !== null) {
-      this.filterTag = value.trim() || null;
-      this.applyFilters();
-    }
-  }
-
   clearFilters() {
     this.filterQuery = '';
     this.filterOnlyMine = false;
-    this.filterTag = null;
+    this.dynamicFilters = {};
     this.applyFilters();
+  }
+
+  // Migrar campos existentes para incluir showInFilters
+  private migrateFieldsToIncludeShowInFilters() {
+    console.log('🔧 Migrando campos para incluir showInFilters...');
+    
+    // Migrar campos do formulário inicial
+    if (this.initialFormFields) {
+      let needsMigration = false;
+      this.initialFormFields.forEach(field => {
+        if (!('showInFilters' in field)) {
+          field.showInFilters = false;
+          needsMigration = true;
+          console.log(`🔧 Adicionado showInFilters: false ao campo ${field.name} (campo antigo)`);
+        } else {
+          console.log(`✅ Campo ${field.name} já tem showInFilters: ${field.showInFilters}`);
+        }
+      });
+      
+      if (needsMigration) {
+        console.log('🔧 Alguns campos do formulário inicial foram migrados em memória');
+      } else {
+        console.log('✅ Todos os campos do formulário inicial já têm showInFilters');
+      }
+    }
+    
+    // Migrar campos das fases
+    Object.entries(this.phaseFormConfigs || {}).forEach(([phaseId, config]: [string, any]) => {
+      if (config?.fields) {
+        let needsMigration = false;
+        config.fields.forEach((field: any) => {
+          if (!('showInFilters' in field)) {
+            field.showInFilters = false;
+            needsMigration = true;
+            console.log(`🔧 Adicionado showInFilters: false ao campo ${field.name} da fase ${phaseId} (campo antigo)`);
+          } else {
+            console.log(`✅ Campo ${field.name} da fase ${phaseId} já tem showInFilters: ${field.showInFilters}`);
+          }
+        });
+        
+        if (needsMigration) {
+          console.log(`🔧 Alguns campos da fase ${phaseId} foram migrados em memória`);
+        } else {
+          console.log(`✅ Todos os campos da fase ${phaseId} já têm showInFilters`);
+        }
+      }
+    });
+  }
+
+  // Carregar campos disponíveis para filtro
+  private loadAvailableFilterFields() {
+    console.log('🔍 loadAvailableFilterFields INICIADO');
+    console.log('🔍 initialFormFields:', this.initialFormFields);
+    console.log('🔍 phaseFormConfigs:', this.phaseFormConfigs);
+    
+    // Executar migração primeiro
+    this.migrateFieldsToIncludeShowInFilters();
+    
+    const allFields: any[] = [];
+    
+    // Adicionar campos do formulário inicial que têm showInFilters = true
+    if (this.initialFormFields) {
+      console.log('🔍 Processando campos do formulário inicial...');
+      this.initialFormFields.forEach((field, index) => {
+        console.log(`🔍 Campo inicial ${index + 1}:`, field);
+        console.log(`🔍 Campo inicial ${index + 1} - Detalhes:`, {
+          name: field.name,
+          type: field.type,
+          showInFilters: field.showInFilters,
+          hasShowInFilters: 'showInFilters' in field,
+          keys: Object.keys(field)
+        });
+        
+        if (field.name && field.type && field.showInFilters) {
+          const filterField = {
+            name: field.name,
+            label: field.label || field.name,
+            type: field.type,
+            source: 'initial'
+          };
+          allFields.push(filterField);
+          console.log('✅ Campo adicionado aos filtros:', filterField);
+        } else {
+          console.log('❌ Campo NÃO adicionado aos filtros (falta name, type ou showInFilters = false)');
+        }
+      });
+    } else {
+      console.log('⚠️ Nenhum initialFormFields encontrado');
+    }
+    
+    // Adicionar campos de fases que têm showInFilters = true
+    console.log('🔍 Processando campos das fases...');
+    Object.entries(this.phaseFormConfigs || {}).forEach(([phaseId, config]: [string, any]) => {
+      console.log(`🔍 Fase ${phaseId}:`, config);
+      if (config?.fields) {
+        config.fields.forEach((field: any, index: number) => {
+          console.log(`🔍 Campo da fase ${phaseId} - ${index + 1}:`, field);
+          console.log(`🔍 Campo da fase ${phaseId} - ${index + 1} - Detalhes:`, {
+            name: field.name,
+            type: field.type,
+            showInFilters: field.showInFilters,
+            hasShowInFilters: 'showInFilters' in field,
+            keys: Object.keys(field)
+          });
+          
+          if (field.name && field.type && field.showInFilters && !allFields.find(f => f.name === field.name)) {
+            const filterField = {
+              name: field.name,
+              label: field.label || field.name,
+              type: field.type,
+              source: 'phase',
+              phaseId: phaseId
+            };
+            allFields.push(filterField);
+            console.log('✅ Campo da fase adicionado aos filtros:', filterField);
+          } else {
+            console.log('❌ Campo da fase NÃO adicionado (falta name, type, showInFilters = false, ou já existe)');
+          }
+        });
+      }
+    });
+    
+    console.log('🔍 Todos os campos coletados:', allFields);
+    
+    // Filtrar apenas campos apropriados para filtro
+    this.availableFilterFields = allFields.filter(field => {
+      const supportedTypes = ['text', 'email', 'select', 'radio', 'checkbox', 'date', 'number', 'tel', 'cnpj', 'cpf', 'temperatura'];
+      const isSupported = supportedTypes.includes(field.type.toLowerCase());
+      console.log(`🔍 Campo ${field.name} (${field.type}) - Suportado: ${isSupported}`);
+      return isSupported;
+    });
+    
+    console.log('🔍 Campos filtrados finais (availableFilterFields):', this.availableFilterFields);
+    console.log('🔍 availableFilterFields.length:', this.availableFilterFields.length);
+    console.log('🔍 showAdvancedFilters:', this.showAdvancedFilters);
+  }
+
+  // Obter opções disponíveis para um campo
+  getFieldOptions(field: any): string[] {
+    // Para campos select, radio e temperatura, verificar se há opções definidas
+    if (field.type === 'select' || field.type === 'radio') {
+      // Buscar o campo original para obter as opções
+      const originalField = this.findOriginalField(field.name, field.source);
+      if (originalField && originalField.options && Array.isArray(originalField.options)) {
+        return originalField.options;
+      }
+    }
+    
+    // Para temperatura, sempre retornar as opções padrão se não encontrar definidas
+    if (field.type === 'temperatura') {
+      const originalField = this.findOriginalField(field.name, field.source);
+      if (originalField && originalField.options && Array.isArray(originalField.options)) {
+        return originalField.options;
+      }
+      // Opções padrão para temperatura
+      return ['Quente', 'Morno', 'Frio'];
+    }
+    
+    // Para outros tipos, buscar valores únicos nos leads existentes
+    return this.getUniqueValuesFromLeads(field.name);
+  }
+
+  // Encontrar campo original baseado no nome e fonte
+  private findOriginalField(fieldName: string, source: string): any {
+    if (source === 'initial') {
+      return this.initialFormFields?.find(f => f.name === fieldName);
+    } else if (source === 'phase') {
+      // Buscar em todas as fases
+      for (const config of Object.values(this.phaseFormConfigs || {})) {
+        const field = (config as any)?.fields?.find((f: any) => f.name === fieldName);
+        if (field) return field;
+      }
+    }
+    return null;
+  }
+
+  // Buscar valores únicos de um campo nos leads
+  private getUniqueValuesFromLeads(fieldName: string): string[] {
+    const values = new Set<string>();
+    
+    this.leads.forEach(lead => {
+      const value = this.getLeadFieldValue(lead, fieldName);
+      if (value != null && value !== '') {
+        values.add(String(value));
+      }
+    });
+    
+    return Array.from(values).sort();
   }
 
   private leadMatchesFilters(lead: Lead): boolean {
@@ -1594,14 +1784,32 @@ export class KanbanComponent implements OnInit, OnDestroy {
       
       // Build searchable text from all relevant fields
       const searchableFields = [
-        fields.companyName,
-        fields.contactName, 
-        fields.contactEmail,
-        fields.contactPhone,
-        fields.description,
+        // Fixed lead properties
         lead.responsibleUserName,
         lead.responsibleUserEmail
       ];
+      
+      // Add all dynamic field values from lead.fields
+      if (fields && typeof fields === 'object') {
+        Object.values(fields).forEach(value => {
+          if (value != null && value !== '') {
+            searchableFields.push(String(value));
+          }
+        });
+      }
+      
+      // Also search in phaseHistory if exists
+      if (lead.phaseHistory && typeof lead.phaseHistory === 'object') {
+        Object.values(lead.phaseHistory).forEach(phaseData => {
+          if (phaseData && typeof phaseData === 'object') {
+            Object.values(phaseData).forEach(value => {
+              if (value != null && value !== '') {
+                searchableFields.push(String(value));
+              }
+            });
+          }
+        });
+      }
       
       const haystack = searchableFields
         .filter(field => field != null && field !== '')
@@ -1615,30 +1823,107 @@ export class KanbanComponent implements OnInit, OnDestroy {
       if (!matchesAll) return false;
     }
     
-    // Tag filter
-    if (this.filterTag && this.filterTag.trim()) {
-      const fields = (lead as any).fields || {};
-      const tags = fields.tags || fields.etiquetas || [];
-      const filterTagLower = this.filterTag.toLowerCase().trim();
+    
+    // Filtros dinâmicos baseados em campos do formulário
+    for (const [fieldName, filterValue] of Object.entries(this.dynamicFilters)) {
+      if (!filterValue || filterValue === '') continue;
       
-      let tagList: string[] = [];
+      const leadValue = this.getLeadFieldValue(lead, fieldName);
       
-      if (Array.isArray(tags)) {
-        tagList = tags.map(tag => String(tag).toLowerCase().trim());
-      } else if (typeof tags === 'string' && tags.trim()) {
-        tagList = tags.split(',').map(tag => tag.toLowerCase().trim()).filter(tag => tag.length > 0);
+      // Se o lead não tem o campo, excluir do resultado
+      if (leadValue === undefined || leadValue === null || leadValue === '') {
+        return false;
       }
       
-      if (!tagList.some(tag => tag.includes(filterTagLower))) return false;
+      const field = this.availableFilterFields.find(f => f.name === fieldName);
+      if (!field) continue;
+      
+      // Aplicar filtro baseado no tipo do campo
+      if (!this.matchesDynamicFilter(leadValue, filterValue, field.type)) {
+        return false;
+      }
     }
     
     return true;
   }
 
+  // Obter valor de um campo específico do lead
+  private getLeadFieldValue(lead: Lead, fieldName: string): any {
+    if (!lead || !fieldName) return undefined;
+    
+    // Verificar em fields (campos do formulário)
+    if (lead.fields && lead.fields[fieldName] !== undefined) {
+      return lead.fields[fieldName];
+    }
+    
+    // Verificar em phaseHistory (dados de fases específicas)
+    if (lead.phaseHistory) {
+      for (const [phaseId, phaseData] of Object.entries(lead.phaseHistory)) {
+        if (phaseData && typeof phaseData === 'object' && phaseData[fieldName] !== undefined) {
+          return phaseData[fieldName];
+        }
+      }
+    }
+    
+    // Verificar campos diretos do lead
+    const leadAsAny = lead as any;
+    if (leadAsAny[fieldName] !== undefined) {
+      return leadAsAny[fieldName];
+    }
+    
+    return undefined;
+  }
+
+  // Verificar se um valor corresponde ao filtro dinâmico
+  private matchesDynamicFilter(leadValue: any, filterValue: any, fieldType: string): boolean {
+    if (!leadValue && !filterValue) return true;
+    if (!leadValue || !filterValue) return false;
+    
+    const leadStr = String(leadValue).toLowerCase();
+    const filterStr = String(filterValue).toLowerCase();
+    
+    switch (fieldType.toLowerCase()) {
+      case 'text':
+      case 'email':
+      case 'tel':
+        // Busca parcial (contém)
+        return leadStr.includes(filterStr);
+        
+      case 'select':
+      case 'radio':
+        // Correspondência exata
+        return leadStr === filterStr;
+        
+      case 'checkbox':
+        // Para checkbox, verificar se está marcado
+        return filterValue === true ? (leadValue === true || leadValue === 'true' || leadValue === 'on') : true;
+        
+      case 'number':
+        // Comparação numérica
+        const leadNum = parseFloat(leadValue);
+        const filterNum = parseFloat(filterValue);
+        return !isNaN(leadNum) && !isNaN(filterNum) && leadNum === filterNum;
+        
+      case 'date':
+        // Comparação de data (apenas dia)
+        try {
+          const leadDate = new Date(leadValue).toDateString();
+          const filterDate = new Date(filterValue).toDateString();
+          return leadDate === filterDate;
+        } catch {
+          return false;
+        }
+        
+      default:
+        // Fallback para busca parcial
+        return leadStr.includes(filterStr);
+    }
+  }
+
   /**
    * Apply filters and update the displayed leads
    */
-  private applyFilters() {
+  applyFilters() {
     // Rebuild displayed leads with current filters
     this.rebuildDisplayedLeads();
     
@@ -1659,7 +1944,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       const filterState = {
         filterQuery: this.filterQuery,
         filterOnlyMine: this.filterOnlyMine,
-        filterTag: this.filterTag
+        dynamicFilters: this.dynamicFilters
       };
       localStorage.setItem(`kanban-filters-${this.boardId}`, JSON.stringify(filterState));
     } catch (error) {
@@ -1679,7 +1964,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         const filterState = JSON.parse(saved);
         this.filterQuery = filterState.filterQuery || '';
         this.filterOnlyMine = filterState.filterOnlyMine || false;
-        this.filterTag = filterState.filterTag || null;
+        this.dynamicFilters = filterState.dynamicFilters || {};
       }
     } catch (error) {
       console.warn('Could not load filter state from localStorage:', error);
@@ -1690,7 +1975,36 @@ export class KanbanComponent implements OnInit, OnDestroy {
    * Check if any filters are active
    */
   hasActiveFilters(): boolean {
-    return !!(this.filterQuery || this.filterOnlyMine || this.filterTag);
+    const hasDynamicFilters = Object.keys(this.dynamicFilters).some(key => this.dynamicFilters[key] && this.dynamicFilters[key] !== '');
+    return !!(this.filterQuery || this.filterOnlyMine || hasDynamicFilters);
+  }
+
+  // Métodos para filtros dinâmicos
+  setDynamicFilter(fieldName: string, value: any) {
+    if (value === null || value === undefined || value === '') {
+      delete this.dynamicFilters[fieldName];
+    } else {
+      this.dynamicFilters[fieldName] = value;
+    }
+    this.applyFilters();
+  }
+
+  onDynamicFilterChange(fieldName: string, event: Event) {
+    const value = (event.target as HTMLSelectElement).value;
+    this.setDynamicFilter(fieldName, value);
+  }
+
+  getDynamicFilterValue(fieldName: string): any {
+    return this.dynamicFilters[fieldName] || '';
+  }
+
+  removeDynamicFilter(fieldName: string) {
+    delete this.dynamicFilters[fieldName];
+    this.applyFilters();
+  }
+
+  getActiveDynamicFiltersCount(): number {
+    return Object.keys(this.dynamicFilters).filter(key => this.dynamicFilters[key] && this.dynamicFilters[key] !== '').length;
   }
 
   // (mantido apenas a versão acima)
@@ -1750,7 +2064,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   viewEmail(email: any) {
-    console.log('Visualizar email:', email);
     const sentAt = email.delivery?.endTime ? new Date(email.delivery.endTime.seconds * 1000).toLocaleString('pt-BR') : '---';
     const createdAt = email.createdAt ? new Date(email.createdAt.seconds * 1000).toLocaleString('pt-BR') : '---';
     
@@ -2001,7 +2314,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
         automationId, 
         { active: !currentStatus }
       );
-      console.log('Status da automação alterado:', automationId);
     } catch (error) {
       console.error('Erro ao alterar status da automação:', error);
     }
@@ -2070,13 +2382,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
     );
 
     if (invalidAutomations.length > 0) {
-      console.log('Encontradas automações inválidas, removendo:', invalidAutomations);
       
       for (const invalidAutomation of invalidAutomations) {
         if (invalidAutomation.id) {
           try {
             await this.firestoreService.deleteAutomation(this.ownerId, this.boardId, invalidAutomation.id);
-            console.log('Automação inválida removida:', invalidAutomation.id);
           } catch (error) {
             console.error('Erro ao remover automação inválida:', error);
           }
@@ -2135,7 +2445,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       event.preventDefault();
       event.stopPropagation();
     }
-    console.log('=== EDITAR AUTOMAÇÃO ===', automation);
     
     // Passar cópia profunda para evitar duplicação/efeitos colaterais no array
     this.selectedAutomation = JSON.parse(JSON.stringify(automation));
@@ -2167,11 +2476,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
       if (automationData.id) {
         // Editando automação existente
         await this.firestoreService.updateAutomation(this.ownerId, this.boardId, automationData.id, payload);
-        console.log('Automação atualizada com sucesso:', automationData.name);
       } else {
         // Criando nova automação
         await this.firestoreService.createAutomation(this.ownerId, this.boardId, payload);
-        console.log('Automação criada com sucesso:', automationData.name);
       }
       this.toast.success('Automação salva com sucesso.');
       this.onCloseAutomationModal();
@@ -2186,7 +2493,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       event.preventDefault();
       event.stopPropagation();
     }
-    console.log('=== MOSTRAR HISTÓRICO DE AUTOMAÇÃO ===', automation);
     
     this.selectedAutomationForHistory = automation;
     this.showHistoryModal = true;
