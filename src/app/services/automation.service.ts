@@ -40,6 +40,9 @@ export class AutomationService {
   private smtpService = inject(SmtpService);
   private subdomainService = inject(SubdomainService);
   private companyService = inject(CompanyService);
+  
+  // Lock para evitar execução simultânea de automações de tempo
+  private timeAutomationLocks = new Map<string, boolean>();
 
   // Processar automações quando um novo lead é criado
   async processNewLeadAutomations(lead: Lead, boardId: string, ownerId: string): Promise<void> {
@@ -179,9 +182,17 @@ export class AutomationService {
         automationId: automation?.id || undefined,
         leadId: lead.id,
         subject: processedSubject,
-        withinMs: 60 * 1000
+        withinMs: 5 * 60 * 1000 // Aumentar para 5 minutos
       });
-      if (existing) outboxId = existing;
+      if (existing) {
+        console.log('📧 Email duplicado detectado, pulando envio:', {
+          leadId: lead.id,
+          automationId: automation?.id,
+          subject: processedSubject,
+          existingEmailId: existing
+        });
+        return; // Sair sem enviar
+      }
 
       const ref: any = outboxId ? { id: outboxId } : await this.firestoreService.createOutboxEmail(ownerId, boardId, {
         to: toValue,
@@ -455,17 +466,38 @@ export class AutomationService {
 
   // Método para processar automações de tempo (SLA, tempo em fase)
   async processTimeBasedAutomations(leads: Lead[], columns: Column[], boardId: string, ownerId: string): Promise<void> {
+    const lockKey = `${ownerId}-${boardId}`;
+    
+    // Verificar se já está executando para este board
+    if (this.timeAutomationLocks.get(lockKey)) {
+      console.log('⏳ Automações de tempo já em execução para este board, pulando...');
+      return;
+    }
+    
+    // Definir lock
+    this.timeAutomationLocks.set(lockKey, true);
+    
     try {
       if (!leads || leads.length === 0) {
         return;
       }
       
+      console.log('🔄 Iniciando processamento de automações de tempo:', {
+        leadsCount: leads.length,
+        boardId,
+        timestamp: new Date().toISOString()
+      });
+      
       const automations = await this.firestoreService.getAutomations(ownerId, boardId);
       const list = (automations as Automation[]).filter(a => a && a.active);
       
       if (list.length === 0) {
+        console.log('ℹ️ Nenhuma automação ativa encontrada');
         return;
       }
+      
+      console.log(`📋 Processando ${list.length} automações ativas`);
+      
 
       // Cache de config de formulário por fase para verificar "form-not-answered"
       const formConfigCache: Record<string, any | null> = {};
@@ -611,6 +643,10 @@ export class AutomationService {
       }
     } catch (error) {
       console.error('❌ Erro ao processar automações baseadas em tempo:', error);
+    } finally {
+      // Liberar lock
+      this.timeAutomationLocks.delete(lockKey);
+      console.log('🔓 Lock de automações de tempo liberado');
     }
   }
 

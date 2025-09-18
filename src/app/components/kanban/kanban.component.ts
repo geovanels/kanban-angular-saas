@@ -115,13 +115,21 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // Carregar fluxo de transições
       this.loadFlowConfig();
       // Agendador periódico para automações de tempo (a cada 60s)
+      // Apenas uma instância por board deve executar as automações
       try {
         this.timeAutomationIntervalId = setInterval(async () => {
           try {
-            await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
-          } catch {}
+            // Só executar se tiver leads carregados e dados válidos
+            if (this.leads && this.leads.length > 0 && this.columns && this.columns.length > 0) {
+              await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
+            }
+          } catch (error) {
+            console.warn('Erro nas automações de tempo:', error);
+          }
         }, 60000);
-      } catch {}
+      } catch (error) {
+        console.error('Erro ao configurar automações de tempo:', error);
+      }
     } else {
       console.error('Parâmetros faltando:', { currentUser: !!this.currentUser, boardId: this.boardId, ownerId: this.ownerId });
     }
@@ -350,10 +358,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           historyCommentsCount: l.historyCommentsCount ?? 0,
           attachmentsCount: l.attachmentsCount ?? 0
         }));
-        // Processar automações baseadas em tempo sempre que os leads mudarem
-        try {
-          await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
-        } catch (e) { console.warn('Falha ao processar automações por tempo:', e); }
+        
         this.isLoading = false;
         this.ensureLeadOrderLoaded();
         this.rebuildDisplayedLeads();
@@ -1156,6 +1161,45 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Novo método para salvar o estado atual das conexões (sem reconstruir)
+  async saveCurrentFlowConfig() {
+    try {
+      console.log('💾 Salvando configuração atual do fluxo:', {
+        allowed: this.flowConfig.allowed,
+        order: this.flowOrder
+      });
+
+      // Sanitizar IDs e validar
+      const normalizeId = (v: any) => (typeof v === 'string' ? v.trim() : String(v || '').trim());
+      const validIds = new Set(this.columns.map(c => c.id));
+      
+      // Limpar conexões inválidas
+      const cleanedAllowed: Record<string, string[]> = {};
+      Object.entries(this.flowConfig.allowed || {}).forEach(([fromId, toIds]) => {
+        const cleanFromId = normalizeId(fromId);
+        if (validIds.has(cleanFromId)) {
+          cleanedAllowed[cleanFromId] = (toIds || [])
+            .map(id => normalizeId(id))
+            .filter(id => validIds.has(id));
+        }
+      });
+
+      const orderClean = (this.flowOrder || []).map(normalizeId).filter(id => validIds.has(id));
+
+      // Salvar no banco
+      await this.firestoreService.saveFlowConfig(this.boardId, { 
+        allowed: cleanedAllowed, 
+        order: orderClean 
+      });
+      
+      console.log('✅ Configuração do fluxo salva com sucesso');
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao salvar configuração do fluxo:', error);
+      throw error; // Re-throw para que as funções chamadoras possam tratar
+    }
+  }
+
   // Flow helpers (UI)
   getAllowedTargets(fromId: string): Column[] {
     const ids = this.flowConfig.allowed[fromId] || [];
@@ -1186,7 +1230,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       
       // Salvar a configuração após adicionar
       try {
-        await this.saveFlowConfig();
+        await this.saveCurrentFlowConfig();
         console.log('✅ Configuração salva após adição da conexão');
       } catch (error) {
         console.error('❌ Erro ao salvar configuração após adição:', error);
@@ -1213,7 +1257,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     
     // Salvar a configuração após remover
     try {
-      await this.saveFlowConfig();
+      await this.saveCurrentFlowConfig();
       console.log('✅ Configuração salva após remoção da conexão');
     } catch (error) {
       console.error('❌ Erro ao salvar configuração após remoção:', error);
