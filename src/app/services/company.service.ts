@@ -369,16 +369,7 @@ TaskBoard - Sistema de Gestão Kanban
                (user.uid && user.uid.trim() !== '');
       });
       
-      console.log(`🔍 Debug Users - Total: ${users.length}, Ativos: ${activeUsers.length}`, {
-        total: users.length,
-        active: activeUsers.length,
-        users: users.map(u => ({ 
-          email: u.email, 
-          name: u.displayName, 
-          status: u.inviteStatus, 
-          uid: u.uid 
-        }))
-      });
+      // Debug: User filtering
       
       return activeUsers;
       
@@ -391,8 +382,10 @@ TaskBoard - Sistema de Gestão Kanban
 
   async getAllCompanyUsers(companyId: string): Promise<CompanyUser[]> {
     try {
-      const usersRef = collection(this.firestore, 'companies', companyId, 'users');
-      const querySnapshot = await runInInjectionContext(this.injector, () => getDocs(usersRef));
+      const querySnapshot = await runInInjectionContext(this.injector, () => {
+        const usersRef = collection(this.firestore, 'companies', companyId, 'users');
+        return getDocs(usersRef);
+      });
       
       const users = querySnapshot.docs.map((doc: any) => {
         const userData = doc.data();
@@ -405,16 +398,6 @@ TaskBoard - Sistema de Gestão Kanban
         } as CompanyUser;
       });
       
-      console.log(`🔍 Debug All Users - Total: ${users.length}`, {
-        users: users.map(u => ({ 
-          email: u.email, 
-          name: u.displayName, 
-          status: u.inviteStatus, 
-          uid: u.uid,
-          createdAt: u.createdAt,
-          acceptedAt: u.acceptedAt
-        }))
-      });
       
       return users;
       

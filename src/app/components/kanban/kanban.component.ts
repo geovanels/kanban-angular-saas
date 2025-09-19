@@ -291,14 +291,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.loadAllPhaseFormConfigs();
         // Sincronizar editor de fluxo: garantir que novas fases entrem na ordem
         try { 
-          console.log('🔄 Columns subscription - Chamando syncFlowOrderWithColumns', {
-            columnsChanged: true,
-            isManualReorder: this.isManualReorder,
-            currentFlowOrder: [...this.flowOrder],
-            columnsCount: columns.length,
-            columnIds: columns.map(c => c.id),
-            columnNames: columns.map(c => c.name)
-          });
+          // Sync flow order with columns
           this.syncFlowOrderWithColumns(); 
         } catch {}
       }
@@ -600,17 +593,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     
     const fieldsToShow = uniqueFields.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
-    console.log(`🃏 Debug Card Fields - Lead ${lead.id} (Column: ${lead.columnId})`, {
-      globalFields: allFieldsForDisplay.length,
-      currentPhaseFields: currentPhaseFields.length,
-      totalUnique: uniqueFields.length,
-      fieldsToShow: fieldsToShow.map(f => ({ 
-        name: f.name, 
-        label: f.label, 
-        showInCard: f.showInCard, 
-        showInAllPhases: f.showInAllPhases 
-      }))
-    });
 
     const out: Array<{ label: string; value: any; type?: string }> = [];
     const isTitleField = (f: any): boolean => {
@@ -658,12 +640,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
         }
       });
       
-      console.log('🌡️ Debug Temperature Search:', {
-        leadId: lead.id,
-        columnId: lead.columnId,
-        totalSources: allSources.length,
-        temperatureFields: allSources.filter(f => (f.type || '').toLowerCase() === 'temperatura')
-      });
       
       const tempField = (allSources as any[]).find(f => {
         const isTemperatura = (f.type || '').toLowerCase() === 'temperatura';
@@ -672,25 +648,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
       });
       
       if (!tempField) {
-        console.log('🌡️ No temperature field found with visibility flags');
         return null;
       }
       
-      console.log('🌡️ Found temperature field:', {
-        name: tempField.name,
-        label: tempField.label,
-        showInCard: tempField.showInCard,
-        showInAllPhases: tempField.showInAllPhases
-      });
       
       const val = this.readFieldValue(lead, tempField.apiFieldName || tempField.name, tempField.label || tempField.name);
       if (val === undefined || val === null || `${val}`.trim() === '') {
-        console.log('🌡️ Temperature field has no value');
         return null;
       }
       
       const result = { label: tempField.label || 'Temperatura', value: val };
-      console.log('🌡️ Temperature result:', result);
       return result;
     } catch (error) {
       console.error('🌡️ getTemperatureGlobalItem error:', error);
@@ -1090,19 +1057,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // Sempre sincronizar com a ordem atual das colunas do banco
       const currentColumnOrder = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
       
-      console.log('🔄 loadFlowConfig - Verificando inicialização', {
-        hasFlowOrder: Array.isArray(this.flowOrder) && this.flowOrder.length > 0,
-        currentFlowOrder: [...(this.flowOrder || [])],
-        columnOrderFromDB: currentColumnOrder,
-        isManualReorder: this.isManualReorder
-      });
+      // Checking flow initialization
       
       // Não sobrescrever flowOrder durante reordenação manual
       if (!this.isManualReorder) {
         this.flowOrder = currentColumnOrder;
-        console.log('🔄 loadFlowConfig - FlowOrder definido pela ordem das colunas:', [...this.flowOrder]);
       } else {
-        console.log('🔄 loadFlowConfig - Mantendo flowOrder durante reordenação manual:', [...this.flowOrder]);
       }
       // Inicializar toggles a partir do allowed atual
       this.flowTogglesByPhase = {};
@@ -1386,14 +1346,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
     
     const sortedIds = [...this.columns].sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>c.id!);
     
-    console.log('🔄 syncFlowOrderWithColumns - Verificando sincronização', {
-      currentFlowOrder: [...this.flowOrder],
-      sortedByOrder: sortedIds,
-      flowOrderExists: Array.isArray(this.flowOrder) && this.flowOrder.length > 0
-    });
+    // Checking synchronization
     
     if (!Array.isArray(this.flowOrder) || this.flowOrder.length === 0) {
-      console.log('🔄 syncFlowOrderWithColumns - Inicializando flowOrder com ordem das colunas');
       this.flowOrder = sortedIds;
       return;
     }
@@ -1691,23 +1646,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async loadInitialForm() {
     try {
-      console.log('📥 loadInitialForm INICIADO');
       const cfg = await this.firestoreService.getInitialFormConfig(this.boardId);
-      console.log('📥 Configuração carregada do Firestore:', cfg);
       
       this.initialFormFields = (cfg as any)?.fields || [];
-      console.log('📥 initialFormFields após carregamento:', this.initialFormFields);
       
-      // Log detalhado de cada campo carregado
-      this.initialFormFields.forEach((field, index) => {
-        console.log(`📥 Campo ${index + 1} carregado:`, {
-          name: field.name,
-          type: field.type,
-          showInFilters: field.showInFilters,
-          hasShowInFilters: 'showInFilters' in field,
-          completeField: field
-        });
-      });
+      // Process loaded fields
       
       // Verificar especificamente por campos de temperatura
       const tempFields = this.initialFormFields.filter(f => f.type === 'temperatura' || f.name?.toLowerCase().includes('temp'));
