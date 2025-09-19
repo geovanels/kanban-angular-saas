@@ -141,99 +141,179 @@ export class AutomationService {
       throw new Error('Template de email não especificado');
     }
 
-    // Buscar template
-    const templates = await this.firestoreService.getEmailTemplates(ownerId, boardId);
-    const template = (templates as any[]).find(t => t.id === action.templateId);
-    if (!template) throw new Error(`Template de email não encontrado: ${action.templateId}`);
-
-    // Destinatários: preferir os definidos no template (podem conter variáveis),
-    // senão cair para ação (toEmail) e, por fim, e-mail do lead
-    const recipientFromTemplateRaw = (template as any).recipients || '';
-    const recipientFromTemplate = this.processEmailTemplate(recipientFromTemplateRaw, lead) || '';
-    const parseEmails = (input: string): string[] => {
-      if (!input) return [];
-      return input
-        .split(/[;,]/)
-        .map(s => s.trim())
-        .filter(s => /.+@.+\..+/.test(s));
-    };
-    const templateEmails = parseEmails(recipientFromTemplate);
-    const fallbackEmails = parseEmails((action as any).toEmail || '')
-      .concat(parseEmails((lead.fields as any).contactEmail || ''))
-      .concat(parseEmails((lead.fields as any).email || ''))
-      .concat(parseEmails((lead.fields as any).emailLead || ''))
-      .concat(parseEmails((lead.fields as any).contatoEmail || ''));
-    const allRecipients = (templateEmails.length ? templateEmails : fallbackEmails);
-    const toValue = allRecipients.join(',');
-    if (!toValue) {
-      throw new Error('Destinatário não definido (template/ação/lead)');
+    // Chave única para lock de envio de email
+    const emailLockKey = `email_${ownerId}_${boardId}_${lead.id}_${action.templateId}_${automation?.id || 'manual'}`;
+    
+    // Verificar se já está sendo enviado o mesmo email
+    if (this.timeAutomationLocks.get(emailLockKey)) {
+      console.log('🔒 Email já está sendo enviado (lock ativo), pulando:', {
+        leadId: lead.id,
+        templateId: action.templateId,
+        automationId: automation?.id,
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
 
-    // Conteúdo/assunto a partir do template salvo (usar body como fonte principal)
-    const body = (template as any).body || (template as any).content || '';
-    const processedContent = this.processEmailTemplate(body, lead, boardId, ownerId);
-    const processedSubject = this.processEmailTemplate((template as any).subject || (template as any).name || 'Mensagem', lead, boardId, ownerId);
+    // Definir lock temporário
+    this.timeAutomationLocks.set(emailLockKey, true);
 
-    // Criar registro na caixa de saída (estado inicial pendente)
-    let outboxId: string | null = null;
     try {
-      // Deduplicar envios muito próximos para mesma automação/lead/assunto
-      const existing = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
-        automationId: automation?.id || undefined,
-        leadId: lead.id,
-        subject: processedSubject,
-        withinMs: 5 * 60 * 1000 // Aumentar para 5 minutos
-      });
-      if (existing) {
-        console.log('📧 Email duplicado detectado, pulando envio:', {
-          leadId: lead.id,
-          automationId: automation?.id,
-          subject: processedSubject,
-          existingEmailId: existing
-        });
-        return; // Sair sem enviar
+      // Buscar template
+      const templates = await this.firestoreService.getEmailTemplates(ownerId, boardId);
+      const template = (templates as any[]).find(t => t.id === action.templateId);
+      if (!template) throw new Error(`Template de email não encontrado: ${action.templateId}`);
+
+      // Destinatários: preferir os definidos no template (podem conter variáveis),
+      // senão cair para ação (toEmail) e, por fim, e-mail do lead
+      const recipientFromTemplateRaw = (template as any).recipients || '';
+      const recipientFromTemplate = this.processEmailTemplate(recipientFromTemplateRaw, lead) || '';
+      const parseEmails = (input: string): string[] => {
+        if (!input) return [];
+        return input
+          .split(/[;,]/)
+          .map(s => s.trim())
+          .filter(s => /.+@.+\..+/.test(s));
+      };
+      const templateEmails = parseEmails(recipientFromTemplate);
+      const fallbackEmails = parseEmails((action as any).toEmail || '')
+        .concat(parseEmails((lead.fields as any).contactEmail || ''))
+        .concat(parseEmails((lead.fields as any).email || ''))
+        .concat(parseEmails((lead.fields as any).emailLead || ''))
+        .concat(parseEmails((lead.fields as any).contatoEmail || ''));
+      const allRecipients = (templateEmails.length ? templateEmails : fallbackEmails);
+      const toValue = allRecipients.join(',');
+      if (!toValue) {
+        throw new Error('Destinatário não definido (template/ação/lead)');
       }
 
-      const ref: any = outboxId ? { id: outboxId } : await this.firestoreService.createOutboxEmail(ownerId, boardId, {
-        to: toValue,
-        subject: processedSubject,
-        html: processedContent,
-        leadId: lead.id,
-        automationId: automation?.id || null,
-        delivery: { state: 'PENDING' }
-      } as any);
-      outboxId = ref?.id || null;
-    } catch (e) {
-      // Continua mesmo se não conseguir registrar a saída
-      console.warn('⚠️ Não foi possível registrar o email na caixa de saída antes do envio.', e);
-    }
+      // Conteúdo/assunto a partir do template salvo (usar body como fonte principal)
+      const body = (template as any).body || (template as any).content || '';
+      const processedContent = this.processEmailTemplate(body, lead, boardId, ownerId);
+      const processedSubject = this.processEmailTemplate((template as any).subject || (template as any).name || 'Mensagem', lead, boardId, ownerId);
 
-    // Enviar email
-    await new Promise<void>((resolve, reject) => {
-      this.smtpService.sendEmail({ to: toValue, subject: processedSubject, html: processedContent }).subscribe({
-        next: async (response: any) => {
-          // Atualizar status no outbox
-          try {
-            if (outboxId) {
-              await this.firestoreService.updateOutboxEmail(ownerId, boardId, outboxId, {
-                delivery: { state: 'SUCCESS', messageId: (response as any)?.messageId || 'sent' }
-              });
-            }
-          } catch {}
-          resolve();
-        },
-        error: async (error: any) => {
-          try {
-            if (outboxId) {
-              await this.firestoreService.updateOutboxEmail(ownerId, boardId, outboxId, {
-                delivery: { state: 'ERROR', error: (error as any)?.error || (error as any)?.message || 'Erro' }
-              });
-            }
-          } catch {}
-          reject(error);
+      // Criar registro na caixa de saída (estado inicial pendente)
+      let outboxId: string | null = null;
+      try {
+        // Verificação tripla de deduplicação
+        
+        // 1. Verificar por automação + lead + assunto (30 min)
+        const existing = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
+          automationId: automation?.id || undefined,
+          leadId: lead.id,
+          subject: processedSubject,
+          withinMs: 30 * 60 * 1000
+        });
+        if (existing) {
+          console.log('📧 Email duplicado detectado (automação + assunto, 30min), pulando envio:', {
+            leadId: lead.id,
+            automationId: automation?.id,
+            subject: processedSubject,
+            existingEmailId: existing,
+            timestamp: new Date().toISOString()
+          });
+          return;
         }
+
+        // 2. Verificar por template + lead (60 min)
+        const recentTemplate = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
+          templateId: action.templateId,
+          leadId: lead.id,
+          withinMs: 60 * 60 * 1000
+        });
+        if (recentTemplate) {
+          console.log('📧 Template duplicado detectado (template + lead, 60min), pulando envio:', {
+            leadId: lead.id,
+            templateId: action.templateId,
+            subject: processedSubject,
+            existingEmailId: recentTemplate,
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // 3. Verificar por lead + assunto + destinatário (15 min) - mais restritivo
+        const recentRecipient = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
+          leadId: lead.id,
+          subject: processedSubject,
+          withinMs: 15 * 60 * 1000
+        });
+        if (recentRecipient) {
+          console.log('📧 Email duplicado detectado (lead + assunto, 15min), pulando envio:', {
+            leadId: lead.id,
+            subject: processedSubject,
+            to: toValue,
+            existingEmailId: recentRecipient,
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        const ref: any = outboxId ? { id: outboxId } : await this.firestoreService.createOutboxEmail(ownerId, boardId, {
+          to: toValue,
+          subject: processedSubject,
+          html: processedContent,
+          leadId: lead.id,
+          automationId: automation?.id || null,
+          templateId: action.templateId || null,
+          delivery: { state: 'PENDING' }
+        } as any);
+        outboxId = ref?.id || null;
+      } catch (e) {
+        // Continua mesmo se não conseguir registrar a saída
+        console.warn('⚠️ Não foi possível registrar o email na caixa de saída antes do envio.', e);
+      }
+
+      // Enviar email
+      await new Promise<void>((resolve, reject) => {
+        this.smtpService.sendEmail({ to: toValue, subject: processedSubject, html: processedContent }).subscribe({
+          next: async (response: any) => {
+            // Atualizar status no outbox
+            try {
+              if (outboxId) {
+                await this.firestoreService.updateOutboxEmail(ownerId, boardId, outboxId, {
+                  delivery: { state: 'SUCCESS', messageId: (response as any)?.messageId || 'sent' }
+                });
+              }
+            } catch {}
+            resolve();
+          },
+          error: async (error: any) => {
+            try {
+              if (outboxId) {
+                await this.firestoreService.updateOutboxEmail(ownerId, boardId, outboxId, {
+                  delivery: { state: 'ERROR', error: (error as any)?.error || (error as any)?.message || 'Erro' }
+                });
+              }
+            } catch {}
+            reject(error);
+          }
+        });
       });
-    });
+
+      console.log('✅ Email enviado com sucesso:', {
+        leadId: lead.id,
+        templateId: action.templateId,
+        automationId: automation?.id,
+        subject: processedSubject,
+        to: toValue,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao enviar email:', {
+        leadId: lead.id,
+        templateId: action.templateId,
+        automationId: automation?.id,
+        error: (error as any)?.message || error,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    } finally {
+      // Liberar lock
+      this.timeAutomationLocks.delete(emailLockKey);
+      console.log('🔓 Lock de email liberado:', emailLockKey);
+    }
   }
 
   // Executar ação de mover para fase
@@ -534,9 +614,9 @@ export class AutomationService {
               const moved = movedTs?.toDate ? movedTs.toDate().getTime() : (movedTs?.seconds ? movedTs.seconds * 1000 : (new Date(movedTs)).getTime());
               if (!moved) continue;
               const elapsed = now - moved;
-              if (elapsed >= days * DAY && !this.hasRecentlyExecuted(lead, automation.id, DAY)) {
+              if (elapsed >= days * DAY && !this.hasRecentlyExecutedForDays(lead, automation.id, days, DAY)) {
                 await this.executeAutomation(automation, lead, boardId, ownerId);
-                await this.markExecuted(ownerId, boardId, lead, automation.id);
+                await this.markExecutedForDays(ownerId, boardId, lead, automation.id, days);
               }
             } else if (type === 'sla-overdue') {
               const column = columns.find(c => c.id === lead.columnId);
@@ -688,6 +768,47 @@ export class AutomationService {
     }
   }
 
+  private hasRecentlyExecutedForDays(lead: Lead, automationId: string, days: number, withinMs: number): boolean {
+    try {
+      const executedAutomations = (lead as any).executedAutomations || {};
+      const key = `${automationId}_${days}days`;
+      const record = executedAutomations[key];
+      
+      if (!record) {
+        return false;
+      }
+
+      let timestamp = null;
+      const lastExecutedAt = record.lastExecutedAt;
+      
+      if (lastExecutedAt?.toDate) {
+        timestamp = lastExecutedAt.toDate().getTime();
+      } else if (lastExecutedAt?.seconds) {
+        timestamp = lastExecutedAt.seconds * 1000;
+      } else if (lastExecutedAt) {
+        try {
+          timestamp = new Date(lastExecutedAt).getTime();
+        } catch {
+          timestamp = null;
+        }
+      }
+
+      if (!timestamp) {
+        return false;
+      }
+
+      const elapsed = Date.now() - timestamp;
+      const isRecent = elapsed < withinMs;
+      
+      console.log(`🔍 Verificando execução para ${key}: timestamp=${new Date(timestamp).toISOString()}, elapsed=${Math.round(elapsed/1000/60)}min, isRecent=${isRecent}`);
+      
+      return isRecent;
+    } catch (error) {
+      console.error(`Erro ao verificar execução recente para automação ${automationId} (${days} dias):`, error);
+      return false;
+    }
+  }
+
   private async markExecuted(ownerId: string, boardId: string, lead: Lead, automationId: string) {
     try {
       const exec = { ...((lead as any).executedAutomations || {}) };
@@ -697,6 +818,21 @@ export class AutomationService {
       await this.firestoreService.updateLead(ownerId, boardId, lead.id!, { executedAutomations: exec } as any);
     } catch (error) {
       console.error(`Erro ao marcar automação ${automationId} como executada para lead ${lead.id}:`, error);
+    }
+  }
+
+  private async markExecutedForDays(ownerId: string, boardId: string, lead: Lead, automationId: string, days: number) {
+    try {
+      const exec = { ...((lead as any).executedAutomations || {}) };
+      const now = new Date();
+      const key = `${automationId}_${days}days`;
+      exec[key] = { lastExecutedAt: now, automationId, days };
+
+      console.log(`✅ Marcando execução para ${key}: ${now.toISOString()}`);
+
+      await this.firestoreService.updateLead(ownerId, boardId, lead.id!, { executedAutomations: exec } as any);
+    } catch (error) {
+      console.error(`Erro ao marcar automação ${automationId} (${days} dias) como executada para lead ${lead.id}:`, error);
     }
   }
 }
