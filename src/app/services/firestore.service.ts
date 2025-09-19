@@ -993,7 +993,7 @@ export class FirestoreService {
   }
 
   // Buscar outbox recente para evitar duplicatas (mesmo lead/automação/assunto em curto intervalo)
-  async findRecentOutboxEmail(userId: string, boardId: string, criteria: { automationId?: string; leadId?: string; subject?: string; withinMs?: number }): Promise<string | null> {
+  async findRecentOutboxEmail(userId: string, boardId: string, criteria: { automationId?: string; leadId?: string; subject?: string; templateId?: string; withinMs?: number }): Promise<string | null> {
     if (!this.currentCompanyId) {
       await this.initializeCompanyContext();
     }
@@ -1003,22 +1003,55 @@ export class FirestoreService {
     try {
       const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
       let qBase: any = emailsRef;
+      
+      // Aplicar filtros específicos
       if (criteria.automationId) qBase = query(qBase, where('automationId', '==', criteria.automationId));
       if (criteria.leadId) qBase = query(qBase, where('leadId', '==', criteria.leadId));
-      qBase = query(qBase, orderBy('createdAt', 'desc'), limit(5));
+      if (criteria.templateId) qBase = query(qBase, where('templateId', '==', criteria.templateId));
+      
+      qBase = query(qBase, orderBy('createdAt', 'desc'), limit(10)); // Aumentar limite para busca mais precisa
       const snap = await runInInjectionContext(this.injector, () => getDocs(qBase));
       const now = Date.now();
+      
       for (const d of snap.docs) {
         const data: any = d.data();
         const created = data?.createdAt?.toDate ? data.createdAt.toDate().getTime() : (data?.createdAt ? new Date(data.createdAt).getTime() : 0);
+        
         if (created && now - created <= withinMs) {
-          if (!criteria.subject || criteria.subject === data.subject) {
+          // Verificar critérios adicionais
+          let matches = true;
+          
+          if (criteria.subject && criteria.subject !== data.subject) {
+            matches = false;
+          }
+          
+          if (criteria.templateId && criteria.templateId !== data.templateId) {
+            matches = false;
+          }
+          
+          if (criteria.automationId && criteria.automationId !== data.automationId) {
+            matches = false;
+          }
+          
+          if (criteria.leadId && criteria.leadId !== data.leadId) {
+            matches = false;
+          }
+          
+          if (matches) {
+            console.log('🔍 Email duplicado encontrado:', {
+              emailId: d.id,
+              leadId: data.leadId,
+              automationId: data.automationId,
+              templateId: data.templateId,
+              subject: data.subject,
+              createdAgo: Math.round((now - created) / 1000 / 60) + 'min'
+            });
             return d.id;
           }
         }
       }
     } catch (e) {
-      // silencioso
+      console.warn('Erro ao buscar emails recentes para deduplicação:', e);
     }
     return null;
   }
