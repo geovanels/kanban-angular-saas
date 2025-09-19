@@ -1,20 +1,13 @@
 import { Component, inject, OnInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { debounceTime } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column, Board } from '../../services/firestore.service';
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
 import { CompanyBreadcrumbComponent } from '../company-breadcrumb/company-breadcrumb.component';
+import { AdvancedFiltersComponent } from '../advanced-filters/advanced-filters.component';
 
-interface ReportFilters {
-  startDate: string;
-  endDate: string;
-  phases: string[];
-  responsible: string[];
-  status: 'all' | 'active' | 'concluded' | 'overdue';
-}
 
 interface SLAIndicator {
   phaseId: string;
@@ -39,7 +32,7 @@ interface PhaseMetric {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MainLayoutComponent, CompanyBreadcrumbComponent],
+  imports: [CommonModule, FormsModule, MainLayoutComponent, CompanyBreadcrumbComponent, AdvancedFiltersComponent],
   templateUrl: './reports.component.html',
   styleUrls: ['./reports.component.scss']
 })
@@ -48,7 +41,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
   private firestoreService = inject(FirestoreService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
-  private fb = inject(FormBuilder);
 
   @Input() boardId: string = '';
   @Input() ownerId: string = '';
@@ -61,18 +53,16 @@ export class ReportsComponent implements OnInit, OnDestroy {
   columns: Column[] = [];
   users: any[] = [];
   
-  // Filters
-  filtersForm: FormGroup = this.fb.group({
-    startDate: [''], // Start empty to show all data initially
-    endDate: [''],   // Start empty to show all data initially
-    phases: [[]],
-    responsible: [[]],
-    status: ['all']
-  });
+  // Kanban-style filters - now handled by AdvancedFiltersComponent
+  filterQuery: string = '';
+  filterOnlyMine: boolean = false;
+  dynamicFilters: { [key: string]: any } = {};
+  showAdvancedFilters: boolean = false;
 
   // Loading states
   isLoading = false;
   isGeneratingReport = false;
+
 
   // Report data
   filteredRecords: Lead[] = [];
@@ -127,8 +117,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
       });
     }
 
-    // Setup form subscriptions immediately for real-time filtering
-    this.setupFormSubscriptions();
 
     // Load available boards
     await this.loadAvailableBoards();
@@ -145,36 +133,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
     // Cleanup subscriptions if any
   }
 
-  private getDefaultStartDate(): string {
-    const date = new Date();
-    date.setMonth(date.getMonth() - 6); // Last 6 months
-    return date.toISOString().split('T')[0];
-  }
 
-  private getDefaultEndDate(): string {
-    return new Date().toISOString().split('T')[0];
-  }
-
-  private setupFormSubscriptions() {
-    // Subscribe to form changes for real-time filtering - no debounce for quick response
-    this.filtersForm.valueChanges.subscribe(values => {
-      console.log('=== FORM VALUES CHANGED ===');
-      console.log('New values:', values);
-      console.log('Current state:', {
-        boardId: this.boardId,
-        ownerId: this.ownerId,
-        recordsCount: this.records.length,
-        hasData: this.boardId && this.ownerId && this.records.length > 0
-      });
-      
-      if (this.boardId && this.ownerId && this.records.length > 0) {
-        console.log('Conditions met - generating report...');
-        this.generateReport();
-      } else {
-        console.log('Conditions not met - skipping report generation');
-      }
-    });
-  }
 
   private async loadAvailableBoards() {
     if (!this.ownerId) return;
@@ -193,65 +152,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.generateReport();
   }
 
-  setDateRangeFilter(range: 'week' | 'month' | '3months' | '6months' | 'all') {
-    console.log('=== Aplicando filtro de período:', range, '===');
-    console.log('Total de registros disponíveis:', this.records.length);
-    
-    if (range === 'all') {
-      console.log('Removendo filtros de data - mostrando todos os dados');
-      this.filtersForm.patchValue({
-        startDate: '',
-        endDate: ''
-      });
-      return; // Let the form subscription handle the update
-    }
-    
-    const endDate = new Date();
-    let startDate = new Date();
-    
-    switch (range) {
-      case 'week':
-        startDate.setDate(startDate.getDate() - 7);
-        break;
-      case 'month':
-        startDate.setMonth(startDate.getMonth() - 1);
-        break;
-      case '3months':
-        startDate.setMonth(startDate.getMonth() - 3);
-        break;
-      case '6months':
-        startDate.setMonth(startDate.getMonth() - 6);
-        break;
-    }
-    
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-    
-    console.log('Definindo período:', { 
-      range, 
-      startDate: startDateStr, 
-      endDate: endDateStr,
-      startDateObj: startDate,
-      endDateObj: endDate
-    });
-    
-    // Patch the form - this will trigger the subscription automatically
-    this.filtersForm.patchValue({
-      startDate: startDateStr,
-      endDate: endDateStr
-    });
-  }
-
-  clearFilters() {
-    console.log('Limpando todos os filtros...');
-    this.filtersForm.reset({
-      startDate: '',
-      endDate: '',
-      phases: [],
-      responsible: [],
-      status: 'all'
-    });
-  }
 
   private async loadData() {
     this.isLoading = true;
@@ -270,8 +170,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.columns = columns;
       this.users = []; // Será implementado posteriormente
 
-      // Load initial form fields from board configuration
-      await this.loadInitialFormFields();
+      // Note: Form field configuration now handled by AdvancedFiltersComponent
 
       console.log('Dados carregados:', {
         boardId: this.boardId,
@@ -298,8 +197,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
     
     this.isGeneratingReport = true;
     try {
-      const filters = this.filtersForm.value;
-      this.applyFilters(filters);
+      // Apply current filters
+      this.applyFilters();
       this.calculateSummaryStats();
       this.calculateSLAIndicators();
       this.calculatePhaseMetrics();
@@ -309,90 +208,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private applyFilters(filters: ReportFilters) {
-    console.log('=== INICIANDO FILTROS ===');
-    console.log('Filtros recebidos:', filters);
-    console.log('Total de registros disponíveis:', this.records.length);
-    
-    // Log das primeiras datas dos registros para debug
-    if (this.records.length > 0) {
-      console.log('Amostra de datas dos registros:', this.records.slice(0, 3).map(record => ({
-        id: record.id,
-        createdAt: record.createdAt,
-        date: this.getLeadDate(record)
-      })));
-    }
-    
-    this.filteredRecords = this.records.filter(record => {
-      let passedDateFilter = true;
-      
-      // Date filter - apply if ANY date filter is provided
-      if ((filters.startDate && filters.startDate.trim() !== '') || 
-          (filters.endDate && filters.endDate.trim() !== '')) {
-        
-        console.log('Aplicando filtro de data...');
-        const leadDate = this.getLeadDate(record);
-        
-        // Check start date if provided
-        if (filters.startDate && filters.startDate.trim() !== '') {
-          const startDate = new Date(filters.startDate);
-          if (leadDate < startDate) {
-            console.log(`Lead ${record.id} excluído: data ${leadDate.toISOString().split('T')[0]} < ${startDate.toISOString().split('T')[0]}`);
-            return false;
-          }
-        }
-        
-        // Check end date if provided  
-        if (filters.endDate && filters.endDate.trim() !== '') {
-          const endDate = new Date(filters.endDate);
-          endDate.setHours(23, 59, 59, 999); // Include end of day
-          if (leadDate > endDate) {
-            console.log(`Lead ${record.id} excluído: data ${leadDate.toISOString().split('T')[0]} > ${endDate.toISOString().split('T')[0]}`);
-            return false;
-          }
-        }
-        
-        console.log(`Lead ${record.id} passou no filtro de data: ${leadDate.toISOString().split('T')[0]}`);
-      } else {
-        console.log('Nenhum filtro de data aplicado - campos vazios');
-      }
-
-      // Phase filter
-      if (filters.phases && filters.phases.length > 0 && !filters.phases.includes(record.columnId)) {
-        return false;
-      }
-
-      // Responsible filter
-      if (filters.responsible && filters.responsible.length > 0 && record.responsibleUserId && 
-          !filters.responsible.includes(record.responsibleUserId)) {
-        return false;
-      }
-
-      // Status filter
-      if (filters.status && filters.status !== 'all') {
-        const isOverdue = this.isLeadOverdue(record);
-        const isConcluded = this.isLeadConcluded(record);
-        
-        switch (filters.status) {
-          case 'active':
-            return !isConcluded;
-          case 'concluded':
-            return isConcluded;
-          case 'overdue':
-            return isOverdue && !isConcluded;
-        }
-      }
-
-      return true;
-    });
-    
-    console.log('=== RESULTADO DOS FILTROS ===');
-    console.log(`${this.records.length} registros total -> ${this.filteredRecords.length} registros filtrados`);
-    console.log('Primeiros registros filtrados:', this.filteredRecords.slice(0, 3).map(record => ({
-      id: record.id,
-      date: this.getLeadDate(record).toISOString().split('T')[0]
-    })));
-  }
 
   private getLeadDate(lead: Lead): Date {
     if (lead.createdAt?.toDate) {
@@ -425,16 +240,15 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private calculateSummaryStats() {
-    const filters = this.filtersForm.value;
-    const startDate = new Date(filters.startDate);
-    const endDate = new Date(filters.endDate);
+    const startDate = this.dynamicFilters.startDate ? new Date(this.dynamicFilters.startDate) : null;
+    const endDate = this.dynamicFilters.endDate ? new Date(this.dynamicFilters.endDate) : null;
 
     this.summaryStats = {
       totalRecords: this.filteredRecords.length,
-      newRecordsThisPeriod: this.filteredRecords.filter(record => {
+      newRecordsThisPeriod: startDate && endDate ? this.filteredRecords.filter(record => {
         const leadDate = this.getLeadDate(record);
         return leadDate >= startDate && leadDate <= endDate;
-      }).length,
+      }).length : this.filteredRecords.length,
       concludedRecords: this.filteredRecords.filter(record => this.isLeadConcluded(record)).length,
       avgConversionTime: this.calculateAverageConversionTime(),
       activeRecords: this.filteredRecords.filter(record => !this.isLeadConcluded(record)).length,
@@ -550,9 +364,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   private generateLeadsOverTimeData(): any[] {
     // Simplified implementation - group by week
-    const filters = this.filtersForm.value;
-    const startDate = new Date(filters.startDate);
-    const endDate = new Date(filters.endDate);
+    const startDate = this.dynamicFilters.startDate ? new Date(this.dynamicFilters.startDate) : new Date(new Date().setMonth(new Date().getMonth() - 6));
+    const endDate = this.dynamicFilters.endDate ? new Date(this.dynamicFilters.endDate) : new Date();
     const data: any[] = [];
 
     const current = new Date(startDate);
@@ -583,7 +396,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   isStandaloneView(): boolean {
     // Check if accessed via direct URL (has query params) vs embedded in kanban
-    return !!this.route.snapshot.queryParams['boardId'];
+    // If boardId was provided via @Input (embedded), it's not standalone
+    // If boardId comes from route query params, it's standalone
+    return !!this.route.snapshot.queryParams['boardId'] && !this.boardIdFromInput;
+  }
+
+  private get boardIdFromInput(): boolean {
+    // Check if boardId was set via @Input before route processing
+    return this.boardId !== '' && !this.route.snapshot.queryParams['boardId'];
   }
 
   // Export methods
@@ -645,28 +465,19 @@ export class ReportsComponent implements OnInit, OnDestroy {
     return maxValue > 0 ? (value / maxValue * 100) : 0;
   }
 
+  getPhasePercentage(value: number): number {
+    if (!this.chartData.phaseDistribution.length) return 0;
+    const maxValue = Math.max(...this.chartData.phaseDistribution.map(item => item.value));
+    return maxValue > 0 ? (value / maxValue) * 100 : 0;
+  }
+
   // Column management methods
   private initializeColumns() {
     this.initializeAvailableColumns();
     this.loadSelectedColumns();
   }
 
-  private async loadInitialFormFields() {
-    if (!this.boardId) return;
-    
-    try {
-      const formConfig = await this.firestoreService.getInitialFormConfig(this.boardId);
-      if (formConfig && formConfig.fields) {
-        (this.board as any).initialFormFields = formConfig.fields || [];
-        console.log('📋 Campos do formulário carregados:', (this.board as any).initialFormFields);
-      } else {
-        (this.board as any).initialFormFields = [];
-      }
-    } catch (error) {
-      console.log('ℹ️ Nenhuma configuração de formulário encontrada, usando campos padrão');
-      (this.board as any).initialFormFields = [];
-    }
-  }
+
 
   private initializeAvailableColumns() {
     // Reset available columns
@@ -913,5 +724,122 @@ export class ReportsComponent implements OnInit, OnDestroy {
     };
 
     alert('DEBUG INFO (veja console para detalhes):\n' + JSON.stringify(debugInfo, null, 2));
+  }
+
+
+  applyFilters() {
+    console.log('=== APLICANDO FILTROS KANBAN-STYLE ===');
+    console.log('filterQuery:', this.filterQuery);
+    console.log('filterOnlyMine:', this.filterOnlyMine);
+    console.log('dynamicFilters:', this.dynamicFilters);
+    console.log('Total de registros disponíveis:', this.records.length);
+    
+    this.filteredRecords = this.records.filter(record => {
+      // Search query filter
+      if (this.filterQuery && this.filterQuery.trim()) {
+        const searchTerm = this.filterQuery.toLowerCase();
+        const searchableFields = [
+          this.readFieldValue(record, 'contactName'),
+          this.readFieldValue(record, 'contactEmail'),
+          this.readFieldValue(record, 'companyName'),
+          this.readFieldValue(record, 'contactPhone'),
+          this.getColumnName(record.columnId)
+        ];
+        
+        const matches = searchableFields.some(field => 
+          field.toLowerCase().includes(searchTerm)
+        );
+        
+        if (!matches) return false;
+      }
+
+      // Only mine filter
+      if (this.filterOnlyMine && record.responsibleUserId !== this.currentUser?.uid) {
+        return false;
+      }
+
+      // Dynamic filters
+      for (const [fieldName, filterValue] of Object.entries(this.dynamicFilters)) {
+        if (filterValue && typeof filterValue === 'string' && filterValue.trim()) {
+          const recordValue = this.readFieldValue(record, fieldName).toLowerCase();
+          const searchValue = filterValue.toLowerCase();
+          if (!recordValue.includes(searchValue)) return false;
+        }
+      }
+
+      return true;
+    });
+    
+    console.log('=== RESULTADO DOS FILTROS ===');
+    console.log(`${this.records.length} registros total -> ${this.filteredRecords.length} registros filtrados`);
+    
+    // Recalcular métricas dos relatórios após aplicar filtros
+    this.calculateSummaryStats();
+    this.calculateSLAIndicators();
+    this.calculatePhaseMetrics();
+    this.generateChartData();
+  }
+
+  exportToExcel() {
+    if (this.filteredRecords.length === 0) {
+      alert('Não há registros para exportar.');
+      return;
+    }
+
+    // Preparar dados para exportação
+    const exportData = this.filteredRecords.map(record => {
+      const data: any = {};
+      
+      // Campos básicos
+      data['ID'] = record.id;
+      data['Fase'] = this.getColumnName(record.columnId);
+      data['Responsável'] = record.responsibleUserId || 'Não atribuído';
+      data['Data de Criação'] = record.createdAt ? new Date(record.createdAt.toDate()).toLocaleDateString('pt-BR') : '';
+      
+      // Campos dinâmicos
+      if (record.fields) {
+        Object.entries(record.fields).forEach(([key, value]) => {
+          data[key] = value || '';
+        });
+      }
+      
+      return data;
+    });
+
+    // Criar conteúdo CSV
+    if (exportData.length === 0) {
+      alert('Não há dados para exportar.');
+      return;
+    }
+
+    const headers = Object.keys(exportData[0]);
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row => 
+        headers.map(header => {
+          const value = row[header] || '';
+          // Escapar aspas e envolver em aspas se contiver vírgula
+          const escapedValue = String(value).replace(/"/g, '""');
+          return escapedValue.includes(',') ? `"${escapedValue}"` : escapedValue;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Criar e baixar arquivo
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    
+    const boardName = this.board?.name || 'Board';
+    const currentDate = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    link.setAttribute('download', `${boardName}_Relatório_${currentDate}.csv`);
+    
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log(`Exported ${this.filteredRecords.length} records to Excel`);
   }
 }

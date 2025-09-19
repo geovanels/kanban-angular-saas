@@ -1,0 +1,63 @@
+// Advanced Filters Component Styles
+.advanced-filters-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+}
+
+.advanced-filters-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.filter-badge {
+  @apply bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center;
+}
+
+.search-input {
+  @apply w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg;
+  @apply focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  @apply transition-all duration-200;
+}
+
+.filter-button {
+  @apply px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg;
+  @apply transition-colors duration-200 flex items-center space-x-2;
+  
+  &.active {
+    @apply bg-blue-100 border-blue-300;
+  }
+}
+
+.clear-button {
+  @apply px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 rounded-lg;
+  @apply transition-colors duration-200;
+}
+
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md;
+  @apply focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  @apply transition-all duration-200;
+}
+
+.form-select {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md;
+  @apply focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  @apply transition-all duration-200;
+}
+
+.form-checkbox {
+  @apply rounded border-gray-300 text-blue-600 focus:ring-blue-500;
+}

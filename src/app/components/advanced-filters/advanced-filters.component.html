@@ -1,0 +1,147 @@
+<!-- Search and Filter Controls -->
+<div class="mb-4">
+  <!-- Search Bar with Integrated Filter Button -->
+  <div class="flex items-center space-x-2">
+    <div class="relative flex-1">
+      <input 
+        type="text" 
+        [(ngModel)]="filterQuery"
+        (ngModelChange)="onFilterQueryChange($event)"
+        placeholder="Pesquisar..."
+        class="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+      <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+      
+      <!-- Filter Button Inside Search -->
+      <button 
+        (click)="toggleAdvancedFilters()"
+        class="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded transition-colors"
+        [class.text-blue-600]="showAdvancedFilters"
+        [class.bg-blue-50]="showAdvancedFilters">
+        <i class="fas fa-filter text-sm"></i>
+        <span *ngIf="hasActiveFilters()" class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center" style="font-size: 10px;">
+          {{ getDynamicFilterCount() + (filterOnlyMine ? 1 : 0) }}
+        </span>
+      </button>
+    </div>
+    
+    <!-- Clear Filters Button -->
+    <button 
+      *ngIf="hasActiveFilters()"
+      (click)="clearFilters()"
+      class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 rounded-lg transition-colors">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Advanced Filters Modal -->
+<div *ngIf="showAdvancedFilters" 
+     class="fixed top-20 left-4 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-200 z-[9999]">
+  <div class="p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900">Filtros Avançados</h3>
+      <button 
+        (click)="toggleAdvancedFilters()"
+        class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <!-- Quick Filter: Show Only Mine -->
+    <div class="mb-6 p-3 bg-gray-50 rounded-lg">
+      <label class="flex items-center space-x-2 cursor-pointer">
+        <input 
+          type="checkbox" 
+          [(ngModel)]="filterOnlyMine"
+          (ngModelChange)="toggleOnlyMine()"
+          class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+        <span class="text-sm text-gray-700 font-medium">Mostrar apenas meus registros</span>
+      </label>
+    </div>
+    
+    <!-- Dynamic Filter Fields -->
+    <div *ngIf="availableFilterFields.length > 0" class="space-y-4">
+      <h4 class="text-sm font-medium text-gray-700 mb-3">Filtros Dinâmicos</h4>
+      
+      <div *ngFor="let field of availableFilterFields" class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">
+          {{ field.label }}
+        </label>
+        
+        <!-- Text/Email/Tel/Number Fields -->
+        <input 
+          *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel' || field.type === 'number' || field.type === 'cnpj' || field.type === 'cpf'"
+          [type]="field.type === 'number' ? 'number' : 'text'"
+          [value]="dynamicFilters[field.name] || ''"
+          (input)="setDynamicFilter(field.name, $any($event.target).value)"
+          [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        
+        <!-- Date Fields -->
+        <input 
+          *ngIf="field.type === 'date'"
+          type="date"
+          [value]="dynamicFilters[field.name] || ''"
+          (input)="setDynamicFilter(field.name, $any($event.target).value)"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        
+        <!-- Select/Radio Fields -->
+        <select 
+          *ngIf="field.type === 'select' || field.type === 'radio'"
+          [value]="dynamicFilters[field.name] || ''"
+          (change)="setDynamicFilter(field.name, $any($event.target).value)"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">Todos</option>
+          <option *ngFor="let option of getFieldOptions(field)" [value]="option">
+            {{ option }}
+          </option>
+        </select>
+        
+        <!-- Temperatura Field -->
+        <select 
+          *ngIf="field.type === 'temperatura'"
+          [value]="dynamicFilters[field.name] || ''"
+          (change)="setDynamicFilter(field.name, $any($event.target).value)"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <option value="">Todas as temperaturas</option>
+          <option value="Quente">🔥 Quente</option>
+          <option value="Morno">🌡️ Morno</option>
+          <option value="Frio">❄️ Frio</option>
+        </select>
+        
+        <!-- Checkbox Fields -->
+        <div *ngIf="field.type === 'checkbox'" class="flex items-center space-x-2">
+          <input 
+            type="checkbox"
+            [checked]="dynamicFilters[field.name] === true"
+            (change)="setDynamicFilter(field.name, $any($event.target).checked)"
+            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+          <span class="text-sm text-gray-700">Apenas marcados</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- No Fields Available -->
+    <div *ngIf="availableFilterFields.length === 0" class="text-center py-6">
+      <i class="fas fa-filter text-gray-300 text-3xl mb-3"></i>
+      <p class="text-gray-500 text-sm">
+        Nenhum campo configurado para filtros.<br>
+        Configure campos com "Mostrar em filtros" ativado no formulário.
+      </p>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+      <button 
+        (click)="clearFilters()"
+        class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+        Limpar
+      </button>
+      <button 
+        (click)="toggleAdvancedFilters()"
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+        Aplicar
+      </button>
+    </div>
+  </div>
+</div>
