@@ -32,10 +32,10 @@ import {
   ɵɵdefineNgModule,
   ɵɵdirectiveInject
 } from "./chunk-SFU4TGYD.js";
-import "./chunk-TQEZG5EA.js";
 import {
   fromEvent
 } from "./chunk-4KH7OR2E.js";
+import "./chunk-TQEZG5EA.js";
 import {
   BehaviorSubject,
   Subject,

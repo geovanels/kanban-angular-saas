@@ -85,7 +85,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   };
 
   // Display options
-  currentView: 'overview' | 'sla' | 'phases' | 'registros' | 'charts' = 'overview';
+  currentView: 'overview' | 'sla' | 'phases' | 'registros' = 'overview';
   exportFormats = ['PDF', 'Excel', 'CSV'];
   
   // Column management for registros table
@@ -96,8 +96,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
     { key: 'overview', name: 'Visão Geral', icon: 'fa-chart-pie' },
     { key: 'sla', name: 'SLA', icon: 'fa-clock' },
     { key: 'phases', name: 'Fases', icon: 'fa-columns' },
-    { key: 'registros', name: 'Registros', icon: 'fa-users' },
-    { key: 'charts', name: 'Gráficos', icon: 'fa-chart-bar' }
+    { key: 'registros', name: 'Registros', icon: 'fa-users' }
   ];
 
   async ngOnInit() {
@@ -351,6 +350,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
       color: metric.phaseColor
     }));
 
+    // Debug: Log chart data
+    console.log('📊 Chart Data Generated:', {
+      phaseMetrics: this.phaseMetrics,
+      phaseDistribution: this.chartData.phaseDistribution,
+      columnsCount: this.columns.length,
+      recordsCount: this.filteredRecords.length
+    });
+
     // Leads over time (simplified)
     this.chartData.registrosOverTime = this.generateLeadsOverTimeData();
 
@@ -390,7 +397,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   // View methods
-  setView(view: 'overview' | 'sla' | 'phases' | 'registros' | 'charts') {
+  setView(view: 'overview' | 'sla' | 'phases' | 'registros') {
     this.currentView = view;
   }
 

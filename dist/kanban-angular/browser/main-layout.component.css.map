@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/components/main-layout/main-layout.component.ts"],
+  "sourcesContent": ["\n    :host {\n      display: block;\n      min-height: 100vh;\n    }\n  "],
+  "mappings": ";AACI;AACE,WAAA;AACA,cAAA;;",
+  "names": []
+}

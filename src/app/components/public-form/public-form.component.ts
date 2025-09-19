@@ -155,7 +155,7 @@ export class PublicFormComponent implements OnInit {
         const company = this.subdomain.getCurrentCompany();
         if (company?.id) {
           try {
-            const users = await this.companyService.getCompanyUsers(company.id);
+            const users = await this.companyService.getAllCompanyUsers(company.id);
             this.companyUsers = users || [];
             // Transformar o campo responsavel em select
             this.currentFields = this.currentFields.map((f: any) => {
