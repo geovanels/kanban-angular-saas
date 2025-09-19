@@ -564,6 +564,46 @@ export class BrandingService {
     return this.brandingSubject.value;
   }
 
+  // Verificar se tem logo
+  hasLogo(): boolean {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    // Verificar se tem logo da empresa configurado
+    if (company?.logoUrl && company.logoUrl.trim() !== '') {
+      return true;
+    }
+    
+    // Fallback para brandingConfig logo
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Obter URL do logo
+  getLogoUrl(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    
+    // Sempre priorizar logo da empresa configurado
+    if (company?.logoUrl && company.logoUrl.trim() !== '') {
+      return company.logoUrl;
+    }
+    
+    // Fallback para brandingConfig logo
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return company.brandingConfig.logo;
+    }
+    
+    return '';
+  }
+
+  // Obter cor primária
+  getPrimaryColor(): string {
+    const company = this.subdomainService.getCurrentCompany();
+    return company?.brandingConfig?.primaryColor || company?.primaryColor || '#3B82F6';
+  }
+
   // Reset para branding padrão
   resetToDefault(): void {
     this.removeCustomCss();

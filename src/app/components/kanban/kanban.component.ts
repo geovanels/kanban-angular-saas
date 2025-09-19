@@ -25,7 +25,7 @@ import { ToastService } from '../toast/toast.service';
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent, ReportsComponent, AdvancedFiltersComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent, ReportsComponent],
   templateUrl: './kanban.component.html',
   styleUrls: ['./kanban.component.scss']
 })
@@ -2870,6 +2870,22 @@ export class KanbanComponent implements OnInit, OnDestroy {
         alert('Erro ao limpar caixa de saída. Tente novamente.');
       }
     }
+  }
+
+  // Filter Methods
+  onFilterQueryChange(query: string) {
+    this.filterQuery = query;
+    this.applyFilters();
+  }
+
+  toggleAdvancedFilters() {
+    this.showAdvancedFilters = !this.showAdvancedFilters;
+  }
+
+  getDynamicFilterCount(): number {
+    return Object.keys(this.dynamicFilters).filter(key => 
+      this.dynamicFilters[key] && this.dynamicFilters[key] !== ''
+    ).length;
   }
 
   // API Methods
