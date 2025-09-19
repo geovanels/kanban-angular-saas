@@ -62,206 +62,19 @@
     </div>
   </nav>
 
-  <!-- Desktop Filters Bar -->
-  <div *ngIf="!isLoading && activeTab === 'kanban'" class="hidden md:block bg-white border-b border-gray-200 px-4 py-3 relative">
-    <div class="flex items-center justify-between">
-      <!-- Campo de busca estilo Gmail -->
-      <div class="flex-1 max-w-2xl relative">
-        <div class="relative flex items-center">
-          <input
-            type="text"
-            placeholder="Buscar nos cards..."
-            [(ngModel)]="filterQuery"
-            (input)="applyFilters()"
-            class="w-full pl-10 pr-16 py-3 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
-            [class.border-blue-300]="filterQuery"
-            [class.bg-white]="filterQuery">
-          
-          <!-- Ícone de busca -->
-          <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-          
-          <!-- Botão de filtros avançados -->
-          <button 
-            (click)="showAdvancedFilters = !showAdvancedFilters"
-            class="absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
-            [class.bg-blue-50]="hasActiveFilters() || showAdvancedFilters"
-            [class.text-blue-600]="hasActiveFilters() || showAdvancedFilters"
-            [class.text-gray-400]="!hasActiveFilters() && !showAdvancedFilters"
-            title="Filtros avançados">
-            <i class="fas fa-sliders-h"></i>
-            <span *ngIf="getActiveDynamicFiltersCount() > 0 || filterOnlyMine" 
-                  class="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-              {{ (filterOnlyMine ? 1 : 0) + getActiveDynamicFiltersCount() }}
-            </span>
-          </button>
-          
-          <!-- Botão limpar busca -->
-          <button 
-            *ngIf="filterQuery"
-            (click)="filterQuery = ''; applyFilters()"
-            class="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
-            <i class="fas fa-times text-xs"></i>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Status dos filtros -->
-      <div class="flex items-center gap-3 ml-4">
-        <div *ngIf="hasActiveFilters()" class="text-sm text-blue-600 flex items-center gap-2">
-          <i class="fas fa-filter"></i>
-          <span>{{ (filterQuery ? 1 : 0) + (filterOnlyMine ? 1 : 0) + getActiveDynamicFiltersCount() }} filtro(s)</span>
-        </div>
-        
-        <button *ngIf="hasActiveFilters()" 
-                (click)="clearFilters()" 
-                class="px-3 py-2 bg-red-50 text-red-700 rounded-lg text-sm hover:bg-red-100 transition-colors flex items-center gap-2">
-          <i class="fas fa-times"></i>
-          Limpar
-        </button>
-      </div>
-    </div>
-
-    <!-- Painel de filtros avançados estilo Gmail (ABSOLUTO) -->
-    <div *ngIf="showAdvancedFilters" 
-         class="absolute top-full left-4 mt-2 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-      <div class="p-6">
-        <div class="flex items-center justify-between mb-6">
-          <h4 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-filter text-blue-600"></i>
-            Filtros Avançados
-          </h4>
-          <button (click)="showAdvancedFilters = false" 
-                  class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        
-        <!-- Filtro "Meus Cards" -->
-        <div class="mb-6 p-4 bg-blue-50 rounded-lg">
-          <label class="flex items-center cursor-pointer">
-            <input type="checkbox" 
-                   [checked]="filterOnlyMine"
-                   (change)="toggleOnlyMine()"
-                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="ml-3 text-sm font-medium text-gray-700 flex items-center gap-2">
-              <i class="fas fa-user text-blue-600"></i>
-              Mostrar apenas meus cards
-            </span>
-          </label>
-          <p class="ml-7 mt-1 text-xs text-gray-500">
-            Exibe somente os cards atribuídos a você
-          </p>
-        </div>
-        
-        <!-- Filtros por campos dinâmicos -->
-        <div *ngIf="availableFilterFields.length > 0">
-          <h5 class="text-sm font-medium text-gray-700 mb-4 flex items-center gap-2">
-            <i class="fas fa-sliders-h text-gray-500"></i>
-            Filtros por Campos
-          </h5>
-          
-          <div class="space-y-4">
-            <div *ngFor="let field of availableFilterFields" 
-                 class="p-4 bg-gray-50 rounded-lg">
-              <label class="text-sm font-medium text-gray-700 mb-2 block">
-                {{ field.label }}
-                <span class="text-xs text-gray-500 ml-1">({{ field.type }})</span>
-              </label>
-              
-              <!-- Campo de texto/email/tel -->
-              <div *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel'" 
-                   class="flex items-center gap-2">
-                <input type="text"
-                       [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
-                       [value]="getDynamicFilterValue(field.name)"
-                       (input)="setDynamicFilter(field.name, $event.target.value)"
-                       class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <button *ngIf="getDynamicFilterValue(field.name)"
-                        (click)="removeDynamicFilter(field.name)"
-                        class="p-2 text-red-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50">
-                  <i class="fas fa-times text-sm"></i>
-                </button>
-              </div>
-              
-              <!-- Campo de número -->
-              <div *ngIf="field.type === 'number'" 
-                   class="flex items-center gap-2">
-                <input type="number"
-                       [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
-                       [value]="getDynamicFilterValue(field.name)"
-                       (input)="setDynamicFilter(field.name, $event.target.value)"
-                       class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <button *ngIf="getDynamicFilterValue(field.name)"
-                        (click)="removeDynamicFilter(field.name)"
-                        class="p-2 text-red-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50">
-                  <i class="fas fa-times text-sm"></i>
-                </button>
-              </div>
-              
-              <!-- Campo de data -->
-              <div *ngIf="field.type === 'date'" 
-                   class="flex items-center gap-2">
-                <input type="date"
-                       [value]="getDynamicFilterValue(field.name)"
-                       (change)="setDynamicFilter(field.name, $event.target.value)"
-                       class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <button *ngIf="getDynamicFilterValue(field.name)"
-                        (click)="removeDynamicFilter(field.name)"
-                        class="p-2 text-red-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50">
-                  <i class="fas fa-times text-sm"></i>
-                </button>
-              </div>
-              
-              <!-- Checkbox -->
-              <label *ngIf="field.type === 'checkbox'" 
-                     class="flex items-center gap-3">
-                <input type="checkbox"
-                       [checked]="getDynamicFilterValue(field.name)"
-                       (change)="setDynamicFilter(field.name, $event.target.checked)"
-                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <span class="text-sm text-gray-600">Apenas marcados</span>
-                <button *ngIf="getDynamicFilterValue(field.name)"
-                        (click)="removeDynamicFilter(field.name)"
-                        class="p-1 text-red-400 hover:text-red-600 transition-colors ml-auto rounded-full hover:bg-red-50">
-                  <i class="fas fa-times text-xs"></i>
-                </button>
-              </label>
-              
-              <!-- Select/Radio/Temperatura -->
-              <div *ngIf="field.type === 'select' || field.type === 'radio' || field.type === 'temperatura'" 
-                   class="flex items-center gap-2">
-                <select [value]="getDynamicFilterValue(field.name)"
-                        (change)="onDynamicFilterChange(field.name, $event)"
-                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                  <option value="">Todos os valores</option>
-                  <option *ngFor="let option of getFieldOptions(field)" [value]="option">
-                    {{ option }}
-                  </option>
-                </select>
-                <button *ngIf="getDynamicFilterValue(field.name)"
-                        (click)="removeDynamicFilter(field.name)"
-                        class="p-2 text-red-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50">
-                  <i class="fas fa-times text-sm"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Status dos filtros dinâmicos -->
-          <div *ngIf="getActiveDynamicFiltersCount() > 0" 
-               class="mt-6 pt-4 border-t border-gray-200 text-sm text-blue-600 flex items-center gap-2">
-            <i class="fas fa-info-circle"></i>
-            <span>{{ getActiveDynamicFiltersCount() }} filtro(s) ativo(s) por campos</span>
-          </div>
-        </div>
-        
-        <!-- Área para quando não há campos dinâmicos -->
-        <div *ngIf="availableFilterFields.length === 0" class="text-center py-4 text-gray-500 text-sm">
-          <i class="fas fa-info-circle mb-2"></i>
-          <p>Nenhum campo dinâmico disponível para filtros</p>
-        </div>
-      </div>
-    </div>
+  <!-- Reusable Advanced Filters Component -->
+  <div *ngIf="!isLoading && activeTab === 'kanban'" class="hidden md:block bg-white border-b border-gray-200 px-4 py-3">
+    <app-advanced-filters 
+      [boardId]="boardId"
+      [ownerId]="ownerId" 
+      [columns]="columns"
+      [currentUser]="currentUser"
+      [(filterQuery)]="filterQuery"
+      [(filterOnlyMine)]="filterOnlyMine"
+      [(dynamicFilters)]="dynamicFilters"
+      [(showAdvancedFilters)]="showAdvancedFilters"
+      (filtersApplied)="applyFilters()">
+    </app-advanced-filters>
   </div>
 
   <!-- Desktop Kanban Board Tab -->
@@ -1193,79 +1006,80 @@ Authorization: Bearer {{ apiToken }}
         Novo lead
       </button>
     </div>
+  </div> <!-- closes mobile-board -->
   </div>
+</app-main-layout>
 
-  <!-- Modal de Lead -->
-  <app-lead-modal 
-    [ownerId]="ownerId"
-    [boardId]="boardId"
-    [columns]="columns"
-    (leadCreated)="onLeadCreated()"
-    (leadUpdated)="onLeadUpdated()"
-    (closeModal)="onLeadUpdated()">
-  </app-lead-modal>
+<!-- Modal de Lead -->
+<app-lead-modal 
+  [ownerId]="ownerId"
+  [boardId]="boardId"
+  [columns]="columns"
+  (leadCreated)="onLeadCreated()"
+  (leadUpdated)="onLeadUpdated()"
+  (closeModal)="onLeadUpdated()">
+</app-lead-modal>
 
-  <!-- Modal de Coluna -->
-  <app-column-modal 
-    [ownerId]="ownerId"
-    [boardId]="boardId"
-    [columns]="columns"
-    (columnCreated)="onColumnCreated()"
-    (columnUpdated)="onColumnUpdated()"
-    (columnDeleted)="onColumnDeleted()"
-    (closeModal)="onColumnUpdated()">
-  </app-column-modal>
+<!-- Modal de Coluna -->
+<app-column-modal 
+  [ownerId]="ownerId"
+  [boardId]="boardId"
+  [columns]="columns"
+  (columnCreated)="onColumnCreated()"
+  (columnUpdated)="onColumnUpdated()"
+  (columnDeleted)="onColumnDeleted()"
+  (closeModal)="onColumnUpdated()">
+</app-column-modal>
 
-  <!-- Modal de Formulário da Fase -->
-  <app-phase-form-modal 
-    [ownerId]="ownerId"
-    [boardId]="boardId"
-    (formConfigSaved)="onPhaseFormConfigSaved()"
-    (closeModal)="onPhaseFormConfigSaved()">
-  </app-phase-form-modal>
+<!-- Modal de Formulário da Fase -->
+<app-phase-form-modal 
+  [ownerId]="ownerId"
+  [boardId]="boardId"
+  (formConfigSaved)="onPhaseFormConfigSaved()"
+  (closeModal)="onPhaseFormConfigSaved()">
+</app-phase-form-modal>
 
-  <!-- Modal de Detalhes do Lead -->
-  <app-lead-detail-modal 
-    [ownerId]="ownerId"
-    [boardId]="boardId"
-    [columns]="columns"
-    [users]="users"
-    (leadUpdated)="onLeadUpdated()"
-    (leadDeleted)="onLeadDeleted()"
-    (closeModal)="onLeadUpdated()">
-  </app-lead-detail-modal>
+<!-- Modal de Detalhes do Lead -->
+<app-lead-detail-modal 
+  [ownerId]="ownerId"
+  [boardId]="boardId"
+  [columns]="columns"
+  [users]="users"
+  (leadUpdated)="onLeadUpdated()"
+  (leadDeleted)="onLeadDeleted()"
+  (closeModal)="onLeadUpdated()">
+</app-lead-detail-modal>
 
-  <!-- Modal de Template -->
-  <app-template-modal 
-    [ownerId]="ownerId"
-    [boardId]="boardId"
-    (templateSaved)="onTemplateSaved()"
-    (closeModal)="onTemplateSaved()">
-  </app-template-modal>
+<!-- Modal de Template -->
+<app-template-modal 
+  [ownerId]="ownerId"
+  [boardId]="boardId"
+  (templateSaved)="onTemplateSaved()"
+  (closeModal)="onTemplateSaved()">
+</app-template-modal>
 
-  <!-- Modal de Automação -->
-  <app-automation-modal
-    *ngIf="showAutomationModal"
-    [isVisible]="showAutomationModal"
-    [automation]="selectedAutomation"
-    [phases]="columns"
-    [allowedTriggerTypes]="selectedPhaseIdForAutomations ? getAllowedTriggerTypesForPhase(selectedPhaseIdForAutomations) : null"
-    [fixedPhaseId]="selectedPhaseIdForAutomations || null"
-    [allowedTransitions]="flowConfig.allowed || {}"
-    [emailTemplates]="emailTemplates"
-    [users]="users"
-    (closeModalEvent)="onCloseAutomationModal()"
-    (saveAutomation)="onSaveAutomation($event)">
-  </app-automation-modal>
+<!-- Modal de Automação -->
+<app-automation-modal
+  *ngIf="showAutomationModal"
+  [isVisible]="showAutomationModal"
+  [automation]="selectedAutomation"
+  [phases]="columns"
+  [allowedTriggerTypes]="selectedPhaseIdForAutomations ? getAllowedTriggerTypesForPhase(selectedPhaseIdForAutomations) : null"
+  [fixedPhaseId]="selectedPhaseIdForAutomations || null"
+  [allowedTransitions]="flowConfig.allowed || {}"
+  [emailTemplates]="emailTemplates"
+  [users]="users"
+  (closeModalEvent)="onCloseAutomationModal()"
+  (saveAutomation)="onSaveAutomation($event)">
+</app-automation-modal>
 
-  <!-- Modal de Histórico de Automação -->
-  <app-automation-history-modal
-    [isVisible]="showHistoryModal"
-    [automationId]="selectedAutomationForHistory?.id || ''"
-    [automationName]="selectedAutomationForHistory?.name || ''"
-    [ownerId]="ownerId"
-    [boardId]="boardId"
-    [leads]="leads"
-    (closeModalEvent)="onCloseHistoryModal()">
-  </app-automation-history-modal>
-</app-main-layout>  
+<!-- Modal de Histórico de Automação -->
+<app-automation-history-modal
+  [isVisible]="showHistoryModal"
+  [automationId]="selectedAutomationForHistory?.id || ''"
+  [automationName]="selectedAutomationForHistory?.name || ''"
+  [ownerId]="ownerId"
+  [boardId]="boardId"
+  [leads]="leads"
+  (closeModalEvent)="onCloseHistoryModal()">
+</app-automation-history-modal>  

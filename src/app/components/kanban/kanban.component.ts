@@ -19,12 +19,13 @@ import { AutomationHistoryModal } from '../automation-history-modal/automation-h
 import { MainLayoutComponent } from '../main-layout/main-layout.component';
 import { VisualFormBuilderComponent } from '../visual-form-builder/visual-form-builder';
 import { ReportsComponent } from '../reports/reports.component';
+import { AdvancedFiltersComponent } from '../advanced-filters/advanced-filters.component';
 import { ToastService } from '../toast/toast.service';
 
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent, ReportsComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent, ReportsComponent, AdvancedFiltersComponent],
   templateUrl: './kanban.component.html',
   styleUrls: ['./kanban.component.scss']
 })
