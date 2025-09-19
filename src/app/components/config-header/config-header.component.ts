@@ -18,17 +18,6 @@ import { CommonModule } from '@angular/common';
               <i class="fas fa-arrow-left"></i>
             </button>
             
-            @if (hasCustomLogo()) {
-              <img [src]="companyLogo" 
-                   [alt]="'Logo ' + companyName" 
-                   class="h-8 w-auto rounded">
-            } @else {
-              <div class="h-8 w-8 rounded flex items-center justify-center text-white font-bold text-sm"
-                   [style.background-color]="primaryColor">
-                {{ getCompanyInitials() }}
-              </div>
-            }
-            
             <h1 class="text-xl font-semibold text-gray-900">
               {{ title }}
             </h1>
@@ -62,14 +51,14 @@ export class ConfigHeaderComponent {
   get companyLogo(): string {
     const company = this.subdomainService.getCurrentCompany();
     
-    // Se tem logo customizado, usar ele
-    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
-      return company.brandingConfig.logo;
+    // Sempre priorizar logo da empresa configurado
+    if (company?.logoUrl && company.logoUrl.trim() !== '') {
+      return company.logoUrl;
     }
     
-    // Se é a Gobuyer, usar logo padrão da Gobuyer
-    if (company?.subdomain === 'gobuyer') {
-      return 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+    // Fallback para brandingConfig logo
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return company.brandingConfig.logo;
     }
     
     return '';
@@ -82,13 +71,13 @@ export class ConfigHeaderComponent {
   hasCustomLogo(): boolean {
     const company = this.subdomainService.getCurrentCompany();
     
-    // Se tem logo customizado
-    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+    // Verificar se tem logo da empresa configurado
+    if (company?.logoUrl && company.logoUrl.trim() !== '') {
       return true;
     }
     
-    // Se é a Gobuyer, sempre tem logo
-    if (company?.subdomain === 'gobuyer') {
+    // Fallback para brandingConfig logo
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
       return true;
     }
     

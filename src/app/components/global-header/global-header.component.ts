@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { BrandingService } from '../../services/branding.service';
 
 @Component({
   selector: 'app-global-header',
@@ -12,15 +13,18 @@ import { SubdomainService } from '../../services/subdomain.service';
     <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
-          <!-- Task Board Logo/Brand -->
+          <!-- Company Logo/Brand -->
           <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <i class="fas fa-tasks text-white text-lg"></i>
-            </div>
-            <div>
-              <h1 class="text-xl font-bold text-gray-900">Task Board</h1>
-              <p class="text-xs text-gray-500">Sistema de Gestão Kanban</p>
-            </div>
+            @if (hasCompanyLogo()) {
+              <img [src]="getCompanyLogo()" 
+                   alt="Logo da Empresa" 
+                   class="h-10 w-auto rounded">
+            } @else {
+              <div class="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                   [style.background-color]="getPrimaryColor()">
+                {{ getCompanyInitials() }}
+              </div>
+            }
           </div>
 
           <!-- Navigation Menu -->
@@ -146,6 +150,7 @@ export class GlobalHeaderComponent {
   private router = inject(Router);
   private authService = inject(AuthService);
   private subdomainService = inject(SubdomainService);
+  private brandingService = inject(BrandingService);
 
   configMenuOpen = false;
   userMenuOpen = false;
@@ -155,6 +160,29 @@ export class GlobalHeaderComponent {
   
   currentCompany() {
     return this.subdomainService.getCurrentCompany();
+  }
+
+  hasCompanyLogo(): boolean {
+    return this.brandingService.hasLogo();
+  }
+
+  getCompanyLogo(): string {
+    return this.brandingService.getLogoUrl();
+  }
+
+  getPrimaryColor(): string {
+    return this.brandingService.getPrimaryColor();
+  }
+
+  getCompanyInitials(): string {
+    const company = this.currentCompany();
+    if (!company?.name) return 'T';
+    
+    const words = company.name.split(' ').filter(word => word.length > 0);
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    return words.slice(0, 2).map(word => word[0]).join('').toUpperCase();
   }
 
   isCurrentRoute(route: string): boolean {

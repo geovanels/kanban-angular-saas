@@ -11,7 +11,7 @@ import { SubdomainService } from '../../services/subdomain.service';
     <div class="bg-gray-50 border-b border-gray-200">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center space-x-4">
-          <!-- Company Logo -->
+          <!-- Page Title -->
           <div class="flex items-center space-x-3">
             <!-- Back Button -->
             <button 
@@ -19,17 +19,6 @@ import { SubdomainService } from '../../services/subdomain.service';
               class="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors">
               <i class="fas fa-arrow-left"></i>
             </button>
-            
-            @if (hasCustomLogo()) {
-              <img [src]="companyLogo" 
-                   [alt]="'Logo ' + companyName" 
-                   class="h-10 w-auto rounded">
-            } @else {
-              <div class="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
-                   [style.background-color]="primaryColor">
-                {{ getCompanyInitials() }}
-              </div>
-            }
             
             <div>
               <h2 class="text-lg font-semibold text-gray-900">
@@ -69,14 +58,14 @@ export class CompanyBreadcrumbComponent {
   get companyLogo(): string {
     const company = this.subdomainService.getCurrentCompany();
     
-    // Se tem logo customizado, usar ele
-    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
-      return company.brandingConfig.logo;
+    // Sempre priorizar logo da empresa configurado
+    if (company?.logoUrl && company.logoUrl.trim() !== '') {
+      return company.logoUrl;
     }
     
-    // Se é a Gobuyer, usar logo padrão da Gobuyer
-    if (company?.subdomain === 'gobuyer') {
-      return 'https://apps.gobuyer.com.br/sso/assets/images/logos/logo-gobuyer.png';
+    // Fallback para brandingConfig logo
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+      return company.brandingConfig.logo;
     }
     
     return '';
@@ -85,13 +74,13 @@ export class CompanyBreadcrumbComponent {
   hasCustomLogo(): boolean {
     const company = this.subdomainService.getCurrentCompany();
     
-    // Se tem logo customizado
-    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
+    // Verificar se tem logo da empresa configurado
+    if (company?.logoUrl && company.logoUrl.trim() !== '') {
       return true;
     }
     
-    // Se é a Gobuyer, sempre tem logo
-    if (company?.subdomain === 'gobuyer') {
+    // Fallback para brandingConfig logo
+    if (company?.brandingConfig?.logo && company.brandingConfig.logo.trim() !== '') {
       return true;
     }
     
