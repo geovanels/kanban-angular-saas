@@ -227,17 +227,72 @@ export class LeadDetailModalComponent {
     return this.columns.find(col => col.order === 0) || null;
   }
 
+  private formatFieldValue(field: any, value: any): string {
+    if (field.type === 'checkbox') {
+      // Se o valor for um array, juntar as opções
+      if (Array.isArray(value)) {
+        return value.length > 0 ? value.join(', ') : 'Nenhuma opção selecionada';
+      }
+      
+      // Se o valor for uma string, pode ser um array serializado ou string simples
+      if (value && typeof value === 'string') {
+        // Tentar parsing JSON primeiro
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            return parsed.length > 0 ? parsed.join(', ') : 'Nenhuma opção selecionada';
+          }
+        } catch {}
+        
+        // Se não é JSON, pode ser uma string com valores separados por vírgula
+        if (value.includes(',')) {
+          const options = value.split(',').map(v => v.trim()).filter(v => v);
+          return options.length > 0 ? options.join(', ') : 'Nenhuma opção selecionada';
+        }
+        
+        // String simples
+        return value;
+      }
+      
+      // Valor vazio ou null
+      return 'Nenhuma opção selecionada';
+    }
+    
+    return value !== null && value !== undefined ? String(value) : 'Não informado';
+  }
+
   getInitialFields(): any[] {
     // Se houver configuração de formulário inicial, usar esses campos na ordem definida
     if (this.initialFormConfig?.fields?.length) {
       const sorted = this.initialFormConfig.fields
         .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
-      return sorted.map((f: any) => ({
-        name: f.apiFieldName || f.name,
-        label: f.label || f.name || f.apiFieldName,
-        value: this.getFieldValue(f.apiFieldName || f.name) ?? this.getFieldValue(f.name) ?? 'Não informado'
-      }));
+      return sorted.map((f: any) => {
+        const fieldName = f.apiFieldName || f.name;
+        const rawValue = this.getFieldValue(fieldName) ?? this.getFieldValue(f.name);
+        
+        // Debug expandido - todos os campos
+        console.log('🔍 Debug ALL fields:', {
+          fieldName: fieldName,
+          fieldLabel: f.label,
+          fieldType: f.type,
+          rawValue: rawValue,
+          rawValueType: typeof rawValue,
+          isArray: Array.isArray(rawValue),
+          fieldConfig: f,
+          allLeadFields: this.currentLead?.fields
+        });
+        
+        const formattedValue = rawValue !== null && rawValue !== undefined 
+          ? this.formatFieldValue(f, rawValue) 
+          : 'Não informado';
+        
+        return {
+          name: fieldName,
+          label: f.label || f.name || f.apiFieldName,
+          value: formattedValue
+        };
+      });
     }
 
     // Fallback dinâmico com deduplicação por grupos de sinônimos

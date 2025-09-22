@@ -1780,7 +1780,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   // Migrar campos existentes para incluir showInFilters
   private migrateFieldsToIncludeShowInFilters() {
-    console.log('🔧 Migrando campos para incluir showInFilters...');
     
     // Migrar campos do formulário inicial
     if (this.initialFormFields) {
@@ -1791,14 +1790,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
           needsMigration = true;
           console.log(`🔧 Adicionado showInFilters: false ao campo ${field.name} (campo antigo)`);
         } else {
-          console.log(`✅ Campo ${field.name} já tem showInFilters: ${field.showInFilters}`);
         }
       });
       
       if (needsMigration) {
         console.log('🔧 Alguns campos do formulário inicial foram migrados em memória');
       } else {
-        console.log('✅ Todos os campos do formulário inicial já têm showInFilters');
       }
     }
     
@@ -1827,9 +1824,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   // Carregar campos disponíveis para filtro
   private loadAvailableFilterFields() {
-    console.log('🔍 loadAvailableFilterFields INICIADO');
-    console.log('🔍 initialFormFields:', this.initialFormFields);
-    console.log('🔍 phaseFormConfigs:', this.phaseFormConfigs);
     
     // Executar migração primeiro
     this.migrateFieldsToIncludeShowInFilters();
@@ -1838,16 +1832,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     
     // Adicionar campos do formulário inicial que têm showInFilters = true
     if (this.initialFormFields) {
-      console.log('🔍 Processando campos do formulário inicial...');
       this.initialFormFields.forEach((field, index) => {
-        console.log(`🔍 Campo inicial ${index + 1}:`, field);
-        console.log(`🔍 Campo inicial ${index + 1} - Detalhes:`, {
-          name: field.name,
-          type: field.type,
-          showInFilters: field.showInFilters,
-          hasShowInFilters: 'showInFilters' in field,
-          keys: Object.keys(field)
-        });
         
         if (field.name && field.type && field.showInFilters) {
           const filterField = {
@@ -1857,9 +1842,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
             source: 'initial'
           };
           allFields.push(filterField);
-          console.log('✅ Campo adicionado aos filtros:', filterField);
         } else {
-          console.log('❌ Campo NÃO adicionado aos filtros (falta name, type ou showInFilters = false)');
         }
       });
     } else {
@@ -1867,19 +1850,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
     
     // Adicionar campos de fases que têm showInFilters = true
-    console.log('🔍 Processando campos das fases...');
     Object.entries(this.phaseFormConfigs || {}).forEach(([phaseId, config]: [string, any]) => {
-      console.log(`🔍 Fase ${phaseId}:`, config);
       if (config?.fields) {
         config.fields.forEach((field: any, index: number) => {
-          console.log(`🔍 Campo da fase ${phaseId} - ${index + 1}:`, field);
-          console.log(`🔍 Campo da fase ${phaseId} - ${index + 1} - Detalhes:`, {
-            name: field.name,
-            type: field.type,
-            showInFilters: field.showInFilters,
-            hasShowInFilters: 'showInFilters' in field,
-            keys: Object.keys(field)
-          });
           
           if (field.name && field.type && field.showInFilters && !allFields.find(f => f.name === field.name)) {
             const filterField = {
@@ -1890,27 +1863,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
               phaseId: phaseId
             };
             allFields.push(filterField);
-            console.log('✅ Campo da fase adicionado aos filtros:', filterField);
           } else {
-            console.log('❌ Campo da fase NÃO adicionado (falta name, type, showInFilters = false, ou já existe)');
           }
         });
       }
     });
     
-    console.log('🔍 Todos os campos coletados:', allFields);
     
     // Filtrar apenas campos apropriados para filtro
     this.availableFilterFields = allFields.filter(field => {
       const supportedTypes = ['text', 'email', 'select', 'radio', 'checkbox', 'date', 'number', 'tel', 'cnpj', 'cpf', 'temperatura'];
       const isSupported = supportedTypes.includes(field.type.toLowerCase());
-      console.log(`🔍 Campo ${field.name} (${field.type}) - Suportado: ${isSupported}`);
       return isSupported;
     });
     
-    console.log('🔍 Campos filtrados finais (availableFilterFields):', this.availableFilterFields);
-    console.log('🔍 availableFilterFields.length:', this.availableFilterFields.length);
-    console.log('🔍 showAdvancedFilters:', this.showAdvancedFilters);
   }
 
   // Obter opções disponíveis para um campo

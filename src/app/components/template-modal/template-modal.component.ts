@@ -62,7 +62,6 @@ export class TemplateModalComponent implements AfterViewInit {
   variables: { name: string; value: string }[] = [];
 
   ngAfterViewInit() {
-    console.log('Template modal inicializado');
   }
 
   // Método para inserir variáveis no TinyMCE na posição do cursor

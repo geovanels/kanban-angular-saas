@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/components/global-header/global-header.component.ts"],
-  "sourcesContent": ["\n    .rotate-180 {\n      transform: rotate(180deg);\n    }\n    \n    @media (max-width: 768px) {\n      .mobile-menu-button {\n        display: block;\n      }\n    }\n  "],
-  "mappings": ";AACI,CAAA;AACE,aAAA,OAAA;;AAGF,OAAA,CAAA,SAAA,EAAA;AACE,GAAA;AACE,aAAA;;;",
-  "names": []
-}

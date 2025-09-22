@@ -44,49 +44,104 @@ export class AutomationService {
   // Lock para evitar execução simultânea de automações de tempo
   private timeAutomationLocks = new Map<string, boolean>();
 
+  // Lock para evitar processamento duplo de novo lead
+  private newLeadLocks = new Map<string, boolean>();
+
   // Processar automações quando um novo lead é criado
   async processNewLeadAutomations(lead: Lead, boardId: string, ownerId: string): Promise<void> {
     try {
-      // Buscar automações ativas do quadro
-      const automations = await this.firestoreService.getAutomations(ownerId, boardId);
-      const newLeadAutomations = (automations as Automation[]).filter(automation => {
-        if (!automation || !automation.active) return false;
-        // Aceitar dois formatos de trigger: tipo plano ou objeto
-        const type = (automation as any).triggerType || (automation as any).trigger?.type;
-        // Se automação exigir fase (alguns setups), só dispare se lead entrou na fase inicial
-        const triggerPhase = (automation as any).triggerPhase || (automation as any).trigger?.phase;
-        if (triggerPhase) {
-          // Se há triggerPhase, só execute se o lead estiver nessa fase E for a fase inicial
-          return type === 'new-lead-created' && lead.columnId === triggerPhase;
-        }
-        return type === 'new-lead-created';
-      });
+      // Chave única para lock de processamento de novo lead
+      const newLeadLockKey = `newlead_${ownerId}_${boardId}_${lead.id}`;
+      
+      // Verificar se já está sendo processado
+      if (this.newLeadLocks.get(newLeadLockKey)) {
+        console.log('🔒 Novo lead já está sendo processado (lock ativo), pulando:', {
+          leadId: lead.id,
+          boardId: boardId,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
 
-      // Executar cada automação
-      for (const automation of newLeadAutomations) {
-        await this.executeAutomation(automation, lead, boardId, ownerId);
+      // Definir lock temporário
+      this.newLeadLocks.set(newLeadLockKey, true);
+
+      try {
+        // Buscar automações ativas do quadro
+        const automations = await this.firestoreService.getAutomations(ownerId, boardId);
+        const newLeadAutomations = (automations as Automation[]).filter(automation => {
+          if (!automation || !automation.active) return false;
+          // Aceitar dois formatos de trigger: tipo plano ou objeto
+          const type = (automation as any).triggerType || (automation as any).trigger?.type;
+          // Se automação exigir fase (alguns setups), só dispare se lead entrou na fase inicial
+          const triggerPhase = (automation as any).triggerPhase || (automation as any).trigger?.phase;
+          if (triggerPhase) {
+            // Se há triggerPhase, só execute se o lead estiver nessa fase E for a fase inicial
+            return type === 'new-lead-created' && lead.columnId === triggerPhase;
+          }
+          return type === 'new-lead-created';
+        });
+
+        // Executar cada automação
+        for (const automation of newLeadAutomations) {
+          await this.executeAutomation(automation, lead, boardId, ownerId);
+        }
+      } finally {
+        // Liberar lock após um breve delay para evitar reentrância
+        setTimeout(() => {
+          this.newLeadLocks.delete(newLeadLockKey);
+          console.log('🔓 Lock de novo lead liberado:', newLeadLockKey);
+        }, 5000); // 5 segundos
       }
     } catch (error) {
       console.error('Erro ao processar automações de novo lead:', error);
     }
   }
 
+  // Lock para evitar processamento duplo de mudança de fase
+  private phaseChangeLocks = new Map<string, boolean>();
+
   // Processar automações quando um lead muda de fase
   async processPhaseChangeAutomations(lead: Lead, newColumnId: string, oldColumnId: string, boardId: string, ownerId: string): Promise<void> {
     try {
-      // Buscar automações ativas do quadro
-      const automations = await this.firestoreService.getAutomations(ownerId, boardId);
+      // Chave única para lock de processamento de mudança de fase
+      const phaseChangeLockKey = `phasechange_${ownerId}_${boardId}_${lead.id}_${newColumnId}`;
+      
+      // Verificar se já está sendo processado
+      if (this.phaseChangeLocks.get(phaseChangeLockKey)) {
+        console.log('🔒 Mudança de fase já está sendo processada (lock ativo), pulando:', {
+          leadId: lead.id,
+          newColumnId: newColumnId,
+          oldColumnId: oldColumnId,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
 
-      const phaseChangeAutomations = (automations as Automation[]).filter(automation => {
-        const isActive = automation.active;
-        const isCardEntersPhase = automation.triggerType === 'card-enters-phase';
-        const matchesPhase = automation.triggerPhase === newColumnId;
-        return isActive && isCardEntersPhase && matchesPhase;
-      });
+      // Definir lock temporário
+      this.phaseChangeLocks.set(phaseChangeLockKey, true);
 
-      // Executar cada automação
-      for (const automation of phaseChangeAutomations) {
-        await this.executeAutomation(automation, lead, boardId, ownerId);
+      try {
+        // Buscar automações ativas do quadro
+        const automations = await this.firestoreService.getAutomations(ownerId, boardId);
+
+        const phaseChangeAutomations = (automations as Automation[]).filter(automation => {
+          const isActive = automation.active;
+          const isCardEntersPhase = automation.triggerType === 'card-enters-phase';
+          const matchesPhase = automation.triggerPhase === newColumnId;
+          return isActive && isCardEntersPhase && matchesPhase;
+        });
+
+        // Executar cada automação
+        for (const automation of phaseChangeAutomations) {
+          await this.executeAutomation(automation, lead, boardId, ownerId);
+        }
+      } finally {
+        // Liberar lock após um breve delay
+        setTimeout(() => {
+          this.phaseChangeLocks.delete(phaseChangeLockKey);
+          console.log('🔓 Lock de mudança de fase liberado:', phaseChangeLockKey);
+        }, 3000); // 3 segundos
       }
     } catch (error) {
       console.error('Erro ao processar automações de mudança de fase:', error);
@@ -197,15 +252,15 @@ export class AutomationService {
       try {
         // Verificação tripla de deduplicação
         
-        // 1. Verificar por automação + lead + assunto (30 min)
+        // 1. Verificar por automação + lead + assunto (2 horas)
         const existing = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
           automationId: automation?.id || undefined,
           leadId: lead.id,
           subject: processedSubject,
-          withinMs: 30 * 60 * 1000
+          withinMs: 2 * 60 * 60 * 1000
         });
         if (existing) {
-          console.log('📧 Email duplicado detectado (automação + assunto, 30min), pulando envio:', {
+          console.log('📧 Email duplicado detectado (automação + assunto, 2h), pulando envio:', {
             leadId: lead.id,
             automationId: automation?.id,
             subject: processedSubject,
@@ -215,14 +270,14 @@ export class AutomationService {
           return;
         }
 
-        // 2. Verificar por template + lead (60 min)
+        // 2. Verificar por template + lead (4 horas)
         const recentTemplate = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
           templateId: action.templateId,
           leadId: lead.id,
-          withinMs: 60 * 60 * 1000
+          withinMs: 4 * 60 * 60 * 1000
         });
         if (recentTemplate) {
-          console.log('📧 Template duplicado detectado (template + lead, 60min), pulando envio:', {
+          console.log('📧 Template duplicado detectado (template + lead, 4h), pulando envio:', {
             leadId: lead.id,
             templateId: action.templateId,
             subject: processedSubject,
@@ -232,14 +287,14 @@ export class AutomationService {
           return;
         }
 
-        // 3. Verificar por lead + assunto + destinatário (15 min) - mais restritivo
+        // 3. Verificar por lead + assunto + destinatário (1 hora) - mais restritivo
         const recentRecipient = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
           leadId: lead.id,
           subject: processedSubject,
-          withinMs: 15 * 60 * 1000
+          withinMs: 60 * 60 * 1000
         });
         if (recentRecipient) {
-          console.log('📧 Email duplicado detectado (lead + assunto, 15min), pulando envio:', {
+          console.log('📧 Email duplicado detectado (lead + assunto, 1h), pulando envio:', {
             leadId: lead.id,
             subject: processedSubject,
             to: toValue,
@@ -562,11 +617,6 @@ export class AutomationService {
         return;
       }
       
-      console.log('🔄 Iniciando processamento de automações de tempo:', {
-        leadsCount: leads.length,
-        boardId,
-        timestamp: new Date().toISOString()
-      });
       
       const automations = await this.firestoreService.getAutomations(ownerId, boardId);
       const list = (automations as Automation[]).filter(a => a && a.active);
@@ -576,7 +626,6 @@ export class AutomationService {
         return;
       }
       
-      console.log(`📋 Processando ${list.length} automações ativas`);
       
 
       // Cache de config de formulário por fase para verificar "form-not-answered"
@@ -726,7 +775,6 @@ export class AutomationService {
     } finally {
       // Liberar lock
       this.timeAutomationLocks.delete(lockKey);
-      console.log('🔓 Lock de automações de tempo liberado');
     }
   }
 
@@ -800,7 +848,6 @@ export class AutomationService {
       const elapsed = Date.now() - timestamp;
       const isRecent = elapsed < withinMs;
       
-      console.log(`🔍 Verificando execução para ${key}: timestamp=${new Date(timestamp).toISOString()}, elapsed=${Math.round(elapsed/1000/60)}min, isRecent=${isRecent}`);
       
       return isRecent;
     } catch (error) {

@@ -598,17 +598,17 @@ export class FirestoreService {
       return () => {};
     }
 
-    const boardsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards');
-    return runInInjectionContext(this.injector, () => 
-      onSnapshot(boardsRef, (snapshot: any) => {
+    return runInInjectionContext(this.injector, () => {
+      const boardsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards');
+      return onSnapshot(boardsRef, (snapshot: any) => {
         const boards = snapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
           companyId: this.currentCompanyId
         } as Board)).filter((board: any) => (board.status || 'active') === 'active');
         callback(boards);
-      })
-    );
+      });
+    });
   }
 
   subscribeToColumns(userId: string, boardId: string, callback: (columns: Column[]) => void) {
@@ -630,10 +630,10 @@ export class FirestoreService {
       return () => {};
     }
 
-    const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
-    const q = query(columnsRef, orderBy('order'));
-    return runInInjectionContext(this.injector, () => 
-      onSnapshot(q, (snapshot: any) => {
+    return runInInjectionContext(this.injector, () => {
+      const columnsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'columns');
+      const q = query(columnsRef, orderBy('order'));
+      return onSnapshot(q, (snapshot: any) => {
         const columns = snapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
@@ -641,8 +641,8 @@ export class FirestoreService {
           boardId: boardId
         } as Column));
         callback(columns);
-      })
-    );
+      });
+    });
   }
 
   subscribeToLeads(userId: string, boardId: string, callback: (leads: Lead[]) => void) {
@@ -664,9 +664,9 @@ export class FirestoreService {
       return () => {};
     }
 
-    const leadsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads');
-    return runInInjectionContext(this.injector, () => 
-      onSnapshot(leadsRef, (snapshot: any) => {
+    return runInInjectionContext(this.injector, () => {
+      const leadsRef = collection(this.firestore, 'companies', this.currentCompanyId, 'boards', boardId, 'leads');
+      return onSnapshot(leadsRef, (snapshot: any) => {
         const leads = snapshot.docs.map((doc: any) => ({ 
           id: doc.id, 
           ...doc.data(),
@@ -674,8 +674,8 @@ export class FirestoreService {
           boardId: boardId
         } as Lead));
         callback(leads);
-      })
-    );
+      });
+    });
   }
 
   // BULK OPERATIONS (Updated for multi-company)

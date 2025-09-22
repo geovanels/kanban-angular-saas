@@ -53,6 +53,13 @@ import { ToastService } from '../toast/toast.service';
                       <span>{{ opt?.label ?? opt }}</span>
                     </label>
                   </div>
+                  <!-- Campo Checkbox -->
+                  <div *ngSwitchCase="'checkbox'" class="flex flex-col gap-2">
+                    <label *ngFor="let opt of (f.options || []); let i = index" class="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" [attr.name]="f.name + '_' + i" [value]="opt" [formControlName]="f.name + '_' + i" class="text-blue-600 focus:ring-blue-500">
+                      <span>{{ opt }}</span>
+                    </label>
+                  </div>
                   <select *ngSwitchCase="'temperatura'" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Selecione...</option>
                     <option *ngFor="let opt of (f.options && f.options.length ? f.options : ['Quente','Morno','Frio'])" [value]="opt">{{ opt }}</option>
@@ -176,7 +183,19 @@ export class PublicFormComponent implements OnInit {
       this.currentFields.forEach((f: any) => {
         const key = f.apiFieldName || f.name;
         const val = (this.lead as any)?.fields?.[key] ?? '';
-        formGroup[f.name] = [val];
+        
+        if (f.type === 'checkbox') {
+          // Para checkboxes, criar controles individuais para cada opção
+          (f.options || []).forEach((opt: string, i: number) => {
+            const checkboxName = f.name + '_' + i;
+            // Verificar se a opção está selecionada no valor salvo
+            const isChecked = Array.isArray(val) ? val.includes(opt) : false;
+            formGroup[checkboxName] = [isChecked];
+          });
+        } else {
+          formGroup[f.name] = [val];
+        }
+        
         // Normalizar radios para array/objetos
         if (f.type === 'radio' && Array.isArray(f.options)) {
           f.options = f.options.map((o: any) => typeof o === 'object' ? o : { value: o, label: o });
@@ -197,7 +216,20 @@ export class PublicFormComponent implements OnInit {
     const mapped: any = {};
     this.currentFields.forEach((f: any) => {
       const apiKey = f.apiFieldName || f.name;
-      mapped[apiKey] = values[f.name];
+      
+      if (f.type === 'checkbox') {
+        // Para checkboxes, coletar todas as opções selecionadas
+        const selectedOptions: string[] = [];
+        (f.options || []).forEach((opt: string, i: number) => {
+          const checkboxName = f.name + '_' + i;
+          if (values[checkboxName]) {
+            selectedOptions.push(opt);
+          }
+        });
+        mapped[apiKey] = selectedOptions;
+      } else {
+        mapped[apiKey] = values[f.name];
+      }
     });
     return mapped;
   }

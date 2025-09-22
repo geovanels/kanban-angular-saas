@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/components/dashboard/dashboard.component.scss"],
-  "sourcesContent": [".line-clamp-2 {\n  display: -webkit-box;\n  -webkit-line-clamp: 2;\n  -webkit-box-orient: vertical;\n  overflow: hidden;\n}\n\n// Board menu styles - garantir visibilidade\n.board-menu-container {\n  position: relative;\n  \n  button {\n    opacity: 1 !important;\n    visibility: visible !important;\n  }\n  \n  // Menu dropdown\n  .absolute {\n    position: absolute !important;\n    z-index: 1000 !important;\n  }\n}"],
-  "mappings": ";AAAA,CAAA;AACE,WAAA;AACA,sBAAA;AACA,sBAAA;AACA,YAAA;;AAIF,CAAA;AACE,YAAA;;AAEA,CAHF,qBAGE;AACE,WAAA;AACA,cAAA;;AAIF,CATF,qBASE,CAAA;AACE,YAAA;AACA,WAAA;;",
-  "names": []
-}
