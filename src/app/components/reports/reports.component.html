@@ -134,7 +134,7 @@
         </div>
 
         <!-- Quick Charts -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Phase Distribution Chart -->
           <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -142,13 +142,6 @@
               Registros por Fase
             </h3>
             <div class="space-y-4">
-              <!-- Debug Info -->
-              <div *ngIf="chartData.phaseDistribution.length === 0" class="text-center py-4">
-                <p class="text-gray-500 text-sm">
-                  🔍 Debug: Nenhum dado de fase encontrado
-                  <br>Fases: {{ columns.length }} | Registros: {{ filteredRecords.length }}
-                </p>
-              </div>
               
               <div *ngFor="let item of chartData.phaseDistribution" class="space-y-2">
                 <div class="flex items-center justify-between">
@@ -184,6 +177,54 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Dynamic Chart -->
+          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-chart-bar mr-2 text-blue-500"></i>
+                Gráfico Dinâmico
+              </h3>
+              <select [(ngModel)]="selectedChartField" 
+                      (change)="onChartFieldChange()"
+                      class="text-sm border border-gray-300 rounded-md px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option *ngFor="let field of availableChartFields" [value]="field">
+                  {{ getFieldLabel(field) }}
+                </option>
+              </select>
+            </div>
+            
+            <div *ngIf="chartData.dynamicCharts.length > 0; else noDynamicData" class="space-y-4">
+              <div *ngFor="let chart of chartData.dynamicCharts">
+                <div class="mb-3">
+                  <span class="text-sm text-gray-600">{{ chart.fieldLabel }} ({{ chart.total }} registros)</span>
+                </div>
+                <div class="space-y-3">
+                  <div *ngFor="let item of chart.items" class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center">
+                        <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="item.color"></div>
+                        <span class="text-sm font-medium text-gray-700">{{ item.name }}</span>
+                      </div>
+                      <span class="text-sm font-bold text-gray-900">{{ item.value }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                      <div class="h-2 rounded-full" 
+                           [style.background-color]="item.color"
+                           [style.width.%]="getDynamicChartPercentage(item.value)">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <ng-template #noDynamicData>
+              <div class="text-center py-4">
+                <p class="text-gray-500 text-sm">Nenhum dado disponível para o campo selecionado</p>
+              </div>
+            </ng-template>
           </div>
         </div>
       </div>
@@ -497,6 +538,57 @@
                   <i class="fas fa-clock text-2xl"></i>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Gráfico da Visão Geral -->
+          <div class="mt-8">
+            <!-- Dynamic Chart -->
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 max-w-2xl mx-auto">
+              <div class="flex flex-col mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                  <i class="fas fa-chart-bar mr-2 text-blue-500"></i>
+                  Gráfico de Análise
+                </h3>
+                <select [(ngModel)]="selectedChartField" 
+                        (change)="onChartFieldChange()"
+                        class="text-sm border border-gray-300 rounded-md px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option *ngFor="let field of availableChartFields" [value]="field">
+                    {{ getFieldLabel(field) }}
+                  </option>
+                </select>
+              </div>
+              
+              <div *ngIf="chartData.dynamicCharts.length > 0; else noDynamicData2" class="space-y-4">
+                <div *ngFor="let chart of chartData.dynamicCharts">
+                  <div class="mb-3">
+                    <span class="text-sm text-gray-600">{{ chart.fieldLabel }} ({{ chart.total }} registros)</span>
+                  </div>
+                  <div class="space-y-3">
+                    <div *ngFor="let item of chart.items" class="space-y-2">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                          <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="item.color"></div>
+                          <span class="text-sm font-medium text-gray-700">{{ item.name }}</span>
+                        </div>
+                        <span class="text-sm font-bold text-gray-900">{{ item.value }}</span>
+                      </div>
+                      <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="h-2 rounded-full" 
+                             [style.background-color]="item.color"
+                             [style.width.%]="getDynamicChartPercentage(item.value)">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <ng-template #noDynamicData2>
+                <div class="text-center py-4">
+                  <p class="text-gray-500 text-sm">Nenhum dado disponível para o campo selecionado</p>
+                </div>
+              </ng-template>
             </div>
           </div>
         </div>
