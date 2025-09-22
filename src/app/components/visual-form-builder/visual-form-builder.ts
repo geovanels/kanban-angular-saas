@@ -300,13 +300,13 @@ export class VisualFormBuilderComponent implements OnInit {
 
     console.log('➕ Novo campo criado:', newField);
 
-    // Processar opções para select, radio e temperatura
-    if ((newField.type === 'select' || newField.type === 'radio') && formValue.options) {
+    // Processar opções para select, radio e checkbox
+    if ((newField.type === 'select' || newField.type === 'radio' || newField.type === 'checkbox') && formValue.options) {
       newField.options = formValue.options
         .split('\n')
         .map((opt: string) => opt.trim())
         .filter((opt: string) => opt);
-      console.log('➕ Opções processadas para select/radio:', newField.options);
+      console.log('➕ Opções processadas para select/radio/checkbox:', newField.options);
     }
 
     // Auto-configurar opções para campo temperatura

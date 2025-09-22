@@ -162,6 +162,19 @@
                   </label>
                 </div>
 
+                <!-- Campo Checkbox -->
+                <div *ngIf="field.type === 'checkbox'" class="flex flex-col gap-2">
+                  <label *ngFor="let opt of (field.options || []); let i = index" class="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      [attr.name]="field.name + '_' + i"
+                      [value]="opt"
+                      [formControlName]="field.name + '_' + i"
+                      class="text-blue-600 focus:ring-blue-500" />
+                    <span>{{ opt }}</span>
+                  </label>
+                </div>
+
                 <!-- Campo Responsável (lista de usuários da empresa) -->
                 <select
                   *ngIf="field.type === 'responsavel'"
