@@ -249,14 +249,103 @@ export class PublicFormComponent implements OnInit {
         if (respField) {
           const fieldName = respField.name;
           const selectedId = this.form.get(fieldName)?.value;
-          if (selectedId) {
-            const match = this.companyUsers.find(u => (u.uid && u.uid === selectedId) || (u.email && u.email === selectedId));
-            updates.responsibleUserId = match?.uid || selectedId;
-            updates.responsibleUserName = match?.displayName || '';
-            updates.responsibleUserEmail = match?.email || '';
+          if (selectedId && selectedId !== this.lead.responsibleUserId) {
+            const selectedUser = this.companyUsers.find(u => (u.uid && u.uid === selectedId) || (u.email && u.email === selectedId));
+            updates.responsibleUserId = selectedUser?.uid || selectedId;
+            updates.responsibleUserName = selectedUser?.displayName || '';
+            updates.responsibleUserEmail = selectedUser?.email || '';
+
+            // Adicionar ao histórico para mudança de responsável
+            console.log('Responsável alterado via formulário público:', selectedUser?.displayName);
+            
+            // Garantir que o contexto da empresa está inicializado
+            const company = this.subdomain.getCurrentCompany();
+            if (company) {
+              await this.fs.setCurrentCompany(company.id);
+            }
+            
+            await this.fs.addLeadHistory(
+              this.userId,
+              this.boardId,
+              this.leadId,
+              {
+                type: 'update',
+                text: `Responsável alterado para <strong>${selectedUser?.displayName || 'Ninguém'}</strong> via formulário público`,
+                user: 'Formulário Público'
+              }
+            );
           }
         }
       } catch {}
+
+      // Registrar diffs de campos (histórico) - igual ao modal de detalhes
+      try {
+        const beforeFields = (this.lead.fields || {}) as any;
+        const changedKeys = Object.keys(mapped).filter(k => `${beforeFields[k] ?? ''}` !== `${mapped[k] ?? ''}`);
+        
+        console.log('Debug formulário público:', {
+          beforeFields,
+          mapped,
+          changedKeys,
+          hasChanges: changedKeys.length > 0
+        });
+        
+        if (changedKeys.length) {
+          const changesList = changedKeys.map(k => {
+            const field = this.currentFields.find((f: any) => (f.apiFieldName || f.name) === k);
+            const label = field?.label || this.humanizeKey(k);
+            let beforeVal = beforeFields[k] ?? '';
+            let afterVal = mapped[k] ?? '';
+            
+            // Se o campo representa responsável, mostrar nome do usuário
+            if (field && (field.type === 'responsavel' || field.originalType === 'responsavel')) {
+              const beforeUser = this.companyUsers.find(u => u.uid === beforeVal || u.email === beforeVal);
+              const afterUser = this.companyUsers.find(u => u.uid === afterVal || u.email === afterVal);
+              beforeVal = beforeUser?.displayName || beforeVal;
+              afterVal = afterUser?.displayName || afterVal;
+            }
+            
+            // Para arrays (checkbox), formatar melhor
+            if (Array.isArray(afterVal)) {
+              afterVal = afterVal.join(', ');
+            }
+            if (Array.isArray(beforeVal)) {
+              beforeVal = beforeVal.join(', ');
+            }
+            
+            return `<li><strong>${label}:</strong> "${beforeVal}" → "${afterVal}"</li>`;
+          }).join('');
+
+          // Adicionar ao histórico
+          console.log('Adicionando ao histórico:', {
+            userId: this.userId,
+            boardId: this.boardId,
+            leadId: this.leadId,
+            changesList
+          });
+          
+          // Garantir que o contexto da empresa está inicializado
+          const company = this.subdomain.getCurrentCompany();
+          if (company) {
+            await this.fs.setCurrentCompany(company.id);
+          }
+          
+          await this.fs.addLeadHistory(
+            this.userId,
+            this.boardId,
+            this.leadId,
+            {
+              type: 'update',
+              text: `Formulário público preenchido:<ul class="list-disc ml-4">${changesList}</ul>`,
+              user: 'Formulário Público'
+            }
+          );
+          
+          console.log('Histórico adicionado com sucesso');
+        }
+      } catch (error) {
+        console.warn('Erro ao registrar histórico:', error);
+      }
 
       await this.fs.updateLead(this.userId, this.boardId, this.leadId, updates);
       try { this.toast.success('Formulário salvo.'); } catch {}
@@ -266,6 +355,13 @@ export class PublicFormComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  private humanizeKey(key: string): string {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
   }
 }
 
