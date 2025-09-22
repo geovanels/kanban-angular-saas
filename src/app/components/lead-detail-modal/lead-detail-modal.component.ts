@@ -57,7 +57,11 @@ export class LeadDetailModalComponent {
   isSaving = false;
   errorMessage = '';
   currentLead: Lead | null = null;
+  cachedInitialFields: any[] = [];
   formReady = false;
+  isLoadingFields = false;
+  isLoadingHistory = false;
+  fieldsReady = false;
   leadHistory: LeadHistory[] = [];
   phaseHistory: PhaseHistory = {};
   // Fluxo de transições (permitidas)
@@ -83,9 +87,180 @@ export class LeadDetailModalComponent {
   async show(lead: Lead) {
     this.currentLead = lead;
     this.isVisible = true;
+    this.cachedInitialFields = []; // Limpar cache
+    this.fieldsReady = false;
+    this.isLoadingFields = true;
+    this.isLoadingHistory = true;
     this.resetForm();
-    await this.loadLeadData();
-    // Repopular o formulário com os dados salvos do lead
+    
+    // Mostrar modal imediatamente e carregar dados em background
+    setTimeout(() => {
+      this.loadLeadDataAsync();
+    }, 10);
+  }
+
+  private async loadLeadDataAsync() {
+    try {
+      // Carregar dados básicos primeiro
+      await this.loadBasicLeadData();
+      
+      // Gerar link público (não depende de outros dados)
+      this.generatePublicLink();
+      
+      // Carregar campos do formulário de forma assíncrona
+      setTimeout(() => {
+        this.loadFormFieldsAsync();
+      }, 50);
+      
+      // Carregar histórico de forma assíncrona
+      setTimeout(() => {
+        this.loadHistoryAsync();
+      }, 100);
+      
+    } catch (error) {
+      this.errorMessage = 'Erro ao carregar dados do lead';
+      this.isLoadingFields = false;
+      this.isLoadingHistory = false;
+    }
+  }
+
+  private async loadBasicLeadData() {
+    if (!this.currentLead) return;
+
+    try {
+      // Buscar versão mais recente do lead
+      const latest = await this.firestoreService.getLead(this.ownerId, this.boardId, this.currentLead.id!);
+      if (latest) {
+        this.currentLead = latest;
+      }
+    } catch {}
+  }
+
+  private async loadFormFieldsAsync() {
+    try {
+      this.isLoadingFields = true;
+      
+      // Carregar formulário da fase atual (já configura os campos)
+      await this.loadCurrentPhaseForm();
+      
+      // Finalizar carregamento
+      this.isLoadingFields = false;
+      this.fieldsReady = true;
+      
+    } catch (error) {
+      this.isLoadingFields = false;
+      this.fieldsReady = true;
+    }
+  }
+
+  private async loadHistoryAsync() {
+    try {
+      this.isLoadingHistory = true;
+      
+      // Carregar histórico do lead
+      const history = await this.firestoreService.getLeadHistory(
+        this.ownerId,
+        this.boardId,
+        this.currentLead!.id!
+      );
+      this.leadHistory = history as LeadHistory[];
+
+      // Subscribir histórico em tempo real
+      if (this.unsubscribeHistory) { 
+        this.unsubscribeHistory(); 
+        this.unsubscribeHistory = null; 
+      }
+      this.unsubscribeHistory = this.firestoreService.subscribeToLeadHistory(
+        this.ownerId,
+        this.boardId,
+        this.currentLead!.id!,
+        (items) => { this.leadHistory = items as any; }
+      ) as any;
+      
+      this.isLoadingHistory = false;
+      
+    } catch (error) {
+      this.isLoadingHistory = false;
+    }
+  }
+
+  private async loadCurrentPhaseForm() {
+    try {
+      // Extrair histórico de fases (já disponível)
+      this.phaseHistory = this.currentLead?.phaseHistory || {};
+
+      // Carregar todas as configurações em paralelo para acelerar
+      const [initialFormConfig, phaseFormConfig, flowConfig] = await Promise.allSettled([
+        this.firestoreService.getInitialFormConfig(this.boardId),
+        this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, this.currentLead!.columnId),
+        this.firestoreService.getFlowConfig(this.boardId)
+      ]);
+
+      // Processar resultado do formulário inicial
+      this.initialFormConfig = initialFormConfig.status === 'fulfilled' ? initialFormConfig.value : null;
+
+      // Processar resultado do formulário da fase
+      if (phaseFormConfig.status === 'fulfilled') {
+        this.currentFormFields = (phaseFormConfig.value as any)?.fields || [];
+      } else {
+        this.currentFormFields = (this.initialFormConfig?.fields || []).map((f: any) => ({ ...f }));
+      }
+
+      // Processar resultado do fluxo
+      this.flowConfig = flowConfig.status === 'fulfilled' && flowConfig.value ? flowConfig.value : { allowed: {} };
+
+      // Configurar campos do formulário de forma mais eficiente
+      this.setupFormFieldsOptimized();
+      
+    } catch (error) {
+      console.warn('Erro ao carregar formulário da fase:', error);
+      this.currentFormFields = [];
+    }
+  }
+
+  private setupFormFieldsOptimized() {
+    try {
+      const formConfig: any = {};
+      
+      // Processar campos rapidamente sem travamentos
+      this.currentFormFields.forEach((field: any) => {
+        const key = field.apiFieldName || field.name;
+        const currentValue = this.getFieldValue(key) ?? this.getFieldValue(field.name);
+        
+        if (field.type === 'checkbox') {
+          // Otimização específica para checkbox - processar de forma mais simples
+          const options = field.options || [];
+          options.forEach((opt: string, i: number) => {
+            const checkboxName = field.name + '_' + i;
+            let isChecked = false;
+            
+            // Verificação simples e rápida
+            if (Array.isArray(currentValue)) {
+              isChecked = currentValue.includes(opt);
+            } else if (typeof currentValue === 'string' && currentValue) {
+              isChecked = currentValue.includes(opt);
+            }
+            
+            formConfig[checkboxName] = [isChecked];
+          });
+        } else {
+          // Outros tipos de campo - processamento normal
+          formConfig[field.name] = [currentValue ?? ''];
+        }
+      });
+
+      // Criar formulário de uma vez
+      this.leadForm = this.fb.group(formConfig);
+      this.formReady = true;
+      
+    } catch (error) {
+      console.warn('Erro ao configurar formulário:', error);
+      this.leadForm = this.fb.group({});
+      this.formReady = true;
+    }
+  }
+
+  private populateFormFields() {
     try {
       const values: any = {};
       (this.currentFormFields || []).forEach((f: any) => {
@@ -95,16 +270,6 @@ export class LeadDetailModalComponent {
       if (Object.keys(values).length) {
         this.leadForm.patchValue(values, { emitEvent: false });
       }
-    } catch {}
-    // Subscribir histórico em tempo real
-    try {
-      if (this.unsubscribeHistory) { this.unsubscribeHistory(); this.unsubscribeHistory = null; }
-      this.unsubscribeHistory = this.firestoreService.subscribeToLeadHistory(
-        this.ownerId,
-        this.boardId,
-        this.currentLead.id!,
-        (items) => { this.leadHistory = items as any; }
-      ) as any;
     } catch {}
   }
 
@@ -129,6 +294,9 @@ export class LeadDetailModalComponent {
 
   private async loadLeadData() {
     if (!this.currentLead) return;
+
+    // Limpar cache dos campos para recalcular
+    this.cachedInitialFields = [];
 
     try {
       // Buscar versão mais recente do lead para garantir phaseHistory atualizado
@@ -262,41 +430,45 @@ export class LeadDetailModalComponent {
   }
 
   getInitialFields(): any[] {
-    // Se houver configuração de formulário inicial, usar esses campos na ordem definida
-    if (this.initialFormConfig?.fields?.length) {
-      const sorted = this.initialFormConfig.fields
-        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
-
-      return sorted.map((f: any) => {
-        const fieldName = f.apiFieldName || f.name;
-        const rawValue = this.getFieldValue(fieldName) ?? this.getFieldValue(f.name);
-        
-        // Debug expandido - todos os campos
-        console.log('🔍 Debug ALL fields:', {
-          fieldName: fieldName,
-          fieldLabel: f.label,
-          fieldType: f.type,
-          rawValue: rawValue,
-          rawValueType: typeof rawValue,
-          isArray: Array.isArray(rawValue),
-          fieldConfig: f,
-          allLeadFields: this.currentLead?.fields
-        });
-        
-        const formattedValue = rawValue !== null && rawValue !== undefined 
-          ? this.formatFieldValue(f, rawValue) 
-          : 'Não informado';
-        
-        return {
-          name: fieldName,
-          label: f.label || f.name || f.apiFieldName,
-          value: formattedValue
-        };
-      });
+    // Usar cache se já foi calculado
+    if (this.cachedInitialFields.length > 0) {
+      return this.cachedInitialFields;
     }
+    
+    this.calculateInitialFields();
+    return this.cachedInitialFields;
+  }
 
-    // Fallback dinâmico com deduplicação por grupos de sinônimos
-    return this.buildDedupedDisplayFields();
+  private calculateInitialFields(): void {
+    try {
+      // Se houver configuração de formulário inicial, usar esses campos na ordem definida
+      if (this.initialFormConfig?.fields?.length) {
+        const sorted = this.initialFormConfig.fields
+          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+        // Processar campos de forma simples e direta
+        this.cachedInitialFields = sorted.map((f: any) => {
+          const fieldName = f.apiFieldName || f.name;
+          const rawValue = this.getFieldValue(fieldName) ?? this.getFieldValue(f.name);
+          
+          const formattedValue = rawValue !== null && rawValue !== undefined 
+            ? this.formatFieldValue(f, rawValue) 
+            : 'Não informado';
+          
+          return {
+            name: fieldName,
+            label: f.label || f.name || f.apiFieldName,
+            value: formattedValue
+          };
+        });
+      } else {
+        // Fallback dinâmico com deduplicação por grupos de sinônimos
+        this.cachedInitialFields = this.buildDedupedDisplayFields();
+      }
+    } catch (error) {
+      console.warn('Erro ao calcular campos iniciais:', error);
+      this.cachedInitialFields = [];
+    }
   }
 
   currentFormFields: any[] = [];
@@ -309,24 +481,11 @@ export class LeadDetailModalComponent {
 
 
   getPhaseHistoryItems(): any[] {
-    console.log('📊 Gerando histórico de fases:', {
-      leadId: this.currentLead?.id,
-      phaseHistory: this.phaseHistory,
-      phaseHistoryKeys: Object.keys(this.phaseHistory || {}),
-      phaseHistoryLength: Object.keys(this.phaseHistory || {}).length,
-      availableColumns: this.columns.map(c => ({ id: c.id, name: c.name }))
-    });
 
     const items: any[] = [];
     
     Object.values(this.phaseHistory).forEach((phase: any) => {
       const column = this.columns.find(col => col.id === phase.phaseId);
-      console.log('📊 Processando fase:', {
-        phaseId: phase.phaseId,
-        columnFound: !!column,
-        columnName: column?.name,
-        phase: phase
-      });
 
       if (column) {
         const enteredAt = phase.enteredAt?.toDate ? phase.enteredAt.toDate() : new Date(phase.enteredAt);
@@ -363,16 +522,13 @@ export class LeadDetailModalComponent {
           isCurrentPhase: !exitedAt && this.currentLead?.columnId === phase.phaseId
         };
 
-        console.log('📊 Item de histórico criado:', item);
         items.push(item);
       }
     });
 
-    console.log('📊 Total de itens processados:', items.length);
 
     // Fallback: se não houver históricos registrados, exibir fase atual como entrada
     if (items.length === 0 && this.currentLead) {
-      console.log('📊 Nenhum histórico encontrado, criando fallback para fase atual');
       const currentColumn = this.getCurrentColumn();
       if (currentColumn) {
         const enteredAt = (this.currentLead.movedToCurrentColumnAt?.toDate && this.currentLead.movedToCurrentColumnAt.toDate())
@@ -390,13 +546,11 @@ export class LeadDetailModalComponent {
           isCurrentPhase: true
         };
 
-        console.log('📊 Item fallback criado:', fallbackItem);
         items.push(fallbackItem);
       }
     }
 
     const sortedItems = items.sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
-    console.log('📊 Itens finais ordenados:', sortedItems);
     
     return sortedItems;
   }
