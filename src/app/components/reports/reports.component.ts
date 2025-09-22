@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, Input, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -41,6 +41,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   private firestoreService = inject(FirestoreService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private cdr = inject(ChangeDetectorRef);
 
   @Input() boardId: string = '';
   @Input() ownerId: string = '';
@@ -81,8 +82,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
   chartData = {
     phaseDistribution: [] as any[],
     registrosOverTime: [] as any[],
-    conversionFunnel: [] as any[]
+    conversionFunnel: [] as any[],
+    dynamicCharts: [] as any[]
   };
+
+  // Dynamic chart configuration
+  availableChartFields: string[] = [];
+  selectedChartField: string = '';
+  chartType: 'bar' | 'pie' = 'bar';
 
   // Display options
   currentView: 'overview' | 'sla' | 'phases' | 'registros' = 'overview';
@@ -122,9 +129,13 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     // If boardId is set (from input or URL), load data directly
     if (this.boardId && this.ownerId) {
+      console.log('📊 ngOnInit - Carregando dados para boardId:', this.boardId);
       await this.loadData();
       this.initializeColumns();
       this.generateReport();
+      console.log('📊 ngOnInit - Dados carregados e relatório gerado');
+    } else {
+      console.log('📊 ngOnInit - Não há boardId ou ownerId definido');
     }
   }
 
@@ -194,6 +205,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
   generateReport() {
     if (this.isGeneratingReport) return;
     
+    console.log('📊 === INICIO generateReport ===');
+    console.log('📊 Dados disponíveis:', {
+      records: this.records.length,
+      columns: this.columns.length,
+      filterQuery: this.filterQuery,
+      dynamicFilters: this.dynamicFilters
+    });
+    
     this.isGeneratingReport = true;
     try {
       // Apply current filters
@@ -202,6 +221,11 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.calculateSLAIndicators();
       this.calculatePhaseMetrics();
       this.generateChartData();
+      
+      // Força a detecção de mudanças para garantir que os gráficos sejam renderizados
+      this.cdr.detectChanges();
+      
+      console.log('📊 === FIM generateReport ===');
     } finally {
       this.isGeneratingReport = false;
     }
@@ -291,10 +315,22 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private calculatePhaseMetrics() {
+    console.log('📊 === INICIO calculatePhaseMetrics ===');
+    console.log('📊 Colunas disponíveis:', this.columns);
+    console.log('📊 Registros filtrados:', this.filteredRecords.length);
+
     this.phaseMetrics = this.columns.map(column => {
       const registrosInPhase = this.filteredRecords.filter(record => record.columnId === column.id);
       const avgTime = this.calculateAverageTimeInPhase(registrosInPhase);
       const conversionRate = this.calculatePhaseConversionRate(column);
+
+      console.log(`📊 Fase ${column.name}:`, {
+        columnId: column.id,
+        registrosInPhase: registrosInPhase.length,
+        avgTime,
+        conversionRate,
+        color: column.color
+      });
 
       return {
         phaseId: column.id!,
@@ -305,6 +341,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
         conversionRate: conversionRate
       };
     });
+
+    console.log('📊 phaseMetrics final:', this.phaseMetrics);
   }
 
   private calculateAverageTimeInPhase(registros: Lead[]): number {
@@ -343,6 +381,11 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private generateChartData() {
+    console.log('📊 === INICIO generateChartData ===');
+    console.log('📊 phaseMetrics disponíveis:', this.phaseMetrics);
+    console.log('📊 columns disponíveis:', this.columns);
+    console.log('📊 filteredRecords disponíveis:', this.filteredRecords.length);
+
     // Phase distribution
     this.chartData.phaseDistribution = this.phaseMetrics.map(metric => ({
       name: metric.phaseName,
@@ -358,6 +401,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
       recordsCount: this.filteredRecords.length
     });
 
+    console.log('📊 phaseDistribution final:', this.chartData.phaseDistribution);
+    console.log('📊 Primeiro item do phaseDistribution:', this.chartData.phaseDistribution[0]);
+    console.log('📊 Segundo item do phaseDistribution:', this.chartData.phaseDistribution[1]);
+
     // Leads over time (simplified)
     this.chartData.registrosOverTime = this.generateLeadsOverTimeData();
 
@@ -367,6 +414,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
       registros: metric.recordsCount,
       order: index
     }));
+
+    // Generate dynamic charts
+    this.generateDynamicCharts();
   }
 
   private generateLeadsOverTimeData(): any[] {
@@ -785,6 +835,15 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.calculateSLAIndicators();
     this.calculatePhaseMetrics();
     this.generateChartData();
+    
+    console.log('📊 Após applyFilters - chartData.phaseDistribution:', this.chartData.phaseDistribution);
+    
+    // Regenerar gráfico dinâmico com os registros filtrados
+    if (this.selectedChartField) {
+      console.log('📊 Regenerando gráfico dinâmico após aplicar filtros...');
+      const chartData = this.generateChartForField(this.selectedChartField);
+      this.chartData.dynamicCharts = [chartData];
+    }
   }
 
   exportToExcel() {
@@ -848,5 +907,146 @@ export class ReportsComponent implements OnInit, OnDestroy {
     document.body.removeChild(link);
     
     console.log(`Exported ${this.filteredRecords.length} records to Excel`);
+  }
+
+  // Dynamic Charts Methods
+  private generateAvailableChartFields() {
+    // Usar apenas os campos configurados com showInFilters: true
+    // Baseado nos logs: segmento, origem, temperatura
+    const fields = new Set<string>();
+    
+    // Add default fields
+    fields.add('fase');
+    fields.add('responsavel');
+    
+    // Add only the 3 specific fields that are configured
+    // These are the only ones with showInFilters: true according to the logs
+    fields.add('segmento');
+    fields.add('origem'); 
+    fields.add('temperatura');
+    
+    console.log('📊 Campos fixos para gráfico dinâmico:', Array.from(fields));
+    
+    this.availableChartFields = Array.from(fields).sort();
+    
+    // Set default selection
+    if (!this.selectedChartField && this.availableChartFields.length > 0) {
+      this.selectedChartField = this.availableChartFields.includes('segmento') ? 'segmento' : this.availableChartFields[0];
+    }
+  }
+
+  private generateDynamicCharts() {
+    this.generateAvailableChartFields();
+    
+    if (!this.selectedChartField) return;
+    
+    const chartData = this.generateChartForField(this.selectedChartField);
+    this.chartData.dynamicCharts = [chartData];
+  }
+
+  private generateChartForField(fieldName: string): any {
+    const data = new Map<string, number>();
+    
+    // IMPORTANTE: Usar this.filteredRecords que já está filtrado pela pesquisa geral
+    // e pelos filtros dinâmicos aplicados
+    console.log(`📊 Gerando gráfico para campo "${fieldName}" com ${this.filteredRecords.length} registros filtrados`);
+    
+    this.filteredRecords.forEach(record => {
+      let value = '';
+      
+      switch (fieldName) {
+        case 'fase':
+          value = this.getColumnName(record.columnId) || 'Sem Fase';
+          break;
+        case 'responsavel':
+          value = record.responsibleUserName || record.responsibleUserId || 'Não Atribuído';
+          break;
+        case 'origem':
+          value = record.fields?.['origem'] || record.fields?.['source'] || 'Não Informado';
+          break;
+        case 'segmento':
+          value = record.fields?.['segmento'] || record.fields?.['segment'] || 'Não Informado';
+          break;
+        case 'temperatura':
+          value = record.fields?.['temperatura'] || 'Não Informado';
+          break;
+        default:
+          value = record.fields?.[fieldName] || 'Não Informado';
+      }
+      
+      value = String(value).trim() || 'Não Informado';
+      data.set(value, (data.get(value) || 0) + 1);
+    });
+    
+    // Convert to chart format
+    const chartItems = Array.from(data.entries())
+      .map(([name, count]) => ({
+        name,
+        value: count,
+        color: this.generateColorForItem(name)
+      }))
+      .sort((a, b) => b.value - a.value) // Sort by count descending
+      .slice(0, 10); // Limit to top 10
+    
+    console.log(`📊 Gráfico para "${fieldName}" gerado com ${chartItems.length} itens:`, chartItems);
+    
+    return {
+      fieldName,
+      fieldLabel: this.getFieldLabel(fieldName),
+      items: chartItems,
+      total: this.filteredRecords.length
+    };
+  }
+
+  onChartFieldChange() {
+    this.generateDynamicCharts();
+  }
+
+  getFieldLabel(fieldName: string): string {
+    const labels: { [key: string]: string } = {
+      'fase': 'Fases',
+      'responsavel': 'Responsáveis',
+      'origem': 'Origem',
+      'segmento': 'Segmento',
+      'source': 'Origem',
+      'segment': 'Segmento',
+      'contactName': 'Nome do Contato',
+      'companyName': 'Nome da Empresa',
+      'produto': 'Produto',
+      'interesse': 'Interesse'
+    };
+    
+    return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
+  }
+
+  private generateColorForItem(itemName: string): string {
+    // Generate consistent colors based on item name
+    const colors = [
+      '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+      '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6B7280'
+    ];
+    
+    let hash = 0;
+    for (let i = 0; i < itemName.length; i++) {
+      hash = itemName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  getDynamicChartMaxValue(): number {
+    if (!this.chartData.dynamicCharts.length || !this.chartData.dynamicCharts[0].items.length) return 0;
+    const maxValue = Math.max(...this.chartData.dynamicCharts[0].items.map((item: any) => item.value));
+    return maxValue;
+  }
+
+  getDynamicChartPercentage(value: number): number {
+    const maxValue = this.getDynamicChartMaxValue();
+    return maxValue > 0 ? (value / maxValue) * 100 : 0;
+  }
+
+  // TrackBy function para otimizar renderização
+  trackByIndex(index: number, item: any): number {
+    return index;
   }
 }

@@ -261,7 +261,7 @@ export class PublicFormComponent implements OnInit {
             // Garantir que o contexto da empresa está inicializado
             const company = this.subdomain.getCurrentCompany();
             if (company) {
-              await this.fs.setCurrentCompany(company.id);
+              this.fs.setCompanyContext(company);
             }
             
             await this.fs.addLeadHistory(
@@ -327,7 +327,7 @@ export class PublicFormComponent implements OnInit {
           // Garantir que o contexto da empresa está inicializado
           const company = this.subdomain.getCurrentCompany();
           if (company) {
-            await this.fs.setCurrentCompany(company.id);
+            this.fs.setCompanyContext(company);
           }
           
           await this.fs.addLeadHistory(
