@@ -77,11 +77,13 @@ service cloud.firestore {
         
         // Board leads subcollection (direto sob board)
         match /leads/{leadId} {
-          allow read, write: if isCompanyUser(companyId);
+          // Allow public access for forms (including anonymous users)
+          allow read, write: if true; // Public access for form functionality
 
           // Lead history (comentários, movimentos, atualizações)
           match /history/{historyId} {
-            allow read, write: if isCompanyUser(companyId);
+            // Allow public access for form updates
+            allow read, write: if true; // Public access for form functionality
           }
         }
 
@@ -117,12 +119,16 @@ service cloud.firestore {
 
         // Board phase form configurations
         match /phaseFormConfigs/{configId} {
-          allow read, write: if isCompanyUser(companyId);
+          // Allow public access for forms
+          allow read: if true; // Public access for form configuration
+          allow write: if isCompanyUser(companyId);
         }
 
         // Board initial form configuration
         match /initialForm/{docId} {
-          allow read, write: if isCompanyUser(companyId);
+          // Allow public access for forms
+          allow read: if true; // Public access for form configuration
+          allow write: if isCompanyUser(companyId);
         }
 
         // Board flow configuration
