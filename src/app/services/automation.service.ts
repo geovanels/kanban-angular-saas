@@ -63,6 +63,37 @@ export class AutomationService {
         return;
       }
 
+      // Verificar se este lead foi criado recentemente (menos de 10 segundos)
+      // para evitar processar como novo lead se já foi processado como entrada de fase
+      const createdAt = lead.createdAt;
+      let createdTime: number;
+      
+      if (createdAt?.seconds) {
+        createdTime = createdAt.seconds * 1000;
+      } else if (createdAt?.toDate) {
+        createdTime = createdAt.toDate().getTime();
+      } else if (createdAt) {
+        createdTime = new Date(createdAt as any).getTime();
+      } else {
+        createdTime = Date.now();
+      }
+      
+      const timeSinceCreation = Date.now() - createdTime;
+      const isVeryNewLead = timeSinceCreation < 10000; // 10 segundos
+      
+      // Lock global para evitar processamento simultâneo de entrada de fase e novo lead
+      const globalLockKey = `lead_processing_${ownerId}_${boardId}_${lead.id}`;
+      if (this.phaseChangeLocks.get(globalLockKey)) {
+        console.log('🔒 Lead está sendo processado para mudança de fase, pulando novo lead:', {
+          leadId: lead.id,
+          boardId: boardId,
+          timeSinceCreation: timeSinceCreation,
+          isVeryNewLead: isVeryNewLead,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
       // Definir lock temporário
       this.newLeadLocks.set(newLeadLockKey, true);
 
@@ -80,6 +111,13 @@ export class AutomationService {
             return type === 'new-lead-created' && lead.columnId === triggerPhase;
           }
           return type === 'new-lead-created';
+        });
+
+        console.log('✅ Processando automações de novo lead:', {
+          leadId: lead.id,
+          automationsCount: newLeadAutomations.length,
+          isVeryNewLead: isVeryNewLead,
+          timestamp: new Date().toISOString()
         });
 
         // Executar cada automação
@@ -118,6 +156,40 @@ export class AutomationService {
         return;
       }
 
+      // Verificar se este é um lead muito novo (criado há menos de 10 segundos)
+      // para evitar processar entrada de fase quando deveria ser só novo lead
+      const createdAt = lead.createdAt;
+      let createdTime: number;
+      
+      if (createdAt?.seconds) {
+        createdTime = createdAt.seconds * 1000;
+      } else if (createdAt?.toDate) {
+        createdTime = createdAt.toDate().getTime();
+      } else if (createdAt) {
+        createdTime = new Date(createdAt as any).getTime();
+      } else {
+        createdTime = Date.now();
+      }
+      
+      const timeSinceCreation = Date.now() - createdTime;
+      const isVeryNewLead = timeSinceCreation < 10000; // 10 segundos
+      
+      // Se é um lead muito novo e não há oldColumnId (primeira fase), provavelmente é criação, não mudança
+      if (isVeryNewLead && (!oldColumnId || oldColumnId === newColumnId)) {
+        console.log('🔒 Lead muito novo sendo criado na fase inicial, pulando mudança de fase:', {
+          leadId: lead.id,
+          newColumnId: newColumnId,
+          oldColumnId: oldColumnId,
+          timeSinceCreation: timeSinceCreation,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Lock global para evitar processamento simultâneo de entrada de fase e novo lead
+      const globalLockKey = `lead_processing_${ownerId}_${boardId}_${lead.id}`;
+      this.phaseChangeLocks.set(globalLockKey, true);
+
       // Definir lock temporário
       this.phaseChangeLocks.set(phaseChangeLockKey, true);
 
@@ -132,14 +204,24 @@ export class AutomationService {
           return isActive && isCardEntersPhase && matchesPhase;
         });
 
+        console.log('✅ Processando automações de mudança de fase:', {
+          leadId: lead.id,
+          newColumnId: newColumnId,
+          oldColumnId: oldColumnId,
+          automationsCount: phaseChangeAutomations.length,
+          isVeryNewLead: isVeryNewLead,
+          timestamp: new Date().toISOString()
+        });
+
         // Executar cada automação
         for (const automation of phaseChangeAutomations) {
           await this.executeAutomation(automation, lead, boardId, ownerId);
         }
       } finally {
-        // Liberar lock após um breve delay
+        // Liberar locks após um breve delay
         setTimeout(() => {
           this.phaseChangeLocks.delete(phaseChangeLockKey);
+          this.phaseChangeLocks.delete(globalLockKey);
           console.log('🔓 Lock de mudança de fase liberado:', phaseChangeLockKey);
         }, 3000); // 3 segundos
       }
@@ -250,9 +332,27 @@ export class AutomationService {
       // Criar registro na caixa de saída (estado inicial pendente)
       let outboxId: string | null = null;
       try {
-        // Verificação tripla de deduplicação
+        // Verificação quádrupla de deduplicação mais robusta
         
-        // 1. Verificar por automação + lead + assunto (2 horas)
+        // 1. Verificar por automação + lead + template (1 hora) - mais específico
+        const exactMatch = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
+          automationId: automation?.id || undefined,
+          leadId: lead.id,
+          templateId: action.templateId,
+          withinMs: 60 * 60 * 1000
+        });
+        if (exactMatch) {
+          console.log('📧 Email duplicado detectado (automação + lead + template, 1h), pulando envio:', {
+            leadId: lead.id,
+            automationId: automation?.id,
+            templateId: action.templateId,
+            existingEmailId: exactMatch,
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // 2. Verificar por automação + lead + assunto (2 horas)
         const existing = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
           automationId: automation?.id || undefined,
           leadId: lead.id,
@@ -260,7 +360,7 @@ export class AutomationService {
           withinMs: 2 * 60 * 60 * 1000
         });
         if (existing) {
-          console.log('📧 Email duplicado detectado (automação + assunto, 2h), pulando envio:', {
+          console.log('📧 Email duplicado detectado (automação + lead + assunto, 2h), pulando envio:', {
             leadId: lead.id,
             automationId: automation?.id,
             subject: processedSubject,
@@ -270,7 +370,7 @@ export class AutomationService {
           return;
         }
 
-        // 2. Verificar por template + lead (4 horas)
+        // 3. Verificar por template + lead (4 horas)
         const recentTemplate = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
           templateId: action.templateId,
           leadId: lead.id,
@@ -287,7 +387,7 @@ export class AutomationService {
           return;
         }
 
-        // 3. Verificar por lead + assunto + destinatário (1 hora) - mais restritivo
+        // 4. Verificar por lead + assunto + destinatário (1 hora) - mais restritivo
         const recentRecipient = await this.firestoreService.findRecentOutboxEmail(ownerId, boardId, {
           leadId: lead.id,
           subject: processedSubject,
