@@ -1,4 +1,4 @@
-import { Component, inject, Input, Output, EventEmitter } from '@angular/core';
+import { Component, inject, Input, Output, EventEmitter, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
@@ -34,7 +34,8 @@ export interface PhaseHistory {
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule],
   templateUrl: './lead-detail-modal.component.html',
-  styleUrls: ['./lead-detail-modal.component.scss']
+  styleUrls: ['./lead-detail-modal.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LeadDetailModalComponent {
   private authService = inject(AuthService);
@@ -42,6 +43,7 @@ export class LeadDetailModalComponent {
   private storageService = inject(StorageService);
   private subdomainService = inject(SubdomainService);
   private fb = inject(FormBuilder);
+  private cdr = inject(ChangeDetectorRef);
 
   @Input() ownerId: string = '';
   @Input() boardId: string = '';
@@ -85,15 +87,18 @@ export class LeadDetailModalComponent {
   initialFormConfig: any | null = null;
 
   async show(lead: Lead) {
+    console.log('🚀 show() chamado para lead:', lead.id);
+    
+    // RESET COMPLETO DE ESTADO
+    this.fullStateReset();
+    
     this.currentLead = lead;
     this.isVisible = true;
-    this.cachedInitialFields = []; // Limpar cache
-    this.fieldsReady = false;
-    this.isLoadingFields = true;
-    this.isLoadingHistory = true;
-    this.resetForm();
     
-    // Mostrar modal imediatamente e carregar dados em background
+    // Forçar detecção inicial
+    this.cdr.detectChanges();
+    
+    // Carregar dados em background com pequeno delay para garantir que o modal seja mostrado
     setTimeout(() => {
       this.loadLeadDataAsync();
     }, 10);
@@ -137,8 +142,20 @@ export class LeadDetailModalComponent {
   }
 
   private async loadFormFieldsAsync() {
+    console.log('📋 loadFormFieldsAsync() iniciado');
     try {
       this.isLoadingFields = true;
+      this.fieldsReady = false;
+      
+      // SEMPRE recarregar configuração inicial
+      console.log('🔄 Recarregando initialFormConfig do zero...');
+      this.initialFormConfig = null;
+      this.initialFormConfig = await this.firestoreService.getInitialFormConfig(this.boardId);
+      console.log('📝 InitialFormConfig carregado:', !!this.initialFormConfig, 
+                 this.initialFormConfig?.fields?.length || 0, 'campos');
+      
+      // Forçar detecção de mudanças após carregar configuração inicial
+      this.cdr.detectChanges();
       
       // Carregar formulário da fase atual (já configura os campos)
       await this.loadCurrentPhaseForm();
@@ -147,9 +164,16 @@ export class LeadDetailModalComponent {
       this.isLoadingFields = false;
       this.fieldsReady = true;
       
+      console.log('✅ loadFormFieldsAsync() concluído - fieldsReady:', this.fieldsReady);
+      
+      // Forçar detecção de mudanças final
+      this.cdr.detectChanges();
+      
     } catch (error) {
+      console.error('❌ Erro em loadFormFieldsAsync:', error);
       this.isLoadingFields = false;
       this.fieldsReady = true;
+      this.cdr.detectChanges();
     }
   }
 
@@ -185,26 +209,28 @@ export class LeadDetailModalComponent {
   }
 
   private async loadCurrentPhaseForm() {
+    console.log('⚙️ loadCurrentPhaseForm() iniciado');
     try {
       // Extrair histórico de fases (já disponível)
       this.phaseHistory = this.currentLead?.phaseHistory || {};
 
-      // Carregar todas as configurações em paralelo para acelerar
-      const [initialFormConfig, phaseFormConfig, flowConfig] = await Promise.allSettled([
-        this.firestoreService.getInitialFormConfig(this.boardId),
+      // Carregar apenas configurações de fase e fluxo (initial já foi carregado)
+      const [phaseFormConfig, flowConfig] = await Promise.allSettled([
         this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, this.currentLead!.columnId),
         this.firestoreService.getFlowConfig(this.boardId)
       ]);
 
-      // Processar resultado do formulário inicial
-      this.initialFormConfig = initialFormConfig.status === 'fulfilled' ? initialFormConfig.value : null;
-
       // Processar resultado do formulário da fase
       if (phaseFormConfig.status === 'fulfilled') {
         this.currentFormFields = (phaseFormConfig.value as any)?.fields || [];
+        console.log('📋 Campos da fase carregados:', this.currentFormFields.length);
       } else {
+        console.log('⚠️ Sem config da fase, usando fallback do formulário inicial');
         this.currentFormFields = (this.initialFormConfig?.fields || []).map((f: any) => ({ ...f }));
       }
+
+      // Carregar campos globais de todas as configurações de fase
+      await this.loadGlobalFieldsAsync();
 
       // Processar resultado do fluxo
       this.flowConfig = flowConfig.status === 'fulfilled' && flowConfig.value ? flowConfig.value : { allowed: {} };
@@ -212,20 +238,197 @@ export class LeadDetailModalComponent {
       // Configurar campos do formulário de forma mais eficiente
       this.setupFormFieldsOptimized();
       
+      console.log('✅ loadCurrentPhaseForm() concluído');
+      
     } catch (error) {
-      console.warn('Erro ao carregar formulário da fase:', error);
+      console.warn('❌ Erro ao carregar formulário da fase:', error);
       this.currentFormFields = [];
     }
   }
 
-  private setupFormFieldsOptimized() {
+  async loadGlobalFieldsAsync() {
     try {
+      console.log('🔍 Carregando campos globais...');
+      
+      const globalFields: any[] = [];
+      const initialFieldNames = new Set<string>(); // Nomes dos campos do formulário inicial
+      
+      // PRIMEIRO: Marcar todos os campos do formulário inicial (para excluir dos globais)
+      console.log('🏁 Mapeando campos do formulário inicial para exclusão:', this.initialFormConfig?.fields?.length || 0, 'campos');
+      
+      if (this.initialFormConfig?.fields) {
+        this.initialFormConfig.fields.forEach((field: any) => {
+          initialFieldNames.add(field.name);
+          console.log(`📌 Campo inicial: ${field.name} - tipo: ${field.type} - allowEditInAnyPhase: ${field.allowEditInAnyPhase}`);
+          
+          // Debug específico para campo responsável
+          if (field.name?.toLowerCase().includes('responsavel') || field.type === 'responsavel') {
+            console.log(`🎯 CAMPO RESPONSÁVEL ENCONTRADO NO INICIAL: ${field.name}`, {
+              type: field.type,
+              allowEditInAnyPhase: field.allowEditInAnyPhase,
+              label: field.label
+            });
+          }
+        });
+      }
+      
+      // SEGUNDO: Verificar campos da fase atual que são globais (EXCETO os do formulário inicial)
+      console.log('🔍 Verificando campos globais nas configurações de fase...');
+      try {
+        const currentPhaseFields = this.currentFormFields || [];
+        console.log('📋 Campos da fase atual:', currentPhaseFields.length);
+        
+        currentPhaseFields.forEach((field: any, index: number) => {
+          console.log(`📝 Campo da fase ${index + 1}:`, {
+            name: field.name,
+            label: field.label,
+            type: field.type,
+            allowEditInAnyPhase: field.allowEditInAnyPhase,
+            isFromInitialForm: initialFieldNames.has(field.name)
+          });
+          
+          // Debug específico para campo responsável
+          if (field.name?.toLowerCase().includes('responsavel') || field.type === 'responsavel') {
+            console.log(`🎯 CAMPO RESPONSÁVEL ENCONTRADO NA FASE: ${field.name}`, {
+              type: field.type,
+              allowEditInAnyPhase: field.allowEditInAnyPhase,
+              label: field.label,
+              isFromInitialForm: initialFieldNames.has(field.name)
+            });
+          }
+          
+          const isGlobalCandidate = field.allowEditInAnyPhase === true;
+          const isFromInitialForm = initialFieldNames.has(field.name);
+          
+          // Adicionar apenas campos globais que NÃO estão no formulário inicial
+          if (isGlobalCandidate && !isFromInitialForm) {
+            globalFields.push(field);
+            console.log(`✅ Campo global da fase adicionado: ${field.name} (${field.type})`);
+          } else if (isGlobalCandidate && isFromInitialForm) {
+            console.log(`⚠️ Campo global ignorado (está no formulário inicial): ${field.name}`);
+          } else {
+            console.log(`❌ Campo da fase não é global: ${field.name} (allowEditInAnyPhase: ${field.allowEditInAnyPhase})`);
+          }
+        });
+      } catch (error) {
+        console.warn('❌ Erro ao verificar campos da fase:', error);
+      }
+      
+      // TERCEIRO: Buscar campos globais em TODAS as configurações de fase (não apenas a atual)
+      console.log('🔍 Buscando campos globais em todas as fases do board...');
+      try {
+        // Buscar configurações de todas as fases
+        for (const column of this.columns) {
+          if (column.id === this.currentLead?.columnId) {
+            // Já verificamos a fase atual acima
+            continue;
+          }
+          
+          try {
+            const phaseConfig = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
+            const phaseFields = (phaseConfig as any)?.fields || [];
+            
+            console.log(`📋 Verificando fase "${column.name}" (${column.id}):`, phaseFields.length, 'campos');
+            
+            phaseFields.forEach((field: any) => {
+              // Debug específico para campo responsável
+              if (field.name?.toLowerCase().includes('responsavel') || field.type === 'responsavel') {
+                console.log(`🎯 CAMPO RESPONSÁVEL ENCONTRADO EM OUTRA FASE (${column.name}): ${field.name}`, {
+                  type: field.type,
+                  allowEditInAnyPhase: field.allowEditInAnyPhase,
+                  label: field.label,
+                  isFromInitialForm: initialFieldNames.has(field.name)
+                });
+              }
+              
+              const isGlobalCandidate = field.allowEditInAnyPhase === true;
+              const isFromInitialForm = initialFieldNames.has(field.name);
+              const alreadyAdded = globalFields.some(gf => gf.name === field.name);
+              
+              // Adicionar campos globais de outras fases que não estão no inicial e ainda não foram adicionados
+              if (isGlobalCandidate && !isFromInitialForm && !alreadyAdded) {
+                globalFields.push(field);
+                console.log(`✅ Campo global de outra fase adicionado: ${field.name} (${field.type}) da fase ${column.name}`);
+              }
+            });
+          } catch (phaseError) {
+            console.log(`⚠️ Erro ao carregar configuração da fase ${column.name}:`, phaseError);
+          }
+        }
+      } catch (error) {
+        console.warn('❌ Erro ao verificar outras fases:', error);
+      }
+      
+      this.globalFormFields = globalFields;
+      console.log(`🌍 Total de campos globais encontrados: ${globalFields.length}`);
+      console.log('🔍 Detalhes dos campos globais:', globalFields.map(f => ({
+        name: f.name,
+        label: f.label,
+        type: f.type,
+        allowEditInAnyPhase: f.allowEditInAnyPhase
+      })));
+      
+    } catch (error) {
+      console.warn('❌ Erro ao carregar campos globais:', error);
+      this.globalFormFields = [];
+    }
+  }
+
+  private setupFormFieldsOptimized() {
+    console.log('🔧 setupFormFieldsOptimized() iniciado');
+    try {
+      // SEMPRE criar nova instância do formulário para evitar problemas de reutilização
+      this.leadForm = this.fb.group({});
+      this.formReady = false;
+      
       const formConfig: any = {};
       
-      // Processar campos rapidamente sem travamentos
-      this.currentFormFields.forEach((field: any) => {
+      // Processar campos da fase central + campos editáveis do formulário inicial
+      const centralFields = this.getCentralFields();
+      const editableInitialFields = this.getInitialFieldsOnly().filter(f => f.isEditable);
+      
+      console.log('📝 Configurando formulário com:', {
+        centralFields: centralFields.length,
+        editableInitialFields: editableInitialFields.length
+      });
+      
+      // Combinar todos os campos que precisam estar no formulário
+      const allFields = [...centralFields];
+      
+      // Adicionar campos editáveis do formulário inicial (evitando duplicatas)
+      const centralFieldNames = new Set(centralFields.map((f: any) => f.name || f.apiFieldName));
+      editableInitialFields.forEach((field: any) => {
+        if (!centralFieldNames.has(field.name)) {
+          // Converter campo inicial para formato de campo de formulário
+          allFields.push({
+            name: field.formControlName,
+            apiFieldName: field.name,
+            type: field.fieldType,
+            label: field.label,
+            placeholder: field.placeholder,
+            options: field.options
+          });
+        }
+      });
+      
+      console.log('📋 Total de campos para o formulário:', allFields.length);
+      
+      allFields.forEach((field: any, index: number) => {
         const key = field.apiFieldName || field.name;
         const currentValue = this.getFieldValue(key) ?? this.getFieldValue(field.name);
+        
+        console.log(`  🏷️ Campo ${index + 1}: ${field.name} = ${currentValue}`);
+        
+        // Debug específico para campo responsável
+        if (field.name?.toLowerCase().includes('responsavel') || field.type === 'responsavel') {
+          console.log(`🎯 CONFIGURANDO CAMPO RESPONSÁVEL NO FORM: ${field.name}`, {
+            key: key,
+            currentValue: currentValue,
+            type: field.type,
+            responsibleUserId: this.currentLead?.responsibleUserId,
+            responsibleUserName: this.currentLead?.responsibleUserName
+          });
+        }
         
         if (field.type === 'checkbox') {
           // Otimização específica para checkbox - processar de forma mais simples
@@ -243,18 +446,97 @@ export class LeadDetailModalComponent {
             
             formConfig[checkboxName] = [isChecked];
           });
+        } else if (field.type === 'responsavel') {
+          // Campo Responsável: usar email como identificador (já que UIDs estão vazios)
+          let responsibleValue = '';
+          
+          // Primeiro tentar encontrar pelo UID
+          const userByUid = this.users.find(u => u.uid === this.currentLead?.responsibleUserId);
+          if (userByUid) {
+            responsibleValue = userByUid.email; // Usar email do usuário encontrado
+          }
+          // Se não encontrar pelo UID, tentar pelo email
+          else if (this.currentLead?.responsibleUserEmail) {
+            responsibleValue = this.currentLead.responsibleUserEmail;
+          }
+          // Fallback para email do usuário encontrado pelo nome
+          else if (this.currentLead?.responsibleUserName) {
+            const userByName = this.users.find(u => 
+              (u.displayName || '').toLowerCase() === this.currentLead?.responsibleUserName?.toLowerCase()
+            );
+            if (userByName) {
+              responsibleValue = userByName.email;
+            }
+          }
+          
+          console.log(`🎯 Campo responsável - usando email:`, {
+            originalUID: this.currentLead?.responsibleUserId,
+            responsibleUserEmail: this.currentLead?.responsibleUserEmail,
+            responsibleUserName: this.currentLead?.responsibleUserName,
+            finalValue: responsibleValue,
+            availableEmails: this.users.map(u => u.email)
+          });
+          
+          formConfig[field.name] = [responsibleValue];
+          console.log(`🎯 Campo responsável configurado: ${field.name} = ${responsibleValue}`);
         } else {
           // Outros tipos de campo - processamento normal
           formConfig[field.name] = [currentValue ?? ''];
         }
       });
 
-      // Criar formulário de uma vez
+      // Criar formulário completamente novo
       this.leadForm = this.fb.group(formConfig);
+      
+      // Aplicar valores usando patchValue para garantir sincronização
+      const patchValues: any = {};
+      Object.keys(formConfig).forEach(key => {
+        patchValues[key] = formConfig[key][0]; // Extrair valor do array [valor]
+      });
+      
+      this.leadForm.patchValue(patchValues, { emitEvent: false });
       this.formReady = true;
       
+      console.log('✅ setupFormFieldsOptimized() concluído - formReady:', this.formReady);
+      console.log('📋 Valores do formulário criado:', this.leadForm.value);
+      console.log('📋 Valores aplicados com patchValue:', patchValues);
+      
+      // Forçar detecção de mudanças para atualizar a interface
+      this.cdr.detectChanges();
+      
+      // Tentar aplicar valor do responsável novamente após um delay (caso seja problema de timing)
+      setTimeout(() => {
+        const responsavelField = allFields.find(f => f.type === 'responsavel');
+        if (responsavelField && this.currentLead?.responsibleUserId) {
+          const responsavelControl = this.leadForm.get(responsavelField.name);
+          console.log(`🔄 Verificando responsável:`, {
+            fieldName: responsavelField.name,
+            currentValue: responsavelControl?.value,
+            expectedValue: this.currentLead.responsibleUserId,
+            needsUpdate: responsavelControl?.value !== this.currentLead.responsibleUserId
+          });
+          
+          if (responsavelControl) {
+            console.log(`🔄 Forçando valor do responsável: ${this.currentLead.responsibleUserId}`);
+            responsavelControl.setValue(this.currentLead.responsibleUserId, { emitEvent: false });
+            responsavelControl.markAsDirty();
+            responsavelControl.updateValueAndValidity();
+            this.cdr.detectChanges();
+            
+            // Tentar via DOM também (fallback)
+            setTimeout(() => {
+              const selectElement = document.querySelector(`select[formcontrolname="${responsavelField.name}"]`) as HTMLSelectElement;
+              if (selectElement) {
+                selectElement.value = this.currentLead!.responsibleUserId!;
+                console.log(`🔄 Valor aplicado via DOM: ${selectElement.value}`);
+              }
+            }, 50);
+          }
+        }
+      }, 200);
+      
     } catch (error) {
-      console.warn('Erro ao configurar formulário:', error);
+      console.error('❌ Erro ao configurar formulário:', error);
       this.leadForm = this.fb.group({});
       this.formReady = true;
     }
@@ -280,6 +562,41 @@ export class LeadDetailModalComponent {
     this.closeModal.emit();
   }
 
+  private fullStateReset() {
+    console.log('🔄 fullStateReset() - resetando estado completo');
+    
+    // Limpar dados do lead
+    this.currentLead = null;
+    
+    // Limpar configurações
+    this.initialFormConfig = null;
+    this.currentFormFields = [];
+    this.globalFormFields = [];
+    this.cachedInitialFields = [];
+    
+    // Limpar estado de loading/ready
+    this.fieldsReady = false;
+    this.isLoadingFields = true;
+    this.isLoadingHistory = true;
+    this.formReady = false;
+    
+    // Limpar histórico e subscription
+    if (this.unsubscribeHistory) {
+      this.unsubscribeHistory();
+      this.unsubscribeHistory = null;
+    }
+    this.leadHistory = [];
+    this.phaseHistory = {};
+    
+    // Reset do formulário e dados relacionados
+    this.resetForm();
+    
+    // Limpar configuração de fluxo
+    this.flowConfig = { allowed: {} };
+    
+    console.log('✅ Estado resetado completamente');
+  }
+
   private resetForm() {
     this.leadForm = this.fb.group({});
     this.commentText = '';
@@ -287,9 +604,11 @@ export class LeadDetailModalComponent {
     this.attachmentPreview = '';
     this.errorMessage = '';
     this.publicLink = '';
-    this.leadHistory = [];
-    this.phaseHistory = {};
-    this.formReady = false;
+    this.showDeleteConfirm = false;
+    this.isSaving = false;
+    this.isLoading = false;
+    this.isUploadingComment = false;
+    this.isUploadingAttachment = false;
   }
 
   private async loadLeadData() {
@@ -430,53 +749,235 @@ export class LeadDetailModalComponent {
   }
 
   getInitialFields(): any[] {
-    // Usar cache se já foi calculado
-    if (this.cachedInitialFields.length > 0) {
-      return this.cachedInitialFields;
+    // Redirecionamento para o novo método
+    return this.getInitialFieldsOnly();
+  }
+  
+  private isFieldGlobal(field: any): boolean {
+    // IMPORTANTE: Um campo é considerado global apenas se estiver no formulário inicial 
+    // E tiver allowEditInAnyPhase = true
+    
+    if (!this.initialFormConfig?.fields) {
+      return false;
     }
     
-    this.calculateInitialFields();
-    return this.cachedInitialFields;
-  }
-
-  private calculateInitialFields(): void {
-    try {
-      // Se houver configuração de formulário inicial, usar esses campos na ordem definida
-      if (this.initialFormConfig?.fields?.length) {
-        const sorted = this.initialFormConfig.fields
-          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
-
-        // Processar campos de forma simples e direta
-        this.cachedInitialFields = sorted.map((f: any) => {
-          const fieldName = f.apiFieldName || f.name;
-          const rawValue = this.getFieldValue(fieldName) ?? this.getFieldValue(f.name);
-          
-          const formattedValue = rawValue !== null && rawValue !== undefined 
-            ? this.formatFieldValue(f, rawValue) 
-            : 'Não informado';
-          
-          return {
-            name: fieldName,
-            label: f.label || f.name || f.apiFieldName,
-            value: formattedValue
-          };
-        });
-      } else {
-        // Fallback dinâmico com deduplicação por grupos de sinônimos
-        this.cachedInitialFields = this.buildDedupedDisplayFields();
-      }
-    } catch (error) {
-      console.warn('Erro ao calcular campos iniciais:', error);
-      this.cachedInitialFields = [];
-    }
+    // Verificar se o campo existe no formulário inicial e tem allowEditInAnyPhase = true
+    const initialField = this.initialFormConfig.fields.find((initialField: any) => 
+      initialField.name === field.name || 
+      initialField.apiFieldName === field.name ||
+      initialField.name === field.apiFieldName ||
+      initialField.apiFieldName === field.apiFieldName
+    );
+    
+    return initialField && initialField.allowEditInAnyPhase === true;
   }
 
   currentFormFields: any[] = [];
+  globalFormFields: any[] = [];
 
   hasRequiredToAdvance(): boolean {
     try {
       return Array.isArray(this.currentFormFields) && this.currentFormFields.some((f: any) => !!f?.requiredToAdvance);
     } catch { return false; }
+  }
+
+  getGlobalFields(): any[] {
+    console.log('🌍 getGlobalFields() chamado');
+    
+    // Retornar todos os campos em globalFormFields, pois já foram filtrados em loadGlobalFieldsAsync()
+    console.log('📊 Campos globais disponíveis:', this.globalFormFields.length);
+    
+    this.globalFormFields.forEach((field: any, index: number) => {
+      const formValue = this.leadForm?.get(field.name)?.value;
+      console.log(`  🔸 Campo global ${index + 1}: ${field.name} (${field.label}) - allowEditInAnyPhase: ${field.allowEditInAnyPhase} - valorFormulario: ${formValue}`);
+      
+      // Debug específico para campo responsável
+      if (field.type === 'responsavel') {
+        const userByEmail = this.users.find(u => u.email === formValue);
+        const formControl = this.leadForm?.get(field.name);
+        console.log(`🎯 DEBUG CAMPO RESPONSÁVEL (usando email):`, {
+          fieldName: field.name,
+          formValue: formValue,
+          formValueType: typeof formValue,
+          usersLoaded: this.users.length,
+          userFoundByEmail: userByEmail,
+          formControlExists: !!formControl,
+          formControlValue: formControl?.value,
+          formReady: this.formReady,
+          allUserEmails: this.users.map(u => u.email),
+          leadData: {
+            responsibleUserId: this.currentLead?.responsibleUserId,
+            responsibleUserEmail: this.currentLead?.responsibleUserEmail,
+            responsibleUserName: this.currentLead?.responsibleUserName
+          },
+          selectOptionsWillBe: this.users.map(u => ({
+            value: u.email,
+            text: u.displayName || u.email,
+            matches: u.email === formValue
+          }))
+        });
+      }
+    });
+    
+    return this.globalFormFields;
+  }
+
+  getPhaseSpecificFields(): any[] {
+    console.log('📋 getPhaseSpecificFields() chamado');
+    console.log('🔵 Campos da fase atual:', this.currentFormFields.length);
+    
+    // Filtrar campos da fase que NÃO são globais (não têm allowEditInAnyPhase = true)
+    const phaseOnlyFields = this.currentFormFields.filter((field: any) => field.allowEditInAnyPhase !== true);
+    
+    console.log('🔍 Campos apenas da fase (não-globais):', phaseOnlyFields.length);
+    phaseOnlyFields.forEach((field: any, index: number) => {
+      console.log(`  🔹 Campo da fase ${index + 1}: ${field.name} (${field.label}) - allowEditInAnyPhase: ${field.allowEditInAnyPhase}`);
+    });
+    
+    return phaseOnlyFields;
+  }
+
+  getAllRelevantFields(): any[] {
+    // Retornar todos os campos relevantes para exibir na parte central:
+    // 1. Campos da fase atual
+    // 2. Campos globais de outras fases (que podem ser editados em qualquer fase)
+    
+    const phaseFields = this.currentFormFields || [];
+    const globalFields = this.getGlobalFields() || [];
+    
+    // Evitar duplicatas comparando por nome do campo
+    const allFields = [...phaseFields];
+    const phaseFieldNames = new Set(phaseFields.map((f: any) => f.name || f.apiFieldName));
+    
+    globalFields.forEach((globalField: any) => {
+      const fieldName = globalField.name || globalField.apiFieldName;
+      if (!phaseFieldNames.has(fieldName)) {
+        allFields.push(globalField);
+      }
+    });
+    
+    return allFields;
+  }
+
+  getCentralFields(): any[] {
+    console.log('🏗️ getCentralFields() chamado');
+    
+    // Campos para exibir na parte central: 
+    // 1. Campos da fase atual (apenas os NÃO globais)
+    // 2. TODOS os campos globais
+    const phaseOnlyFields = this.getPhaseSpecificFields() || []; // Apenas campos não-globais da fase
+    const globalFields = this.getGlobalFields() || [];
+    
+    console.log('📋 Campos apenas da fase (não-globais):', phaseOnlyFields.length);
+    console.log('🌍 Campos globais:', globalFields.length);
+    
+    // Começar com campos apenas da fase (não-globais)
+    const centralFields = [...phaseOnlyFields];
+    const fieldNames = new Set(phaseOnlyFields.map((f: any) => f.name || f.apiFieldName));
+    
+    // Adicionar TODOS os campos globais
+    globalFields.forEach((globalField: any) => {
+      const fieldName = globalField.name || globalField.apiFieldName;
+      centralFields.push(globalField);
+      fieldNames.add(fieldName);
+      console.log(`✅ Campo global adicionado ao centro: ${fieldName}`);
+    });
+    
+    console.log('🎯 Total de campos centrais:', centralFields.length);
+    return centralFields;
+  }
+
+  getInitialFieldsOnly(): any[] {
+    console.log('🔍 getInitialFieldsOnly chamado:', {
+      currentLead: !!this.currentLead,
+      initialFormConfig: !!this.initialFormConfig,
+      fieldsReady: this.fieldsReady,
+      isLoadingFields: this.isLoadingFields,
+      initialFormConfigFields: this.initialFormConfig?.fields?.length || 0
+    });
+    
+    // Se ainda não temos dados suficientes, retornar array vazio mas logar detalhes
+    if (!this.currentLead) {
+      console.log('❌ currentLead não disponível');
+      return [];
+    }
+    
+    if (!this.initialFormConfig) {
+      console.log('❌ initialFormConfig não disponível');
+      return [];
+    }
+    
+    // Campos APENAS do formulário inicial (para o lado esquerdo)
+    // Não incluir campos globais de outras fases
+    // SEMPRE recalcular para garantir dados atualizados
+    try {
+      if (this.initialFormConfig?.fields?.length) {
+        console.log('📝 Processando', this.initialFormConfig.fields.length, 'campos iniciais');
+        
+        const sorted = this.initialFormConfig.fields
+          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+
+        const result = sorted.map((f: any, index: number) => {
+          const fieldName = f.apiFieldName || f.name;
+          const rawValue = this.getFieldValue(fieldName) ?? this.getFieldValue(f.name);
+          
+          console.log(`  📄 Campo ${index + 1}:`, {
+            name: fieldName,
+            label: f.label,
+            rawValue: rawValue,
+            allowEditInAnyPhase: f.allowEditInAnyPhase
+          });
+          
+          const formattedValue = rawValue !== null && rawValue !== undefined 
+            ? this.formatFieldValue(f, rawValue) 
+            : 'Não informado';
+          
+          // Um campo inicial é editável apenas se tiver allowEditInAnyPhase = true
+          const isEditable = f.allowEditInAnyPhase === true;
+          
+          return {
+            name: fieldName,
+            label: f.label || f.name || f.apiFieldName,
+            value: formattedValue,
+            isEditable: isEditable,
+            fieldType: f.type,
+            formControlName: f.name,
+            placeholder: f.placeholder,
+            options: f.options || (f.type === 'temperatura' ? ['Quente', 'Morno', 'Frio'] : [])
+          };
+        });
+        
+        console.log('✅ getInitialFieldsOnly retornando:', result.length, 'campos processados');
+        return result;
+      } else {
+        console.log('⚠️ Sem campos no initialFormConfig, usando fallback');
+        // Fallback dinâmico com deduplicação por grupos de sinônimos
+        const fallbackFields = this.buildDedupedDisplayFields().map(field => ({
+          ...field,
+          isEditable: false,
+          fieldType: 'text',
+          formControlName: field.name,
+          placeholder: '',
+          options: []
+        }));
+        console.log('🔄 Fallback retornando:', fallbackFields.length, 'campos');
+        return fallbackFields;
+      }
+    } catch (error) {
+      console.error('❌ Erro ao calcular campos iniciais:', error);
+      return [];
+    }
+  }
+
+  hasEditableGlobalFields(): boolean {
+    // Verificar se há campos editáveis no formulário inicial
+    const initialFields = this.getInitialFieldsOnly();
+    return initialFields.some(field => field.isEditable);
+  }
+
+  async saveGlobalFields() {
+    // Usar a mesma lógica de saveChanges, que já trata campos globais e de fase
+    await this.saveChanges();
   }
 
 
@@ -632,7 +1133,10 @@ export class LeadDetailModalComponent {
       const formData = this.leadForm.value;
       // Mapear apiFieldName -> name para persistir com a chave correta usada na API quando existir
       const mapped: any = { ...formData };
-      (this.currentFormFields || []).forEach((f: any) => {
+      
+      // Mapear todos os campos relevantes (fase atual + globais)
+      const relevantFields = this.getAllRelevantFields();
+      relevantFields.forEach((f: any) => {
         if (f.apiFieldName && f.apiFieldName !== f.name && mapped.hasOwnProperty(f.name)) {
           mapped[f.apiFieldName] = mapped[f.name];
           delete mapped[f.name];
@@ -654,7 +1158,7 @@ export class LeadDetailModalComponent {
 
       // Atualizar responsável se mudou
       // Atualizar responsável via campo do formulário caso exista tipo 'responsavel'
-      const respFieldDef = (this.currentFormFields || []).find((f: any) => f.type === 'responsavel');
+      const respFieldDef = relevantFields.find((f: any) => f.type === 'responsavel');
       const respFieldName = respFieldDef?.name;
       const newRespId = respFieldName ? formData[respFieldName] : formData.responsibleUserId;
       if (newRespId && newRespId !== this.currentLead.responsibleUserId) {
@@ -676,24 +1180,29 @@ export class LeadDetailModalComponent {
         );
       }
 
-      // Registrar diffs de campos (histórico) — incluindo campos do formulário da fase
+      // Registrar diffs de campos (histórico) — incluindo campos da fase e globais
       try {
         const beforeFields = (this.currentLead.fields || {}) as any;
         const changedKeys = Object.keys(mapped).filter(k => `${beforeFields[k] ?? ''}` !== `${mapped[k] ?? ''}`);
         if (changedKeys.length) {
           const changesList = changedKeys.map(k => {
-            const label = (this.currentFormFields || []).find((f: any) => (f.apiFieldName || f.name) === k)?.label || this.humanizeKey(k);
+            const field = relevantFields.find((f: any) => (f.apiFieldName || f.name) === k);
+            const label = field?.label || this.humanizeKey(k);
+            const isGlobal = this.getGlobalFields().some((f: any) => (f.apiFieldName || f.name) === k);
             let beforeVal = beforeFields[k] ?? '';
             let afterVal = mapped[k] ?? '';
+            
             // Se o campo representa responsável, mostrar nome do usuário
-            const isResp = (this.currentFormFields || []).some((f: any) => (f.apiFieldName === k || f.name === k) && (f.type === 'responsavel' || f.originalType === 'responsavel'));
+            const isResp = relevantFields.some((f: any) => (f.apiFieldName === k || f.name === k) && (f.type === 'responsavel' || f.originalType === 'responsavel'));
             if (isResp) {
               const beforeUser = this.users.find(u => u.uid === beforeVal || u.email === beforeVal);
               const afterUser = this.users.find(u => u.uid === afterVal || u.email === afterVal);
               beforeVal = beforeUser?.displayName || beforeVal;
               afterVal = afterUser?.displayName || afterVal;
             }
-            return `<li><strong>${label}:</strong> "${beforeVal}" → "${afterVal}"</li>`;
+            
+            const fieldType = isGlobal ? ' (Global)' : ' (Fase atual)';
+            return `<li><strong>${label}${fieldType}:</strong> "${beforeVal}" → "${afterVal}"</li>`;
           }).join('');
           await this.firestoreService.addLeadHistory(
             this.ownerId,
@@ -701,7 +1210,7 @@ export class LeadDetailModalComponent {
             this.currentLead.id!,
             {
               type: 'update',
-              text: `Formulário da fase salvo:<ul class="list-disc ml-4">${changesList}</ul>`,
+              text: `Formulário atualizado:<ul class="list-disc ml-4">${changesList}</ul>`,
               user: currentUser.displayName || currentUser.email
             }
           );
@@ -722,7 +1231,8 @@ export class LeadDetailModalComponent {
         ...mapped
       } as any;
       const afterValues: any = {};
-      (this.currentFormFields || []).forEach((f: any) => {
+      // Atualizar valores de todos os campos relevantes
+      relevantFields.forEach((f: any) => {
         const key = f.apiFieldName || f.name;
         afterValues[f.name] = mapped.hasOwnProperty(key) ? mapped[key] : (this.getFieldValue(key) ?? '');
       });
