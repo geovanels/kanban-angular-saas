@@ -866,6 +866,42 @@ export class FirestoreService {
     return null;
   }
 
+  async getAllPhaseFormConfigs(userId: string, boardId: string) {
+    if (!this.currentCompanyId) {
+      await this.initializeCompanyContext();
+    }
+    if (!this.currentCompanyId) return [];
+
+    try {
+      const formConfigsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/phaseFormConfigs`);
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(formConfigsRef));
+      
+      const configs: any[] = [];
+      snapshot.docs.forEach(doc => {
+        configs.push({ id: doc.id, ...doc.data() });
+      });
+      
+      return configs;
+    } catch (error) {
+      console.warn('Erro ao carregar configurações de fase:', error);
+      
+      // Fallback: estrutura alternativa sem prefixo de empresa
+      try {
+        const altRef = collection(this.firestore, `boards/${boardId}/phaseFormConfigs`);
+        const snapshot = await runInInjectionContext(this.injector, () => getDocs(altRef));
+        
+        const configs: any[] = [];
+        snapshot.docs.forEach(doc => {
+          configs.push({ id: doc.id, ...doc.data() });
+        });
+        
+        return configs;
+      } catch {
+        return [];
+      }
+    }
+  }
+
   async deletePhaseFormConfig(userId: string, boardId: string, configId: string) {
     if (!this.currentCompanyId) {
       await this.initializeCompanyContext();

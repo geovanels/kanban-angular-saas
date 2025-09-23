@@ -179,6 +179,18 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.records = registros;
       this.columns = columns;
       this.users = []; // Será implementado posteriormente
+      
+      // Debug: verificar estrutura dos dados de responsáveis
+      console.log('🔍 Debug estrutura dos registros:', {
+        totalRegistros: registros.length,
+        primeiroRegistro: registros[0],
+        camposResponsavel: registros.map(r => ({
+          id: r.id,
+          responsibleUserName: r.responsibleUserName,
+          responsibleUserId: r.responsibleUserId,
+          responsibleUserEmail: r.responsibleUserEmail
+        })).slice(0, 5) // primeiros 5
+      });
 
       // Note: Form field configuration now handled by AdvancedFiltersComponent
 
@@ -959,7 +971,15 @@ export class ReportsComponent implements OnInit, OnDestroy {
           value = this.getColumnName(record.columnId) || 'Sem Fase';
           break;
         case 'responsavel':
-          value = record.responsibleUserName || record.responsibleUserId || 'Não Atribuído';
+          // Debug para ver todos os possíveis campos de responsável
+          console.log(`📊 Debug responsável para registro ${record.id}:`, {
+            responsibleUserName: record.responsibleUserName,
+            responsibleUserId: record.responsibleUserId,
+            responsibleUserEmail: record.responsibleUserEmail,
+            allKeys: Object.keys(record)
+          });
+          
+          value = record.responsibleUserName || record.responsibleUserEmail || record.responsibleUserId || 'Não Atribuído';
           break;
         case 'origem':
           value = record.fields?.['origem'] || record.fields?.['source'] || 'Não Informado';

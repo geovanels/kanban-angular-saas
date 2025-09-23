@@ -18,6 +18,7 @@ interface FormField {
   requiredToAdvance?: boolean; // Obrigatório para avançar de fase
   showInAllPhases?: boolean; // Exibir em todas as fases
   showInFilters?: boolean; // Exibir nos filtros avançados
+  allowEditInAnyPhase?: boolean; // Permitir edição em qualquer fase (campos globais)
 }
 
 @Component({
@@ -74,7 +75,8 @@ export class VisualFormBuilderComponent implements OnInit {
       showInCard: [false], // Por padrão, não exibir no card
       requiredToAdvance: [false],
       showInAllPhases: [false],
-      showInFilters: [false] // Por padrão, não exibir nos filtros
+      showInFilters: [false], // Por padrão, não exibir nos filtros
+      allowEditInAnyPhase: [false] // Por padrão, não permitir edição em qualquer fase
     });
 
     // Listener para automaticamente marcar "showInAllPhases" quando "showInCard" for marcado
@@ -161,7 +163,8 @@ export class VisualFormBuilderComponent implements OnInit {
       showInCard: false,
       requiredToAdvance: false,
       showInAllPhases: false,
-      showInFilters: false
+      showInFilters: false,
+      allowEditInAnyPhase: false
     });
   }
 
@@ -281,6 +284,7 @@ export class VisualFormBuilderComponent implements OnInit {
     const showInAllPhases = showInCard ? true : (formValue.showInAllPhases || false);
     
     console.log('➕ Configurações de visibilidade:', { showInCard, showInAllPhases });
+    console.log('➕ allowEditInAnyPhase:', formValue.allowEditInAnyPhase);
 
     const newField: FormField = {
       name: formValue.name,
@@ -293,6 +297,7 @@ export class VisualFormBuilderComponent implements OnInit {
       requiredToAdvance: formValue.requiredToAdvance || false,
       showInAllPhases: showInAllPhases,
       showInFilters: formValue.showInFilters || false,
+      allowEditInAnyPhase: formValue.allowEditInAnyPhase || false, // IMPORTANTE: Adicionar aqui
       // Só incluir propriedades que não sejam undefined
       ...(formValue.placeholder && formValue.placeholder.trim() && { placeholder: formValue.placeholder.trim() }),
       ...(formValue.apiFieldName && formValue.apiFieldName.trim() && { apiFieldName: formValue.apiFieldName.trim() })
@@ -340,12 +345,15 @@ export class VisualFormBuilderComponent implements OnInit {
 
   editField(index: number) {
     const field = this.fields[index];
+    console.log('✏️ Editando campo:', field);
+    console.log('✏️ allowEditInAnyPhase no campo original:', field.allowEditInAnyPhase);
+    
     this.editingIndex = index;
     this.editingField = { ...field };
     this.selectedFieldType = field.type;
     this.selectedField = field;
 
-    this.fieldsForm.patchValue({
+    const patchValues = {
       name: field.name,
       label: field.label,
       type: field.type,
@@ -357,8 +365,18 @@ export class VisualFormBuilderComponent implements OnInit {
       showInCard: field.showInCard || false, // Default false se não especificado
       requiredToAdvance: field.requiredToAdvance || false,
       showInAllPhases: field.showInAllPhases || false,
-      showInFilters: field.showInFilters || false
-    });
+      showInFilters: field.showInFilters || false,
+      allowEditInAnyPhase: field.allowEditInAnyPhase || false
+    };
+    
+    console.log('✏️ Valores sendo aplicados ao formulário:', patchValues);
+    this.fieldsForm.patchValue(patchValues);
+    
+    // Verificar se o valor foi aplicado corretamente
+    setTimeout(() => {
+      const currentValue = this.fieldsForm.get('allowEditInAnyPhase')?.value;
+      console.log('✏️ Valor atual no formulário após patchValue:', currentValue);
+    }, 100);
   }
 
   cancelEdit() {

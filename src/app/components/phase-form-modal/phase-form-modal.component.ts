@@ -93,6 +93,7 @@ export class PhaseFormModalComponent {
             showInCard: field.showInCard || false, // Default to false
             requiredToAdvance: !!field.requiredToAdvance,
             showInAllPhases: !!field.showInAllPhases,
+            allowEditInAnyPhase: !!field.allowEditInAnyPhase, // Default to false
             order: field.order || 0
           };
         })
@@ -116,10 +117,14 @@ export class PhaseFormModalComponent {
     this.isSaving = true;
     
     try {
+      console.log('💾 Salvando configuração. Campos antes da limpeza:', this.formFields);
+      
       const config = {
         columnId: this.currentColumn.id!,
         columnName: this.currentColumn.name,
         fields: this.formFields.map((field, index) => {
+          console.log(`🔍 Campo ${index}: ${field.name}, allowEditInAnyPhase:`, field.allowEditInAnyPhase);
+          
           // Limpar campos undefined para evitar erro do Firebase
           const cleanField: any = {
             name: field.name || '',
@@ -131,8 +136,11 @@ export class PhaseFormModalComponent {
             showInCard: field.showInCard || false,
             requiredToAdvance: !!field.requiredToAdvance,
             showInAllPhases: !!field.showInAllPhases,
-            showInFilters: !!field.showInFilters
+            showInFilters: !!field.showInFilters,
+            allowEditInAnyPhase: !!field.allowEditInAnyPhase
           };
+          
+          console.log(`✅ Campo limpo ${index}:`, cleanField);
 
           // Só adicionar se não for undefined ou string vazia
           if (field.placeholder && field.placeholder.trim()) {

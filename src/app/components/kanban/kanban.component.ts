@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Board, Column, Lead } from '../../services/firestore.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { CompanyService } from '../../services/company.service';
 import { AutomationService } from '../../services/automation.service';
 import { ApiService } from '../../services/api.service';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
@@ -33,6 +34,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private firestoreService = inject(FirestoreService);
   private subdomainService = inject(SubdomainService);
+  private companyService = inject(CompanyService);
   private automationService = inject(AutomationService);
   private apiService = inject(ApiService);
   private toast = inject(ToastService);
@@ -265,7 +267,29 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async loadUsers() {
     try {
-      // Simular carregamento de usuários - em um caso real, você buscaria do Firestore
+      const company = this.subdomainService.getCurrentCompany();
+      if (!company || !company.id) {
+        console.warn('Empresa não encontrada para carregar usuários');
+        this.users = [];
+        return;
+      }
+
+      // Carregar usuários reais da empresa
+      const companyUsers = await this.companyService.getAllCompanyUsers(company.id);
+      
+      // Filtrar apenas usuários ativos
+      this.users = companyUsers
+        .filter(user => !user.inviteStatus || user.inviteStatus === 'accepted')
+        .map(user => ({
+          uid: user.uid,
+          displayName: user.displayName || this.extractNameFromEmail(user.email),
+          email: user.email
+        }));
+
+      console.log('Usuários carregados:', this.users.length);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+      // Fallback para usuário atual se houver erro
       this.users = [
         {
           uid: this.currentUser?.uid,
@@ -273,9 +297,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
           email: this.currentUser?.email
         }
       ];
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
     }
+  }
+
+  private extractNameFromEmail(email: string): string {
+    const localPart = email.split('@')[0];
+    return localPart
+      .replace(/[._]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 
   private subscribeToRealtimeUpdates() {
