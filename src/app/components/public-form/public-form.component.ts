@@ -6,6 +6,7 @@ import { FirestoreService, Lead } from '../../services/firestore.service';
 import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { ToastService } from '../toast/toast.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-public-form',
@@ -91,6 +92,7 @@ export class PublicFormComponent implements OnInit {
   private toast = inject(ToastService);
   private fb = inject(FormBuilder);
   private companyService = inject(CompanyService);
+  private authService = inject(AuthService);
 
   form: FormGroup = this.fb.group({});
   loading = signal(true);
@@ -117,20 +119,40 @@ export class PublicFormComponent implements OnInit {
     this.leadId = qp.get('leadId') || '';
     this.columnId = qp.get('columnId') || '';
 
+    // Debug: Parâmetros recebidos
+    // console.log('Parâmetros:', { subdomain: sub, companyId: companyIdParam, userId: this.userId, boardId: this.boardId, leadId: this.leadId, columnId: this.columnId });
+
+    // Fazer autenticação anônima para acessar Firestore
+    try {
+      const currentUser = this.authService.getCurrentUser();
+      if (!currentUser) {
+        const authResult = await this.authService.signInAnonymouslyForPublicForms();
+        if (!authResult.success) {
+          console.warn('Erro no login anônimo:', authResult.error);
+        }
+      }
+    } catch (error) {
+      console.warn('Erro na autenticação anônima:', error);
+    }
+
     try {
       let company: any = null;
+      
       // 1) Preferir companyId do link
       if (companyIdParam) {
         company = await this.companyService.getCompany(companyIdParam);
       }
+      
       // 2) Tentar por subdomain explícito
       if (!company && sub) {
         company = await this.companyService.getCompanyBySubdomain(sub);
       }
+      
       // 3) Fallback: detectar pelo host
       if (!company) {
         company = await this.subdomain.initializeFromSubdomain();
       }
+      
       if (company) {
         this.subdomain.setCurrentCompany(company);
         this.companyName.set(company.name || sub || null);
@@ -142,14 +164,30 @@ export class PublicFormComponent implements OnInit {
       } else if (sub) {
         // fallback simples apenas com o nome
         this.companyName.set(sub);
+      } else {
       }
-    } catch { this.companyName.set(sub || null); }
+    } catch (error) { 
+      this.companyName.set(sub || null); 
+    }
+
+    // Definir contexto da empresa ANTES de chamar métodos do FirestoreService
+    // para evitar verificações de autenticação
+    try {
+      const company = this.subdomain.getCurrentCompany();
+      if (company) {
+        this.fs.setCompanyContext(company);
+      }
+    } catch (error) {
+      console.warn('Erro ao definir contexto da empresa:', error);
+    }
 
     try {
       if (this.leadId) {
         this.lead = await this.fs.getLead(this.userId, this.boardId, this.leadId);
       }
-    } catch {}
+    } catch (error) {
+      // Continuar mesmo se não conseguir carregar o lead
+    }
 
     try {
       // Preferir formulário da fase
@@ -203,7 +241,7 @@ export class PublicFormComponent implements OnInit {
       });
       this.form = this.fb.group(formGroup);
       this.fieldsLoaded.set(this.currentFields.length > 0);
-    } catch {
+    } catch (error) {
       this.currentFields = [];
       this.fieldsLoaded.set(false);
     }
@@ -256,7 +294,6 @@ export class PublicFormComponent implements OnInit {
             updates.responsibleUserEmail = selectedUser?.email || '';
 
             // Adicionar ao histórico para mudança de responsável
-            console.log('Responsável alterado via formulário público:', selectedUser?.displayName);
             
             // Garantir que o contexto da empresa está inicializado
             const company = this.subdomain.getCurrentCompany();
@@ -282,13 +319,6 @@ export class PublicFormComponent implements OnInit {
       try {
         const beforeFields = (this.lead.fields || {}) as any;
         const changedKeys = Object.keys(mapped).filter(k => `${beforeFields[k] ?? ''}` !== `${mapped[k] ?? ''}`);
-        
-        console.log('Debug formulário público:', {
-          beforeFields,
-          mapped,
-          changedKeys,
-          hasChanges: changedKeys.length > 0
-        });
         
         if (changedKeys.length) {
           const changesList = changedKeys.map(k => {
@@ -317,12 +347,6 @@ export class PublicFormComponent implements OnInit {
           }).join('');
 
           // Adicionar ao histórico
-          console.log('Adicionando ao histórico:', {
-            userId: this.userId,
-            boardId: this.boardId,
-            leadId: this.leadId,
-            changesList
-          });
           
           // Garantir que o contexto da empresa está inicializado
           const company = this.subdomain.getCurrentCompany();
@@ -340,8 +364,6 @@ export class PublicFormComponent implements OnInit {
               user: 'Formulário Público'
             }
           );
-          
-          console.log('Histórico adicionado com sucesso');
         }
       } catch (error) {
         console.warn('Erro ao registrar histórico:', error);
@@ -350,7 +372,6 @@ export class PublicFormComponent implements OnInit {
       await this.fs.updateLead(this.userId, this.boardId, this.leadId, updates);
       try { this.toast.success('Formulário salvo.'); } catch {}
     } catch (e) {
-      console.error(e);
       try { this.toast.error('Erro ao salvar formulário.'); } catch {}
     } finally {
       this.saving.set(false);

@@ -1,6 +1,6 @@
 import { Injectable, inject, Injector, runInInjectionContext } from '@angular/core';
 import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-         signOut, signInWithPopup, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from '@angular/fire/auth';
+         signOut, signInWithPopup, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously } from '@angular/fire/auth';
 import { GoogleAuthProvider } from 'firebase/auth';
 import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
@@ -155,6 +155,15 @@ export class AuthService {
     try {
       await signOut(this.auth);
       return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async signInAnonymouslyForPublicForms() {
+    try {
+      const result = await signInAnonymously(this.auth);
+      return { success: true, user: result.user };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
