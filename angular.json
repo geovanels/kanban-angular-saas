@@ -31,19 +31,12 @@
               {
                 "glob": "**/*",
                 "input": "public"
-              },
-              {
-                "glob": "**/*",
-                "input": "node_modules/tinymce",
-                "output": "/tinymce/"
               }
             ],
             "styles": [
-              "node_modules/bootstrap/dist/css/bootstrap.min.css",
               "src/styles.scss"
             ],
             "allowedCommonJsDependencies": [
-              "@ckeditor/ckeditor5-build-classic",
               "tinymce"
             ]
           },

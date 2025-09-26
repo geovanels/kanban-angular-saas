@@ -7,8 +7,6 @@ import { provideFirestore, getFirestore, connectFirestoreEmulator } from '@angul
 import { provideStorage, getStorage, connectStorageEmulator } from '@angular/fire/storage';
 import { provideFunctions, getFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
 import { ReactiveFormsModule } from '@angular/forms';
-import { FormlyModule } from '@ngx-formly/core';
-import { FormlyBootstrapModule } from '@ngx-formly/bootstrap';
 import { environment } from '../environments/environment';
 import { CompanyInterceptor } from './interceptors/company.interceptor';
 import { BrandingService } from './services/branding.service';
@@ -104,13 +102,7 @@ export const appConfig: ApplicationConfig = {
       multi: true 
     },
     importProvidersFrom(
-      ReactiveFormsModule,
-      FormlyModule.forRoot({
-        validationMessages: [
-          { name: 'required', message: 'Este campo é obrigatório' },
-        ],
-      }),
-      FormlyBootstrapModule
+      ReactiveFormsModule
     ),
     // Garantir que os serviços sejam instanciados
     BrandingService,

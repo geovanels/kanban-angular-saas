@@ -9,7 +9,7 @@ import { FirestoreService } from '../../services/firestore.service';
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, EditorModule],
   providers: [
-    { provide: TINYMCE_SCRIPT_SRC, useValue: 'tinymce/tinymce.min.js' }
+    { provide: TINYMCE_SCRIPT_SRC, useValue: 'https://cdnjs.cloudflare.com/ajax/libs/tinymce/5.10.9/tinymce.min.js' }
   ],
   templateUrl: './template-modal.component.html',
   styleUrls: ['./template-modal.component.scss']
@@ -29,27 +29,45 @@ export class TemplateModalComponent implements AfterViewInit {
   isLoading = false;
   errorMessage = '';
   currentTemplate: any = null;
-  
+
   public tinymceEditor: any = null;
-  
-  // Configuração do TinyMCE
+
+  // Configuração completa do TinyMCE com todos os recursos gratuitos
   public tinymceConfig = {
     height: 400,
-    menubar: false,
+    menubar: 'edit view insert format table tools help',
     plugins: [
       'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
       'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-      'insertdatetime', 'media', 'table', 'help', 'wordcount'
+      'insertdatetime', 'media', 'table', 'help', 'wordcount', 'emoticons'
     ],
     toolbar: 'undo redo | blocks | ' +
-      'bold italic backcolor | alignleft aligncenter ' +
-      'alignright alignjustify | bullist numlist outdent indent | ' +
-      'removeformat | code | help',
-    content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
-    placeholder: 'Digite o conteúdo do seu template de email aqui...',
+      'bold italic underline strikethrough | forecolor backcolor | ' +
+      'alignleft aligncenter alignright alignjustify | ' +
+      'bullist numlist outdent indent | ' +
+      'table tabledelete | tableprops tablerowprops tablecellprops | ' +
+      'tableinsertrowbefore tableinsertrowafter tabledeleterow | ' +
+      'tableinsertcolbefore tableinsertcolafter tabledeletecol | ' +
+      'link image media | code preview fullscreen | ' +
+      'emoticons charmap insertdatetime | help',
+    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; }',
+    placeholder: 'Digite o conteúdo do template...',
     branding: false,
-    code_dialog_width: 800,
-    code_dialog_height: 600
+    table_default_attributes: {
+      border: '1',
+      cellpadding: '5',
+      cellspacing: '0',
+      style: 'border-collapse: collapse; width: 100%;'
+    },
+    table_default_styles: {
+      'border-collapse': 'collapse',
+      'width': '100%'
+    },
+    image_advtab: true,
+    link_default_target: '_blank',
+    convert_urls: false,
+    remove_script_host: false,
+    relative_urls: false
   };
 
   templateForm: FormGroup = this.fb.group({
@@ -64,29 +82,28 @@ export class TemplateModalComponent implements AfterViewInit {
   ngAfterViewInit() {
   }
 
-  // Método para inserir variáveis no TinyMCE na posição do cursor
+  // Método para inserir variáveis no TinyMCE
   insertVariable(variable: string) {
     if (this.tinymceEditor) {
       try {
-        // Inserir variável na posição do cursor no TinyMCE
         this.tinymceEditor.insertContent(variable);
         this.tinymceEditor.focus();
         return;
       } catch (error) {
-        console.warn('Falha ao inserir no TinyMCE, usando fallback:', error);
+        console.warn('Falha ao inserir no TinyMCE:', error);
       }
     }
 
-    // Fallback: inserir no final do conteúdo atual
+    // Fallback para o formulário
     const currentContent = this.templateForm.get('body')?.value || '';
     const newContent = currentContent + ' ' + variable;
     this.templateForm.patchValue({ body: newContent });
   }
 
-  // Método chamado quando TinyMCE é inicializado
+  // Método quando o TinyMCE é inicializado
   onEditorInit(editor: any) {
     this.tinymceEditor = editor;
-    console.log('TinyMCE Editor inicializado e pronto');
+    console.log('TinyMCE inicializado');
   }
 
   showCreateModal() {
@@ -131,7 +148,6 @@ export class TemplateModalComponent implements AfterViewInit {
       body: template.body || ''
     });
 
-    // TinyMCE será preenchido automaticamente através do modelo do formulário
     console.log('Template carregado:', template.body);
   }
 
