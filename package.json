@@ -6,7 +6,7 @@
     "start": "ng serve",
     "dev": "ng serve",
     "build": "ng build --configuration production",
-    "vercel-build": "ng build --configuration production",
+    "vercel-build": "npm install --legacy-peer-deps && ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve": "ng serve --host 0.0.0.0 --port 4200"
@@ -18,7 +18,7 @@
     "@angular/common": "^20.2.0",
     "@angular/compiler": "^20.2.0",
     "@angular/core": "^20.2.0",
-    "@angular/fire": "^18.0.1",
+    "@angular/fire": "^19.0.0",
     "@angular/forms": "^20.2.0",
     "@angular/platform-browser": "^20.2.0",
     "@angular/router": "^20.2.0",
