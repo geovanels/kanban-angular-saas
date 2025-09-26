@@ -1,1 +1,29 @@
+# Logs and temporary files
 firebase-debug.log
+firestore-debug.log
+*.log
+*.tmp
+
+# macOS files
+.DS_Store
+._*
+
+# Build outputs
+dist/
+.angular/cache/
+
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.local
+
+# Screenshots and media (development only)
+prints/
+screenshots/
