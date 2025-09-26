@@ -117,6 +117,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.loadInitialForm();
       // Carregar fluxo de transições
       this.loadFlowConfig();
+
+      // Inicializar monitor global de automações para leads da API
+      console.log(`🚀 Iniciando monitor global de automações para board ${this.boardId}`);
+      this.automationService.initializeGlobalLeadMonitor(this.boardId, this.ownerId);
       // Agendador periódico para automações de tempo (a cada 60s)
       // Apenas uma instância por board deve executar as automações
       try {
@@ -143,6 +147,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (this.timeAutomationIntervalId) {
       try { clearInterval(this.timeAutomationIntervalId); } catch {}
       this.timeAutomationIntervalId = null;
+    }
+
+    // Parar monitor global de automações
+    if (this.boardId && this.ownerId) {
+      this.automationService.stopGlobalLeadMonitor(this.boardId, this.ownerId);
     }
   }
 
