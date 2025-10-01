@@ -37,6 +37,7 @@
     "@angular/cli": "^17.3.0",
     "@angular/compiler": "^17.3.0",
     "@angular/compiler-cli": "^17.3.0",
-    "typescript": "~5.4.0"
+    "typescript": "~5.4.0",
+    "yargs": "^17.7.2"
   }
 }
