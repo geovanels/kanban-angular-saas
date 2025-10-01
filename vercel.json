@@ -1,7 +1,7 @@
 {
   "version": 2,
   "env": {
-    "NODE_VERSION": "18"
+    "NODE_VERSION": "22"
   },
   "builds": [
     {
@@ -9,7 +9,7 @@
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist/kanban-angular",
-        "nodeVersion": "18.x"
+        "nodeVersion": "22.x"
       }
     }
   ],

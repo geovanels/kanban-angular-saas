@@ -40,7 +40,7 @@ import { AuthService } from '../../services/auth.service';
                   <textarea *ngSwitchCase="'textarea'" rows="3" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
                   <select *ngSwitchCase="'select'" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Selecione...</option>
-                    <ng-container *ngIf="f.options && f.options.length && typeof f.options[0] === 'object'; else simpleOpts">
+                    <ng-container *ngIf="f.options && f.options.length && isObjectOption(f.options[0]); else simpleOpts">
                       <option *ngFor="let opt of f.options" [value]="opt.value">{{ opt.label }}</option>
                     </ng-container>
                     <ng-template #simpleOpts>
@@ -50,15 +50,15 @@ import { AuthService } from '../../services/auth.service';
                   <!-- Campo Radio -->
                   <div *ngSwitchCase="'radio'" class="flex flex-col gap-2">
                     <label *ngFor="let opt of (f.options || [])" class="inline-flex items-center gap-2 text-sm text-gray-700">
-                      <input type="radio" [attr.name]="f.name" [value]="opt?.value ?? opt" [formControlName]="f.name" class="text-blue-600 focus:ring-blue-500">
-                      <span>{{ opt?.label ?? opt }}</span>
+                      <input type="radio" [attr.name]="f.name" [value]="isObjectOption(opt) ? opt.value : opt" [formControlName]="f.name" class="text-blue-600 focus:ring-blue-500">
+                      <span>{{ isObjectOption(opt) ? opt.label : opt }}</span>
                     </label>
                   </div>
                   <!-- Campo Checkbox -->
                   <div *ngSwitchCase="'checkbox'" class="flex flex-col gap-2">
                     <label *ngFor="let opt of (f.options || []); let i = index" class="inline-flex items-center gap-2 text-sm text-gray-700">
-                      <input type="checkbox" [attr.name]="f.name + '_' + i" [value]="opt" [formControlName]="f.name + '_' + i" class="text-blue-600 focus:ring-blue-500">
-                      <span>{{ opt }}</span>
+                      <input type="checkbox" [attr.name]="f.name + '_' + i" [value]="isObjectOption(opt) ? opt.value : opt" [formControlName]="f.name + '_' + i" class="text-blue-600 focus:ring-blue-500">
+                      <span>{{ isObjectOption(opt) ? opt.label : opt }}</span>
                     </label>
                   </div>
                   <select *ngSwitchCase="'temperatura'" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -383,6 +383,10 @@ export class PublicFormComponent implements OnInit {
       .replace(/([A-Z])/g, ' $1')
       .replace(/^./, str => str.toUpperCase())
       .trim();
+  }
+
+  isObjectOption(option: any): boolean {
+    return typeof option === 'object' && option !== null;
   }
 }
 

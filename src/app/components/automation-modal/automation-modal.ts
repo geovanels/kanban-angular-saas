@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-automation-modal',
+  standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './automation-modal.html',
   styleUrls: ['./automation-modal.scss']
@@ -99,13 +100,14 @@ export class AutomationModal implements OnInit {
 
   onTriggerTypeChange() {
     const triggerType = this.automationForm.get('triggerType')?.value;
-    
-    this.showTriggerPhase = triggerType === 'card-enters-phase' || 
-                           triggerType === 'card-in-phase-for-time' || 
+
+    this.showTriggerPhase = triggerType === 'card-enters-phase' ||
+                           triggerType === 'card-in-phase-for-time' ||
                            triggerType === 'form-not-answered' ||
+                           triggerType === 'form-answered' ||
                            triggerType === 'sla-overdue';
-    
-    this.showTriggerTime = triggerType === 'card-in-phase-for-time' || triggerType === 'form-not-answered';
+
+    this.showTriggerTime = triggerType === 'card-in-phase-for-time' || triggerType === 'form-not-answered' || triggerType === 'form-answered';
 
     const triggerPhaseCtrl = this.automationForm.get('triggerPhase');
     const triggerDaysCtrl = this.automationForm.get('triggerDays');
@@ -120,9 +122,15 @@ export class AutomationModal implements OnInit {
       triggerPhaseCtrl?.setValue('');
     }
     triggerPhaseCtrl?.updateValueAndValidity({ emitEvent: false });
-    
+
     if (this.showTriggerTime) {
-      triggerDaysCtrl?.setValidators([Validators.required, Validators.min(1)]);
+      // Para form-answered, permitir 0 (imediato)
+      const minValue = triggerType === 'form-answered' ? 0 : 1;
+      triggerDaysCtrl?.setValidators([Validators.required, Validators.min(minValue)]);
+      // Definir valor padrão adequado
+      if (triggerType === 'form-answered' && !triggerDaysCtrl?.value) {
+        triggerDaysCtrl?.setValue(0);
+      }
     } else {
       triggerDaysCtrl?.clearValidators();
       triggerDaysCtrl?.setValue(1);
@@ -204,6 +212,7 @@ export class AutomationModal implements OnInit {
       'card-enters-phase': 'Um card entrou na fase',
       'card-in-phase-for-time': 'Um card está na fase por um tempo',
       'form-not-answered': 'Formulário da fase não respondido',
+      'form-answered': 'Formulário da fase respondido',
       'sla-overdue': 'SLA Vencido'
     };
     return types[triggerType] || 'Sem Nome';
