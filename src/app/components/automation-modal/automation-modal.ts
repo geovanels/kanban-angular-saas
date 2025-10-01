@@ -130,8 +130,11 @@ export class AutomationModal implements OnInit {
     if (this.showTriggerPhase) {
       triggerPhaseCtrl?.setValidators([Validators.required]);
       const currentVal = triggerPhaseCtrl?.value;
-      const desired = this.fixedPhaseId || currentVal || (this.phases && this.phases[0]?.id) || '';
-      if (desired) triggerPhaseCtrl?.setValue(desired);
+      // Só definir valor se não houver nenhum valor atual
+      if (!currentVal) {
+        const desired = this.fixedPhaseId || (this.phases && this.phases[0]?.id) || '';
+        if (desired) triggerPhaseCtrl?.setValue(desired);
+      }
     } else {
       triggerPhaseCtrl?.clearValidators();
       triggerPhaseCtrl?.setValue('');
