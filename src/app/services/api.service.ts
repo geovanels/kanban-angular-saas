@@ -36,7 +36,7 @@ export interface WebhookPayload {
   providedIn: 'root'
 })
 export class ApiService {
-  private http = inject(HttpClient);
+  private http: HttpClient = inject(HttpClient);
   private subdomainService = inject(SubdomainService);
 
   // Lead Intake API - via Firebase HTTP Function

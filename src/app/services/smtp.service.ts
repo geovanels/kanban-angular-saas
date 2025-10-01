@@ -34,7 +34,7 @@ export interface EmailResponse {
   providedIn: 'root'
 })
 export class SmtpService {
-  private http = inject(HttpClient);
+  private http: HttpClient = inject(HttpClient);
   private subdomainService = inject(SubdomainService);
   private functions = inject(Functions);
   private companyService = inject(CompanyService);

@@ -50,10 +50,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
   @ViewChild(TemplateModalComponent) templateModal!: TemplateModalComponent;
   @ViewChild(AutomationModal) automationModal!: AutomationModal;
   @ViewChild('flowScroller') flowScrollerRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('kanbanBoard') kanbanBoardRef!: ElementRef<HTMLDivElement>;
   flowThumbPercent = 10;
   flowThumbLeftPercent = 0;
   private isDraggingFlowBar = false;
   private isManualReorder = false;
+
+  // Drag to scroll
+  private isDraggingScroll = false;
+  private scrollStartX = 0;
+  private scrollStartY = 0;
+  private scrollLeft = 0;
+  private scrollTop = 0;
 
   board: Board | null = null;
   columns: Column[] = [];
@@ -2845,6 +2853,56 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }).catch(err => {
       console.error('Erro ao copiar texto:', err);
     });
+  }
+
+  // Drag to scroll methods
+  onKanbanMouseDown(event: MouseEvent) {
+    if (!this.kanbanBoardRef) return;
+
+    // Ignorar se clicar em botões, inputs ou cards arrastáveis
+    const target = event.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('textarea') ||
+        target.closest('.kanban-card') || target.closest('.cdk-drag')) {
+      return;
+    }
+
+    this.isDraggingScroll = true;
+    const el = this.kanbanBoardRef.nativeElement;
+    this.scrollStartX = event.pageX - el.offsetLeft;
+    this.scrollStartY = event.pageY - el.offsetTop;
+    this.scrollLeft = el.scrollLeft;
+    this.scrollTop = el.scrollTop;
+    el.style.cursor = 'grabbing';
+    el.style.userSelect = 'none';
+  }
+
+  onKanbanMouseMove(event: MouseEvent) {
+    if (!this.isDraggingScroll || !this.kanbanBoardRef) return;
+
+    event.preventDefault();
+    const el = this.kanbanBoardRef.nativeElement;
+    const x = event.pageX - el.offsetLeft;
+    const y = event.pageY - el.offsetTop;
+    const walkX = (x - this.scrollStartX) * 2; // Multiplicador para scroll mais rápido
+    const walkY = (y - this.scrollStartY) * 2;
+    el.scrollLeft = this.scrollLeft - walkX;
+    el.scrollTop = this.scrollTop - walkY;
+  }
+
+  onKanbanMouseUp() {
+    if (!this.kanbanBoardRef) return;
+    this.isDraggingScroll = false;
+    const el = this.kanbanBoardRef.nativeElement;
+    el.style.cursor = 'grab';
+    el.style.userSelect = 'auto';
+  }
+
+  onKanbanMouseLeave() {
+    if (!this.kanbanBoardRef) return;
+    this.isDraggingScroll = false;
+    const el = this.kanbanBoardRef.nativeElement;
+    el.style.cursor = 'grab';
+    el.style.userSelect = 'auto';
   }
 
 }
