@@ -797,6 +797,22 @@ export class AutomationService {
           }))
         );
       }
+
+      const formAnsweredAutomations = list.filter(a => {
+        const type = (a as any).triggerType || (a as any).trigger?.type;
+        return type === 'form-answered';
+      });
+
+      if (formAnsweredAutomations.length > 0) {
+        console.log(`✅ Encontradas ${formAnsweredAutomations.length} automações 'form-answered' ativas:`,
+          formAnsweredAutomations.map(a => ({
+            id: a.id,
+            name: a.name,
+            phase: (a as any).triggerPhase,
+            days: (a as any).triggerDays || 0
+          }))
+        );
+      }
       
       
 
