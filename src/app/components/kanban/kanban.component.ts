@@ -2910,5 +2910,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
     el.style.userSelect = 'auto';
   }
 
+  getLeadTitle(lead: any): string {
+    const fields = lead?.fields || {};
+    // Suportar variações de nomes de campos
+    const title = fields['companyName'] ||
+                  fields['nameComapny'] ||  // typo comum no banco
+                  fields['nameCompany'] ||
+                  fields['contactName'] ||
+                  fields['nameContact'] ||  // variação alternativa
+                  fields['contactEmail'] ||
+                  fields['emailContact'] ||
+                  'Sem título';
+    return title;
+  }
+
 }
 
