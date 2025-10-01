@@ -106,7 +106,10 @@ export class AutomationModal implements OnInit {
         });
       }
 
-      this.onTriggerTypeChange();
+      // Delay para garantir que o Angular atualize a view antes de chamar onTriggerTypeChange
+      setTimeout(() => {
+        this.onTriggerTypeChange();
+      }, 0);
     }
   }
 
