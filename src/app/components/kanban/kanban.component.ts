@@ -2757,9 +2757,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
       event.preventDefault();
       event.stopPropagation();
     }
-    
+
+    console.log('🔧 Editando automação (ANTES do JSON.parse):', automation);
+
     // Passar cópia profunda para evitar duplicação/efeitos colaterais no array
     this.selectedAutomation = JSON.parse(JSON.stringify(automation));
+
+    console.log('🔧 Automação selecionada (DEPOIS do JSON.parse):', this.selectedAutomation);
+
     this.showAutomationModal = true;
   }
 
