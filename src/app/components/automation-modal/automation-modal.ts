@@ -79,12 +79,20 @@ export class AutomationModal implements OnInit {
     if (this.automation) {
       console.log('📝 Carregando dados da automação:', this.automation);
 
+      // Suportar dois formatos: direto (triggerType) ou aninhado (trigger.type)
+      const trigger = this.automation.trigger || {};
+      const triggerType = this.automation.triggerType ?? trigger.type ?? 'new-lead-created';
+      const triggerPhase = this.automation.triggerPhase ?? trigger.phase ?? '';
+      const triggerDays = this.automation.triggerDays ?? trigger.days ?? 1;
+
+      console.log('🔍 Valores extraídos:', { triggerType, triggerPhase, triggerDays });
+
       this.automationForm.patchValue({
         id: this.automation.id,
         name: this.automation.name,
-        triggerType: this.automation.triggerType,
-        triggerPhase: this.automation.triggerPhase,
-        triggerDays: this.automation.triggerDays
+        triggerType: triggerType,
+        triggerPhase: triggerPhase,
+        triggerDays: triggerDays
       });
 
       console.log('📋 Form após patchValue:', this.automationForm.value);
