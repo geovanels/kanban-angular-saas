@@ -26,6 +26,7 @@ export class AutomationModal implements OnInit {
   isEditing = false;
   showTriggerPhase = false;
   showTriggerTime = false;
+  private isLoadingAutomation = false;
 
   constructor(private fb: FormBuilder) {
     this.automationForm = this.createForm();
@@ -79,6 +80,8 @@ export class AutomationModal implements OnInit {
     if (this.automation) {
       console.log('📝 Carregando dados da automação:', this.automation);
 
+      this.isLoadingAutomation = true;
+
       // Suportar dois formatos: direto (triggerType) ou aninhado (trigger.type)
       const trigger = this.automation.trigger || {};
       const triggerType = this.automation.triggerType ?? trigger.type ?? 'new-lead-created';
@@ -86,6 +89,17 @@ export class AutomationModal implements OnInit {
       const triggerDays = this.automation.triggerDays ?? trigger.days ?? 1;
 
       console.log('🔍 Valores extraídos:', { triggerType, triggerPhase, triggerDays });
+
+      // Configurar flags de exibição ANTES de setar os valores
+      this.showTriggerPhase = triggerType === 'card-enters-phase' ||
+                             triggerType === 'card-in-phase-for-time' ||
+                             triggerType === 'form-not-answered' ||
+                             triggerType === 'form-answered' ||
+                             triggerType === 'sla-overdue';
+
+      this.showTriggerTime = triggerType === 'card-in-phase-for-time' ||
+                            triggerType === 'form-not-answered' ||
+                            triggerType === 'form-answered';
 
       this.automationForm.patchValue({
         id: this.automation.id,
@@ -106,14 +120,41 @@ export class AutomationModal implements OnInit {
         });
       }
 
-      // Delay para garantir que o Angular atualize a view antes de chamar onTriggerTypeChange
+      // Delay para aplicar validadores após carregar os valores
       setTimeout(() => {
-        this.onTriggerTypeChange();
+        this.applyValidators();
+        this.isLoadingAutomation = false;
       }, 0);
     }
   }
 
+  private applyValidators() {
+    const triggerPhaseCtrl = this.automationForm.get('triggerPhase');
+    const triggerDaysCtrl = this.automationForm.get('triggerDays');
+    const triggerType = this.automationForm.get('triggerType')?.value;
+
+    if (this.showTriggerPhase) {
+      triggerPhaseCtrl?.setValidators([Validators.required]);
+    } else {
+      triggerPhaseCtrl?.clearValidators();
+    }
+    triggerPhaseCtrl?.updateValueAndValidity({ emitEvent: false });
+
+    if (this.showTriggerTime) {
+      const minValue = triggerType === 'form-answered' ? 0 : 1;
+      triggerDaysCtrl?.setValidators([Validators.required, Validators.min(minValue)]);
+    } else {
+      triggerDaysCtrl?.clearValidators();
+    }
+    triggerDaysCtrl?.updateValueAndValidity({ emitEvent: false });
+  }
+
   onTriggerTypeChange() {
+    // Se estiver carregando uma automação, não fazer nada
+    if (this.isLoadingAutomation) {
+      return;
+    }
+
     const triggerType = this.automationForm.get('triggerType')?.value;
 
     this.showTriggerPhase = triggerType === 'card-enters-phase' ||
