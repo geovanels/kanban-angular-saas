@@ -9,7 +9,7 @@
       <div class="border rounded-lg p-4">
         <h3 class="font-semibold text-md mb-3 text-gray-700">Gatilho (Quando...)</h3>
         <select formControlName="triggerType" class="w-full p-2 border rounded-md mb-2 bg-white" (change)="onTriggerTypeChange()">
-          <ng-container *ngIf="!allowedTriggerTypes">
+          <ng-container *ngIf="!effectiveAllowedTriggerTypes || effectiveAllowedTriggerTypes.length === 0">
             <option value="new-lead-created">Criar novo registro (apenas fase inicial)</option>
             <option value="card-enters-phase">Um card entrou na fase</option>
             <option value="card-in-phase-for-time">Um card está na fase por um tempo</option>
@@ -17,13 +17,13 @@
             <option value="form-answered">Formulário da fase respondido</option>
             <option value="sla-overdue">SLA da fase venceu</option>
           </ng-container>
-          <ng-container *ngIf="allowedTriggerTypes">
-            <option *ngIf="allowedTriggerTypes.includes('new-lead-created')" value="new-lead-created">Criar novo registro (apenas fase inicial)</option>
-            <option *ngIf="allowedTriggerTypes.includes('card-enters-phase')" value="card-enters-phase">Um card entrou na fase</option>
-            <option *ngIf="allowedTriggerTypes.includes('card-in-phase-for-time')" value="card-in-phase-for-time">Um card está na fase por um tempo</option>
-            <option *ngIf="allowedTriggerTypes.includes('form-not-answered')" value="form-not-answered">Formulário da fase não respondido</option>
-            <option *ngIf="allowedTriggerTypes.includes('form-answered')" value="form-answered">Formulário da fase respondido</option>
-            <option *ngIf="allowedTriggerTypes.includes('sla-overdue')" value="sla-overdue">SLA da fase venceu</option>
+          <ng-container *ngIf="effectiveAllowedTriggerTypes && effectiveAllowedTriggerTypes.length > 0">
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('new-lead-created')" value="new-lead-created">Criar novo registro (apenas fase inicial)</option>
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('card-enters-phase')" value="card-enters-phase">Um card entrou na fase</option>
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('card-in-phase-for-time')" value="card-in-phase-for-time">Um card está na fase por um tempo</option>
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('form-not-answered')" value="form-not-answered">Formulário da fase não respondido</option>
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('form-answered')" value="form-answered">Formulário da fase respondido</option>
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('sla-overdue')" value="sla-overdue">SLA da fase venceu</option>
           </ng-container>
         </select>
         

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
@@ -27,8 +27,9 @@ export class AutomationModal implements OnInit {
   showTriggerPhase = false;
   showTriggerTime = false;
   private isLoadingAutomation = false;
+  effectiveAllowedTriggerTypes: string[] | null = null;
 
-  constructor(private fb: FormBuilder) {
+  constructor(private fb: FormBuilder, private cdr: ChangeDetectorRef) {
     this.automationForm = this.createForm();
   }
 
@@ -39,6 +40,11 @@ export class AutomationModal implements OnInit {
   }
 
   ngOnInit() {
+    console.log('🎬 ngOnInit - allowedTriggerTypes:', this.allowedTriggerTypes);
+
+    // Inicializar effectiveAllowedTriggerTypes
+    this.effectiveAllowedTriggerTypes = this.allowedTriggerTypes;
+
     if (this.automation) {
       this.isEditing = true;
       this.modalTitle = 'Editar Automação';
@@ -90,6 +96,14 @@ export class AutomationModal implements OnInit {
 
       console.log('🔍 Valores extraídos:', { triggerType, triggerPhase, triggerDays });
 
+      // Se estiver editando e o triggerType não está na lista permitida, adicionar temporariamente
+      if (this.allowedTriggerTypes && !this.allowedTriggerTypes.includes(triggerType)) {
+        console.log('⚠️ triggerType não está em allowedTriggerTypes, adicionando temporariamente');
+        this.effectiveAllowedTriggerTypes = [...this.allowedTriggerTypes, triggerType];
+      } else {
+        this.effectiveAllowedTriggerTypes = this.allowedTriggerTypes;
+      }
+
       // Configurar flags de exibição ANTES de setar os valores
       this.showTriggerPhase = triggerType === 'card-enters-phase' ||
                              triggerType === 'card-in-phase-for-time' ||
@@ -101,15 +115,21 @@ export class AutomationModal implements OnInit {
                             triggerType === 'form-not-answered' ||
                             triggerType === 'form-answered';
 
+      // Forçar detecção de mudanças antes de setar valores
+      this.cdr.detectChanges();
+
       this.automationForm.patchValue({
         id: this.automation.id,
         name: this.automation.name,
-        triggerType: triggerType,
         triggerPhase: triggerPhase,
         triggerDays: triggerDays
-      });
+      }, { emitEvent: false });
+
+      // Setar triggerType separadamente e forçar update
+      this.automationForm.get('triggerType')?.setValue(triggerType, { emitEvent: false });
 
       console.log('📋 Form após patchValue:', this.automationForm.value);
+      console.log('🎯 triggerType control value:', this.automationForm.get('triggerType')?.value);
 
       const actionsArray = this.automationForm.get('actions') as FormArray;
       actionsArray.clear();
@@ -123,8 +143,18 @@ export class AutomationModal implements OnInit {
       // Delay para aplicar validadores após carregar os valores
       setTimeout(() => {
         this.applyValidators();
+        // Forçar re-renderização do select
+        const triggerTypeCtrl = this.automationForm.get('triggerType');
+        if (triggerTypeCtrl) {
+          const currentValue = triggerTypeCtrl.value;
+          triggerTypeCtrl.setValue('', { emitEvent: false });
+          this.cdr.detectChanges();
+          triggerTypeCtrl.setValue(currentValue, { emitEvent: false });
+          this.cdr.detectChanges();
+        }
         this.isLoadingAutomation = false;
-      }, 0);
+        console.log('✅ Loading concluído. triggerType final:', this.automationForm.get('triggerType')?.value);
+      }, 50);
     }
   }
 
@@ -150,12 +180,16 @@ export class AutomationModal implements OnInit {
   }
 
   onTriggerTypeChange() {
+    console.log('🔄 onTriggerTypeChange chamado. isLoadingAutomation:', this.isLoadingAutomation);
+
     // Se estiver carregando uma automação, não fazer nada
     if (this.isLoadingAutomation) {
+      console.log('⏭️ Ignorando onTriggerTypeChange pois está carregando');
       return;
     }
 
     const triggerType = this.automationForm.get('triggerType')?.value;
+    console.log('🔄 Processando mudança de trigger para:', triggerType);
 
     this.showTriggerPhase = triggerType === 'card-enters-phase' ||
                            triggerType === 'card-in-phase-for-time' ||

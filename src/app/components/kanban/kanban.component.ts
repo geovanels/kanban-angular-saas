@@ -1655,7 +1655,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   getAllowedTriggerTypesForPhase(phaseId: string): string[] {
-    const base = ['new-lead-created', 'card-enters-phase', 'card-in-phase-for-time', 'form-not-answered', 'sla-overdue'];
+    const base = ['new-lead-created', 'card-enters-phase', 'card-in-phase-for-time', 'form-not-answered', 'form-answered', 'sla-overdue'];
     return base;
   }
 
