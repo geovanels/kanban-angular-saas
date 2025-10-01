@@ -1083,7 +1083,7 @@ Authorization: Bearer {{ apiToken }}
                 *ngFor="let lead of getLeadsForColumn(column.id!)"
                 (click)="showLeadDetailModal(lead)"
                 class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
-                <div class="text-base font-bold text-gray-900 mb-1">{{ lead.fields['companyName'] || 'Sem título' }}</div>
+                <div class="text-base font-bold text-gray-900 mb-1">{{ getLeadTitle(lead) }}</div>
                 <div class="text-[13px] text-gray-500 mb-2" *ngIf="getLeadResponsibleName(lead)">
                   {{ getLeadResponsibleName(lead) }}
                 </div>

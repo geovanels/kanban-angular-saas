@@ -99,16 +99,20 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async loadBoards() {
     if (!this.currentUser) {
+      console.log('❌ Dashboard - Usuário não autenticado');
       return;
     }
 
+    console.log('🔄 Dashboard - Carregando boards para usuário:', this.currentUser.uid, this.currentUser.email);
     this.isLoading = true;
     try {
       this.boards = await this.firestoreService.getBoards(this.currentUser.uid);
-      
+      console.log('📋 Dashboard - Boards carregados:', this.boards.length, this.boards);
+
       // Carregar estatísticas para cada board
       await this.loadBoardStatistics();
     } catch (error) {
+      console.error('❌ Dashboard - Erro ao carregar boards:', error);
       // Handle error silently or show user-friendly message
     } finally {
       this.isLoading = false;

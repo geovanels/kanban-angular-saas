@@ -9,15 +9,17 @@ import { CommonModule } from '@angular/common';
     <footer class="bg-gray-50 border-t border-gray-200 mt-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center justify-center">
-          <div class="flex items-center space-x-2 text-sm text-gray-500">
-            <span>Powered by</span>
-            <div class="flex items-center space-x-1">
-              <div class="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center">
-                <i class="fas fa-tasks text-white text-xs"></i>
+          <div class="flex flex-col sm:flex-row items-center gap-1 sm:space-x-2 text-sm text-gray-500 text-center">
+            <div class="flex items-center space-x-2">
+              <span>Powered by</span>
+              <div class="flex items-center space-x-1">
+                <div class="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center">
+                  <i class="fas fa-tasks text-white text-xs"></i>
+                </div>
+                <span class="font-semibold text-gray-700">Task Board</span>
               </div>
-              <span class="font-semibold text-gray-700">Task Board</span>
             </div>
-            <span>•</span>
+            <span class="hidden sm:inline">•</span>
             <span>Sistema de Gestão Kanban</span>
           </div>
         </div>
