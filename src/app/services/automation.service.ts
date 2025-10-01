@@ -168,9 +168,42 @@ export class AutomationService {
 
         // Executar cada automação
         for (const automation of newLeadAutomations) {
+          console.log(`▶️ Verificando automação: ${automation.id} - ${automation.name}`);
+
+          // Verificar se já foi executada anteriormente
+          const alreadyExecuted = await this.hasRecentlyExecuted(lead, automation.id, 365 * 24 * 60 * 60 * 1000); // 1 ano
+          if (alreadyExecuted) {
+            console.log(`⏭️ Automação ${automation.id} já foi executada para este lead, pulando`);
+            continue;
+          }
+
+          // Verificar se o lead foi criado há menos de 5 minutos (evitar disparar para leads antigos)
+          let leadCreatedAt: number | null = null;
+          const createdTs = (lead.createdAt as any);
+          if (createdTs?.toDate) {
+            leadCreatedAt = createdTs.toDate().getTime();
+          } else if (createdTs?.seconds) {
+            leadCreatedAt = createdTs.seconds * 1000;
+          } else if (createdTs) {
+            try {
+              leadCreatedAt = new Date(createdTs).getTime();
+            } catch {
+              leadCreatedAt = null;
+            }
+          }
+
+          const now = Date.now();
+          const fiveMinutes = 5 * 60 * 1000;
+
+          if (leadCreatedAt && (now - leadCreatedAt) > fiveMinutes) {
+            console.log(`⏭️ Lead foi criado há mais de 5 minutos (${Math.floor((now - leadCreatedAt) / 60000)} min), não é um lead novo, pulando automação de novo lead`);
+            continue;
+          }
+
           console.log(`▶️ Executando automação: ${automation.id} - ${automation.name}`);
           try {
             await this.executeAutomation(automation, lead, boardId, ownerId);
+            await this.markExecuted(ownerId, boardId, lead, automation.id);
             console.log(`✅ Automação ${automation.id} executada com sucesso`);
           } catch (execError) {
             console.error(`❌ Erro ao executar automação ${automation.id}:`, execError);
