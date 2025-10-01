@@ -77,6 +77,8 @@ export class AutomationModal implements OnInit {
 
   loadAutomationData() {
     if (this.automation) {
+      console.log('📝 Carregando dados da automação:', this.automation);
+
       this.automationForm.patchValue({
         id: this.automation.id,
         name: this.automation.name,
@@ -85,9 +87,11 @@ export class AutomationModal implements OnInit {
         triggerDays: this.automation.triggerDays
       });
 
+      console.log('📋 Form após patchValue:', this.automationForm.value);
+
       const actionsArray = this.automationForm.get('actions') as FormArray;
       actionsArray.clear();
-      
+
       if (this.automation.actions) {
         this.automation.actions.forEach((action: any) => {
           actionsArray.push(this.createActionGroup(action));
