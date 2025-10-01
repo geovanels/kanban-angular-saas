@@ -194,7 +194,13 @@
   </div>
 
   <!-- Desktop Kanban Board Tab -->
-  <div *ngIf="!isLoading && activeTab === 'kanban'" class="kanban-board desktop-board">
+  <div *ngIf="!isLoading && activeTab === 'kanban'"
+       class="kanban-board desktop-board"
+       #kanbanBoard
+       (mousedown)="onKanbanMouseDown($event)"
+       (mousemove)="onKanbanMouseMove($event)"
+       (mouseup)="onKanbanMouseUp()"
+       (mouseleave)="onKanbanMouseLeave()">
     <div 
       *ngFor="let column of columns" 
       class="kanban-column"

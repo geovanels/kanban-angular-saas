@@ -4,11 +4,17 @@
   gap: 12px;               /* mais espaço entre fases como solicitado */
   padding: 12px;
   overflow-x: auto;
+  overflow-y: auto;
   min-height: calc(100vh - 80px);
   scroll-snap-type: x mandatory;
   position: relative;
   justify-content: flex-start;
   align-items: stretch;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 /* Hide mobile layout by default (desktop first) */

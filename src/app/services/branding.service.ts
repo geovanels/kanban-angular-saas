@@ -26,7 +26,7 @@ export interface LogoUploadResponse {
   providedIn: 'root'
 })
 export class BrandingService {
-  private http = inject(HttpClient);
+  private http: HttpClient = inject(HttpClient);
   private subdomainService = inject(SubdomainService);
   private companyService = inject(CompanyService);
 
