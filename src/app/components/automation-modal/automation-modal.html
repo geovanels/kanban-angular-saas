@@ -14,6 +14,7 @@
             <option value="card-enters-phase">Um card entrou na fase</option>
             <option value="card-in-phase-for-time">Um card está na fase por um tempo</option>
             <option value="form-not-answered">Formulário da fase não respondido</option>
+            <option value="form-answered">Formulário da fase respondido</option>
             <option value="sla-overdue">SLA da fase venceu</option>
           </ng-container>
           <ng-container *ngIf="allowedTriggerTypes">
@@ -21,6 +22,7 @@
             <option *ngIf="allowedTriggerTypes.includes('card-enters-phase')" value="card-enters-phase">Um card entrou na fase</option>
             <option *ngIf="allowedTriggerTypes.includes('card-in-phase-for-time')" value="card-in-phase-for-time">Um card está na fase por um tempo</option>
             <option *ngIf="allowedTriggerTypes.includes('form-not-answered')" value="form-not-answered">Formulário da fase não respondido</option>
+            <option *ngIf="allowedTriggerTypes.includes('form-answered')" value="form-answered">Formulário da fase respondido</option>
             <option *ngIf="allowedTriggerTypes.includes('sla-overdue')" value="sla-overdue">SLA da fase venceu</option>
           </ng-container>
         </select>
@@ -42,9 +44,13 @@
         <div [class.hidden]="!showTriggerTime" class="mt-2">
           <label for="triggerDays" class="text-sm font-medium text-gray-700" *ngIf="automationForm.get('triggerType')?.value === 'card-in-phase-for-time'">Por (dias):</label>
           <label for="triggerDays" class="text-sm font-medium text-gray-700" *ngIf="automationForm.get('triggerType')?.value === 'form-not-answered'">Aguardar (dias):</label>
-          <input type="number" formControlName="triggerDays" min="1" class="w-full p-2 border rounded-md mt-1" placeholder="Ex: 3">
+          <label for="triggerDays" class="text-sm font-medium text-gray-700" *ngIf="automationForm.get('triggerType')?.value === 'form-answered'">Aguardar (dias):</label>
+          <input type="number" formControlName="triggerDays" min="0" class="w-full p-2 border rounded-md mt-1" placeholder="Ex: 3">
           <div class="text-xs text-gray-500 mt-1" *ngIf="automationForm.get('triggerType')?.value === 'form-not-answered'">
             Se, após esse prazo, nenhum campo do formulário da fase tiver sido preenchido, a automação será executada.
+          </div>
+          <div class="text-xs text-gray-500 mt-1" *ngIf="automationForm.get('triggerType')?.value === 'form-answered'">
+            Após esse prazo, se pelo menos um campo do formulário da fase tiver sido preenchido, a automação será executada. (0 = imediato)
           </div>
         </div>
       </div>

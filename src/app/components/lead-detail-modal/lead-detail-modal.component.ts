@@ -86,45 +86,49 @@ export class LeadDetailModalComponent {
   // Configuração do formulário inicial (somente leitura)
   initialFormConfig: any | null = null;
 
+  // Cache de configurações de formulários
+  private static formConfigCache = new Map<string, any>();
+  private static cacheTimestamp = new Map<string, number>();
+  private static CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
   async show(lead: Lead) {
-    
+
     // RESET COMPLETO DE ESTADO
     this.fullStateReset();
-    
+
     this.currentLead = lead;
     this.isVisible = true;
-    
+
     // Forçar detecção inicial
     this.cdr.detectChanges();
-    
-    // Carregar dados em background com pequeno delay para garantir que o modal seja mostrado
-    setTimeout(() => {
-      this.loadLeadDataAsync();
-    }, 10);
+
+    // Carregar dados imediatamente (sem setTimeout desnecessário)
+    this.loadLeadDataAsync();
   }
 
   private async loadLeadDataAsync() {
     try {
-      // Carregar dados básicos primeiro
-      await this.loadBasicLeadData();
-      
-      // Gerar link público (não depende de outros dados)
+      // Gerar link público imediatamente (síncrono)
       this.generatePublicLink();
-      
-      // Carregar campos do formulário de forma assíncrona
-      setTimeout(() => {
-        this.loadFormFieldsAsync();
-      }, 50);
-      
-      // Carregar histórico de forma assíncrona
-      setTimeout(() => {
-        this.loadHistoryAsync();
-      }, 100);
-      
+
+      // Carregar tudo em paralelo para máxima performance
+      Promise.all([
+        this.loadBasicLeadData(),
+        this.loadFormFieldsAsync(),
+        this.loadHistoryAsync()
+      ]).catch(error => {
+        console.error('Erro ao carregar dados do lead:', error);
+        this.errorMessage = 'Erro ao carregar dados do lead';
+        this.isLoadingFields = false;
+        this.isLoadingHistory = false;
+        this.cdr.detectChanges();
+      });
+
     } catch (error) {
       this.errorMessage = 'Erro ao carregar dados do lead';
       this.isLoadingFields = false;
       this.isLoadingHistory = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -136,33 +140,39 @@ export class LeadDetailModalComponent {
       const latest = await this.firestoreService.getLead(this.ownerId, this.boardId, this.currentLead.id!);
       if (latest) {
         this.currentLead = latest;
+        this.cdr.detectChanges();
       }
-    } catch {}
+    } catch (error) {
+      console.error('Erro ao carregar dados básicos do lead:', error);
+    }
   }
 
   private async loadFormFieldsAsync() {
     try {
       this.isLoadingFields = true;
       this.fieldsReady = false;
-      
-      // SEMPRE recarregar configuração inicial
-      this.initialFormConfig = null;
-      this.initialFormConfig = await this.firestoreService.getInitialFormConfig(this.boardId);
-      
+
+      // Carregar configuração inicial com cache
+      const initialCacheKey = `initial_${this.boardId}`;
+      this.initialFormConfig = await this.getCachedFormConfig(
+        initialCacheKey,
+        () => this.firestoreService.getInitialFormConfig(this.boardId)
+      );
+
       // Forçar detecção de mudanças após carregar configuração inicial
       this.cdr.detectChanges();
-      
+
       // Carregar formulário da fase atual (já configura os campos)
       await this.loadCurrentPhaseForm();
-      
+
       // Finalizar carregamento
       this.isLoadingFields = false;
       this.fieldsReady = true;
-      
-      
+
+
       // Forçar detecção de mudanças final
       this.cdr.detectChanges();
-      
+
     } catch (error) {
       this.isLoadingFields = false;
       this.fieldsReady = true;
@@ -170,34 +180,48 @@ export class LeadDetailModalComponent {
     }
   }
 
+  private async getCachedFormConfig(cacheKey: string, fetchFn: () => Promise<any>): Promise<any> {
+    const now = Date.now();
+    const cached = LeadDetailModalComponent.formConfigCache.get(cacheKey);
+    const timestamp = LeadDetailModalComponent.cacheTimestamp.get(cacheKey);
+
+    // Retornar cache se ainda válido
+    if (cached && timestamp && (now - timestamp) < LeadDetailModalComponent.CACHE_TTL) {
+      return cached;
+    }
+
+    // Buscar novo e cachear
+    const config = await fetchFn();
+    LeadDetailModalComponent.formConfigCache.set(cacheKey, config);
+    LeadDetailModalComponent.cacheTimestamp.set(cacheKey, now);
+    return config;
+  }
+
   private async loadHistoryAsync() {
     try {
       this.isLoadingHistory = true;
-      
-      // Carregar histórico do lead
-      const history = await this.firestoreService.getLeadHistory(
-        this.ownerId,
-        this.boardId,
-        this.currentLead!.id!
-      );
-      this.leadHistory = history as LeadHistory[];
 
-      // Subscribir histórico em tempo real
-      if (this.unsubscribeHistory) { 
-        this.unsubscribeHistory(); 
-        this.unsubscribeHistory = null; 
+      // Subscribir histórico em tempo real diretamente (mais rápido que buscar + subscribir)
+      if (this.unsubscribeHistory) {
+        this.unsubscribeHistory();
+        this.unsubscribeHistory = null;
       }
+
       this.unsubscribeHistory = this.firestoreService.subscribeToLeadHistory(
         this.ownerId,
         this.boardId,
         this.currentLead!.id!,
-        (items) => { this.leadHistory = items as any; }
+        (items) => {
+          this.leadHistory = items as any;
+          this.isLoadingHistory = false;
+          this.cdr.detectChanges();
+        }
       ) as any;
-      
-      this.isLoadingHistory = false;
-      
+
     } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
       this.isLoadingHistory = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -206,10 +230,17 @@ export class LeadDetailModalComponent {
       // Extrair histórico de fases (já disponível)
       this.phaseHistory = this.currentLead?.phaseHistory || {};
 
-      // Carregar apenas configurações de fase e fluxo (initial já foi carregado)
+      // Carregar apenas configurações de fase e fluxo (initial já foi carregado) - COM CACHE
+      const phaseCacheKey = `phase_${this.boardId}_${this.currentLead!.columnId}`;
+      const flowCacheKey = `flow_${this.boardId}`;
+
       const [phaseFormConfig, flowConfig] = await Promise.allSettled([
-        this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, this.currentLead!.columnId),
-        this.firestoreService.getFlowConfig(this.boardId)
+        this.getCachedFormConfig(phaseCacheKey, () =>
+          this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, this.currentLead!.columnId)
+        ),
+        this.getCachedFormConfig(flowCacheKey, () =>
+          this.firestoreService.getFlowConfig(this.boardId)
+        )
       ]);
 
       // Processar resultado do formulário da fase
@@ -269,34 +300,36 @@ export class LeadDetailModalComponent {
       } catch (error) {
       }
       
-      // TERCEIRO: Buscar campos globais em TODAS as configurações de fase (não apenas a atual)
+      // TERCEIRO: Buscar campos globais em TODAS as configurações de fase (não apenas a atual) - EM PARALELO
       try {
-        // Buscar configurações de todas as fases
-        for (const column of this.columns) {
-          if (column.id === this.currentLead?.columnId) {
-            // Já verificamos a fase atual acima
-            continue;
-          }
-          
-          try {
-            const phaseConfig = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
-            const phaseFields = (phaseConfig as any)?.fields || [];
-            
-            
-            phaseFields.forEach((field: any) => {
-              
-              const isGlobalCandidate = field.allowEditInAnyPhase === true;
-              const isFromInitialForm = initialFieldNames.has(field.name);
-              const alreadyAdded = globalFields.some(gf => gf.name === field.name);
-              
-              // Adicionar campos globais de outras fases que não estão no inicial e ainda não foram adicionados
-              if (isGlobalCandidate && !isFromInitialForm && !alreadyAdded) {
-                globalFields.push(field);
-              }
-            });
-          } catch (phaseError) {
-          }
-        }
+        // Buscar configurações de todas as fases em paralelo para melhor performance
+        const otherColumns = this.columns.filter(col => col.id !== this.currentLead?.columnId);
+
+        const phaseConfigPromises = otherColumns.map(column => {
+          const cacheKey = `phase_${this.boardId}_${column.id}`;
+          return this.getCachedFormConfig(cacheKey, () =>
+            this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!)
+          ).catch(() => null); // Retornar null em caso de erro
+        });
+
+        const phaseConfigs = await Promise.all(phaseConfigPromises);
+
+        phaseConfigs.forEach((phaseConfig) => {
+          if (!phaseConfig) return;
+
+          const phaseFields = (phaseConfig as any)?.fields || [];
+
+          phaseFields.forEach((field: any) => {
+            const isGlobalCandidate = field.allowEditInAnyPhase === true;
+            const isFromInitialForm = initialFieldNames.has(field.name);
+            const alreadyAdded = globalFields.some(gf => gf.name === field.name);
+
+            // Adicionar campos globais de outras fases que não estão no inicial e ainda não foram adicionados
+            if (isGlobalCandidate && !isFromInitialForm && !alreadyAdded) {
+              globalFields.push(field);
+            }
+          });
+        });
       } catch (error) {
       }
       
@@ -326,11 +359,14 @@ export class LeadDetailModalComponent {
       // Adicionar campos editáveis do formulário inicial (evitando duplicatas)
       const centralFieldNames = new Set(centralFields.map((f: any) => f.name || f.apiFieldName));
       editableInitialFields.forEach((field: any) => {
-        if (!centralFieldNames.has(field.name)) {
+        // Usar o formControlName como chave principal pois é isso que o HTML espera
+        const fieldKey = field.formControlName || field.name;
+        if (!centralFieldNames.has(fieldKey) && !centralFieldNames.has(field.name)) {
           // Converter campo inicial para formato de campo de formulário
+          // IMPORTANTE: usar formControlName como name para coincidir com o HTML
           allFields.push({
-            name: field.formControlName,
-            apiFieldName: field.name,
+            name: fieldKey, // Usar formControlName aqui
+            apiFieldName: field.name, // Manter name original como apiFieldName
             type: field.fieldType,
             label: field.label,
             placeholder: field.placeholder,
@@ -774,7 +810,8 @@ export class LeadDetailModalComponent {
             : 'Não informado';
           
           // Um campo inicial é editável apenas se tiver allowEditInAnyPhase = true
-          const isEditable = f.allowEditInAnyPhase === true;
+          // Campos da fase inicial devem ser editáveis por padrão, a menos que explicitamente bloqueados
+          const isEditable = f.allowEditInAnyPhase !== false;
           
           return {
             name: fieldName,

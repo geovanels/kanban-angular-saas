@@ -6,6 +6,7 @@ import { BrandingService } from './services/branding.service';
 
 @Component({
   selector: 'app-root',
+  standalone: true,
   imports: [RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss'

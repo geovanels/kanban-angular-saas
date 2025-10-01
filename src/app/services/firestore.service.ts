@@ -1029,13 +1029,18 @@ export class FirestoreService {
   }
 
   // Buscar outbox recente para evitar duplicatas (mesmo lead/automação/assunto em curto intervalo)
+  // IMPORTANTE: Para otimizar estas queries, criar índices compostos no Firestore:
+  // 1. companies/{companyId}/boards/{boardId}/mail: (leadId ASC, createdAt DESC)
+  // 2. companies/{companyId}/boards/{boardId}/mail: (automationId ASC, leadId ASC, createdAt DESC)
+  // 3. companies/{companyId}/boards/{boardId}/mail: (templateId ASC, leadId ASC, createdAt DESC)
   async findRecentOutboxEmail(userId: string, boardId: string, criteria: { automationId?: string; leadId?: string; subject?: string; templateId?: string; withinMs?: number }): Promise<string | null> {
     if (!this.currentCompanyId) {
       await this.initializeCompanyContext();
     }
     if (!this.currentCompanyId) return null;
 
-    const withinMs = criteria.withinMs ?? 2 * 60 * 1000; // 2 minutos por padrão
+    // Default aumentado para 4 horas para cobrir todas as verificações de deduplicação
+    const withinMs = criteria.withinMs ?? 4 * 60 * 60 * 1000; // 4 horas por padrão
     try {
       const emailsRef = collection(this.firestore, `companies/${this.currentCompanyId}/boards/${boardId}/mail`);
       let qBase: any = emailsRef;

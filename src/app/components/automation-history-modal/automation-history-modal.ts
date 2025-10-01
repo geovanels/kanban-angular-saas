@@ -4,6 +4,7 @@ import { FirestoreService } from '../../services/firestore.service';
 
 @Component({
   selector: 'app-automation-history-modal',
+  standalone: true,
   imports: [CommonModule],
   templateUrl: './automation-history-modal.html',
   styleUrl: './automation-history-modal.scss'

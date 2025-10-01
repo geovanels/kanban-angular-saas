@@ -134,7 +134,7 @@ export interface FilterValues {
                   <input type="text"
                          [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
                          [value]="getDynamicFilterValue(field.name)"
-                         (input)="setDynamicFilter(field.name, $event.target.value)"
+                         (input)="setDynamicFilter(field.name, $any($event.target).value)"
                          class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <button *ngIf="getDynamicFilterValue(field.name)"
                           (click)="removeDynamicFilter(field.name)"
@@ -149,7 +149,7 @@ export interface FilterValues {
                   <input type="number"
                          [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
                          [value]="getDynamicFilterValue(field.name)"
-                         (input)="setDynamicFilter(field.name, $event.target.value)"
+                         (input)="setDynamicFilter(field.name, $any($event.target).value)"
                          class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <button *ngIf="getDynamicFilterValue(field.name)"
                           (click)="removeDynamicFilter(field.name)"
@@ -163,7 +163,7 @@ export interface FilterValues {
                      class="flex items-center gap-2">
                   <input type="date"
                          [value]="getDynamicFilterValue(field.name)"
-                         (change)="setDynamicFilter(field.name, $event.target.value)"
+                         (change)="setDynamicFilter(field.name, $any($event.target).value)"
                          class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <button *ngIf="getDynamicFilterValue(field.name)"
                           (click)="removeDynamicFilter(field.name)"
@@ -177,7 +177,7 @@ export interface FilterValues {
                        class="flex items-center gap-3">
                   <input type="checkbox"
                          [checked]="getDynamicFilterValue(field.name)"
-                         (change)="setDynamicFilter(field.name, $event.target.checked)"
+                         (change)="setDynamicFilter(field.name, $any($event.target).checked)"
                          class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                   <span class="text-sm text-gray-600">Apenas marcados</span>
                   <button *ngIf="getDynamicFilterValue(field.name)"
