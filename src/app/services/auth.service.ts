@@ -140,39 +140,61 @@ export class AuthService {
 
   async sendPasswordReset(email: string) {
     try {
-      // Verificar se o usuário existe e quais métodos de login ele tem
-      const signInMethods = await fetchSignInMethodsForEmail(this.auth, email);
-
-      console.log('🔐 [sendPasswordReset] Métodos de login para', email, ':', signInMethods);
-
-      // Se o usuário não existe
-      if (signInMethods.length === 0) {
-        return {
-          success: false,
-          error: 'Usuário não encontrado. Verifique o email ou crie uma conta.'
-        };
-      }
+      console.log('🔐 [sendPasswordReset] Iniciando recuperação de senha para:', email);
 
       // Configurações personalizadas para o email de recuperação
       const actionCodeSettings = {
-        url: `${window.location.origin}/login?recovered=true`, // URL para onde o usuário será redirecionado após redefinir a senha
-        handleCodeInApp: false, // Usar a página padrão do Firebase para redefinir senha
+        url: `${window.location.origin}/login?recovered=true`,
+        handleCodeInApp: false,
       };
 
-      await sendPasswordResetEmail(this.auth, email, actionCodeSettings);
+      // Tentar enviar email de recuperação diretamente
+      try {
+        await sendPasswordResetEmail(this.auth, email, actionCodeSettings);
+        console.log('✅ [sendPasswordReset] Email de recuperação enviado com sucesso');
 
-      // Mensagem especial se a conta só tem Google
-      if (!signInMethods.includes('password')) {
-        return {
-          success: true,
-          message: 'Email enviado! Você poderá definir uma senha para sua conta Google e fazer login com email e senha também.'
-        };
+        // Verificar se o usuário existe e quais métodos de login ele tem para personalizar a mensagem
+        try {
+          const signInMethods = await fetchSignInMethodsForEmail(this.auth, email);
+          console.log('🔐 [sendPasswordReset] Métodos de login para', email, ':', signInMethods);
+
+          // Mensagem especial se a conta só tem Google ou não tem senha
+          if (signInMethods.length === 0 || !signInMethods.includes('password')) {
+            return {
+              success: true,
+              message: 'Email enviado! Você poderá definir uma senha para sua conta e fazer login com email e senha também.'
+            };
+          }
+        } catch (methodsError) {
+          console.log('⚠️ [sendPasswordReset] Não foi possível verificar métodos, mas email foi enviado');
+        }
+
+        return { success: true };
+
+      } catch (sendError: any) {
+        console.error('❌ [sendPasswordReset] Erro ao enviar email:', sendError);
+
+        // Tratar erros específicos do Firebase
+        if (sendError.code === 'auth/user-not-found') {
+          return {
+            success: false,
+            error: 'Usuário não encontrado. Verifique o email ou crie uma conta.'
+          };
+        }
+
+        if (sendError.code === 'auth/invalid-email') {
+          return {
+            success: false,
+            error: 'Email inválido. Por favor, verifique o endereço de email.'
+          };
+        }
+
+        throw sendError;
       }
 
-      return { success: true };
     } catch (error: any) {
-      console.error('❌ [sendPasswordReset] Erro ao enviar email:', error);
-      return { success: false, error: error.message };
+      console.error('❌ [sendPasswordReset] Erro geral:', error);
+      return { success: false, error: error.message || 'Erro ao enviar email de recuperação.' };
     }
   }
 

@@ -325,31 +325,33 @@
         </p>
       </div>
 
-      <form (ngSubmit)="sendPasswordReset()" class="auth-form">
+      <div class="auth-form">
         <div class="form-group">
           <label for="reset-email" class="form-label">
             <i class="fas fa-envelope"></i>
             Email
           </label>
-          <input 
-            type="email" 
+          <input
+            type="email"
             id="reset-email"
             class="form-control"
             [value]="resetEmail()"
             (input)="resetEmail.set($any($event.target).value)"
+            (keyup.enter)="sendPasswordReset()"
             placeholder="seu@email.com"
             required>
         </div>
 
-        <button 
-          type="submit" 
+        <button
+          type="button"
           class="btn btn-primary btn-block"
+          (click)="sendPasswordReset()"
           [disabled]="resetLoading() || !resetEmail().trim()">
           <i class="fas fa-spinner fa-spin" *ngIf="resetLoading()"></i>
           <i class="fas fa-paper-plane" *ngIf="!resetLoading()"></i>
           {{ resetLoading() ? 'Enviando...' : 'Enviar Email de Recuperação' }}
         </button>
-      </form>
+      </div>
 
       <div class="text-center mt-4">
         <button 
