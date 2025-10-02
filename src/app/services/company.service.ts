@@ -605,36 +605,65 @@ TaskBoard - Sistema de Gestão Kanban
 
   async getCompanyByUserEmail(userEmail: string): Promise<Company | null> {
     try {
+      console.log('🔍 [getCompanyByUserEmail] Iniciando busca para:', userEmail);
+
       return await runInInjectionContext(this.injector, async () => {
         // 1) Procurar por owner
         const companiesRef = collection(this.firestore, 'companies');
         const ownerQuery = query(companiesRef, where('ownerEmail', '==', userEmail), limit(1));
         const ownerSnap = await runInInjectionContext(this.injector, () => getDocs(ownerQuery));
-        
+
+        console.log('🔍 [getCompanyByUserEmail] Resultado busca por owner:', {
+          found: !ownerSnap.empty,
+          count: ownerSnap.docs.length
+        });
+
         if (!ownerSnap.empty) {
           const d = ownerSnap.docs[0];
-          return { id: d.id, ...d.data() } as Company;
+          const company = { id: d.id, ...d.data() } as Company;
+          console.log('✅ [getCompanyByUserEmail] Empresa encontrada como owner:', company.name);
+          return company;
         }
 
         // 2) Procurar por usuário em qualquer empresa via collectionGroup('users')
+        // NOTA: Buscar TODOS os documentos porque o email é o ID do documento, não um campo indexado
+        console.log('🔍 [getCompanyByUserEmail] Buscando via collectionGroup users (sem filtro)...');
         const usersGroup = collectionGroup(this.firestore, 'users');
-        const usersSnap = await runInInjectionContext(this.injector, () => getDocs(query(usersGroup, where('email', '==', userEmail), limit(1))));
-        
-        if (!usersSnap.empty) {
-          const userDoc = usersSnap.docs[0];
+        const usersSnap = await runInInjectionContext(this.injector, () => getDocs(usersGroup));
+
+        console.log('🔍 [getCompanyByUserEmail] Total de documentos encontrados:', usersSnap.docs.length);
+
+        // Filtrar manualmente pelo email (que é o ID do documento)
+        const userDoc = usersSnap.docs.find(doc => doc.id === userEmail);
+
+        console.log('🔍 [getCompanyByUserEmail] Resultado busca via users:', {
+          found: !!userDoc,
+          userEmail: userEmail
+        });
+
+        if (userDoc) {
+          console.log('🔍 [getCompanyByUserEmail] Documento do usuário:', {
+            path: userDoc.ref.path,
+            data: userDoc.data()
+          });
+
           const companyRef = userDoc.ref.parent?.parent; // companies/{companyId}
           if (companyRef) {
+            console.log('🔍 [getCompanyByUserEmail] Referência da empresa:', companyRef.path);
             const companyDoc = await runInInjectionContext(this.injector, () => getDoc(companyRef));
             if (companyDoc.exists()) {
-              return { id: companyDoc.id, ...companyDoc.data() } as Company;
+              const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
+              console.log('✅ [getCompanyByUserEmail] Empresa encontrada como membro:', company.name);
+              return company;
             }
           }
         }
 
+        console.log('❌ [getCompanyByUserEmail] Nenhuma empresa encontrada para:', userEmail);
         return null;
       });
     } catch (error) {
-      console.error('Erro na busca:', error);
+      console.error('❌ [getCompanyByUserEmail] Erro na busca:', error);
       return null;
     }
   }

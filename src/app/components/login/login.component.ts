@@ -141,13 +141,18 @@ export class LoginComponent implements OnInit {
 
     const { email, password } = this.loginForm.value;
     const result = await this.authService.signInWithEmail(email, password);
-    
+
     if (result.success) {
       await this.handleSuccessfulLogin();
     } else {
-      this.errorMessage.set(this.getErrorMessage(result.error));
+      // Verificar se é conta Google sem senha
+      if (result.error === 'google-only-account') {
+        this.errorMessage.set(result.errorMessage || 'Esta conta usa login com Google. Você pode entrar com Google ou definir uma senha.');
+      } else {
+        this.errorMessage.set(this.getErrorMessage(result.error));
+      }
     }
-    
+
     this.isLoading.set(false);
   }
 
@@ -377,12 +382,13 @@ export class LoginComponent implements OnInit {
 
     try {
       const result = await this.authService.sendPasswordReset(email);
-      
+
       if (result.success) {
-        this.successMessage.set(
+        // Usar mensagem personalizada se disponível, senão usar padrão
+        const message = result.message ||
           `Email de recuperação enviado para ${email}. ` +
-          'Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.'
-        );
+          'Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.';
+        this.successMessage.set(message);
       } else {
         throw new Error(result.error);
       }
