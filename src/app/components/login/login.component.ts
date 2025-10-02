@@ -364,24 +364,30 @@ export class LoginComponent implements OnInit {
   }
 
   async sendPasswordReset() {
+    console.log('📧 [LoginComponent] sendPasswordReset chamado');
     const email = this.resetEmail().trim();
-    
+    console.log('📧 [LoginComponent] Email para reset:', email);
+
     if (!email) {
+      console.log('❌ [LoginComponent] Email vazio');
       this.errorMessage.set('Por favor, informe o email.');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.log('❌ [LoginComponent] Email inválido');
       this.errorMessage.set('Por favor, informe um email válido.');
       return;
     }
 
+    console.log('📧 [LoginComponent] Validação OK, chamando authService.sendPasswordReset...');
     this.resetLoading.set(true);
     this.clearMessages();
 
     try {
       const result = await this.authService.sendPasswordReset(email);
+      console.log('📧 [LoginComponent] Resultado:', result);
 
       if (result.success) {
         // Usar mensagem personalizada se disponível, senão usar padrão
@@ -389,10 +395,13 @@ export class LoginComponent implements OnInit {
           `Email de recuperação enviado para ${email}. ` +
           'Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.';
         this.successMessage.set(message);
+        console.log('✅ [LoginComponent] Mensagem de sucesso exibida');
       } else {
+        console.log('❌ [LoginComponent] Erro no resultado:', result.error);
         throw new Error(result.error);
       }
     } catch (error: any) {
+      console.error('❌ [LoginComponent] Exceção capturada:', error);
       this.errorMessage.set(this.getErrorMessage(error));
     } finally {
       this.resetLoading.set(false);
