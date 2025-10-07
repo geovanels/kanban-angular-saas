@@ -6,13 +6,20 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function getUserEmail() {
       return request.auth.token.email;
     }
-    
+
     function getUserUid() {
       return request.auth.uid;
+    }
+
+    // IMPORTANTE: Regra global para collectionGroup('users')
+    // Permite que usuários autenticados leiam apenas seus próprios documentos
+    // em qualquer subcoleção 'users' (necessário para descobrir a empresa no login)
+    match /{path=**}/users/{userEmail} {
+      allow read: if isAuthenticated() && userEmail == getUserEmail();
     }
     
     // Verifica owner da empresa lendo o doc da empresa (email OU uid)
@@ -63,9 +70,12 @@ service cloud.firestore {
       
       // Company users subcollection
       match /users/{userEmail} {
-        // Allow reading own membership doc to break discovery circular dependency
-        allow read: if (isAuthenticated() && userEmail == getUserEmail()) || isCompanyUser(companyId);
-        
+        // NOTA: A leitura é permitida pela regra global /{path=**}/users/{userEmail}
+        // que permite leitura do próprio documento para collectionGroup funcionar
+
+        // Também permite leitura adicional se já for membro da empresa
+        allow read: if isAuthenticated() && isCompanyUser(companyId);
+
         // Allow creating/updating/deleting users if can manage users
         allow create, update, delete: if canManageUsers(companyId);
       }

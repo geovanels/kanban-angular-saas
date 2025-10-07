@@ -625,37 +625,39 @@ TaskBoard - Sistema de Gestão Kanban
           return company;
         }
 
-        // 2) Procurar por usuário em qualquer empresa via collectionGroup('users')
-        // NOTA: Buscar TODOS os documentos porque o email é o ID do documento, não um campo indexado
-        console.log('🔍 [getCompanyByUserEmail] Buscando via collectionGroup users (sem filtro)...');
-        const usersGroup = collectionGroup(this.firestore, 'users');
-        const usersSnap = await runInInjectionContext(this.injector, () => getDocs(usersGroup));
+        // 2) Procurar por usuário iterando todas as empresas
+        // NOVA ABORDAGEM: Buscar todas as empresas e verificar se o usuário está na subcoleção
+        console.log('🔍 [getCompanyByUserEmail] Buscando empresas e verificando membros...');
+        const allCompaniesSnap = await runInInjectionContext(this.injector, () => getDocs(companiesRef));
 
-        console.log('🔍 [getCompanyByUserEmail] Total de documentos encontrados:', usersSnap.docs.length);
+        console.log('🔍 [getCompanyByUserEmail] Total de empresas:', allCompaniesSnap.docs.length);
 
-        // Filtrar manualmente pelo email (que é o ID do documento)
-        const userDoc = usersSnap.docs.find(doc => doc.id === userEmail);
+        for (const companyDoc of allCompaniesSnap.docs) {
+          try {
+            // Verificar se o usuário existe na subcoleção users desta empresa
+            const userRef = doc(this.firestore, 'companies', companyDoc.id, 'users', userEmail);
+            const userDoc = await runInInjectionContext(this.injector, () => getDoc(userRef));
 
-        console.log('🔍 [getCompanyByUserEmail] Resultado busca via users:', {
-          found: !!userDoc,
-          userEmail: userEmail
-        });
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              console.log('🔍 [getCompanyByUserEmail] Usuário encontrado na empresa:', {
+                companyId: companyDoc.id,
+                companyName: companyDoc.data()['name'],
+                userData: userData
+              });
 
-        if (userDoc) {
-          console.log('🔍 [getCompanyByUserEmail] Documento do usuário:', {
-            path: userDoc.ref.path,
-            data: userDoc.data()
-          });
-
-          const companyRef = userDoc.ref.parent?.parent; // companies/{companyId}
-          if (companyRef) {
-            console.log('🔍 [getCompanyByUserEmail] Referência da empresa:', companyRef.path);
-            const companyDoc = await runInInjectionContext(this.injector, () => getDoc(companyRef));
-            if (companyDoc.exists()) {
-              const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
-              console.log('✅ [getCompanyByUserEmail] Empresa encontrada como membro:', company.name);
-              return company;
+              // Verificar se o usuário está ativo
+              if (userData['inviteStatus'] === 'accepted' || userData['uid']) {
+                const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
+                console.log('✅ [getCompanyByUserEmail] Empresa encontrada como membro:', company.name);
+                return company;
+              } else {
+                console.log('⚠️ [getCompanyByUserEmail] Usuário encontrado mas convite pendente');
+              }
             }
+          } catch (checkError) {
+            // Ignorar erros de permissão ao verificar usuário específico
+            console.log('⚠️ [getCompanyByUserEmail] Erro ao verificar usuário na empresa', companyDoc.id);
           }
         }
 
