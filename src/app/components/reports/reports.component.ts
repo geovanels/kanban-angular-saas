@@ -129,13 +129,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     // If boardId is set (from input or URL), load data directly
     if (this.boardId && this.ownerId) {
-      console.log('📊 ngOnInit - Carregando dados para boardId:', this.boardId);
       await this.loadData();
       this.initializeColumns();
       this.generateReport();
-      console.log('📊 ngOnInit - Dados carregados e relatório gerado');
-    } else {
-      console.log('📊 ngOnInit - Não há boardId ou ownerId definido');
     }
   }
 
@@ -179,33 +175,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.records = registros;
       this.columns = columns;
       this.users = []; // Será implementado posteriormente
-      
-      // Debug: verificar estrutura dos dados de responsáveis
-      console.log('🔍 Debug estrutura dos registros:', {
-        totalRegistros: registros.length,
-        primeiroRegistro: registros[0],
-        camposResponsavel: registros.map(r => ({
-          id: r.id,
-          responsibleUserName: r.responsibleUserName,
-          responsibleUserId: r.responsibleUserId,
-          responsibleUserEmail: r.responsibleUserEmail
-        })).slice(0, 5) // primeiros 5
-      });
 
       // Note: Form field configuration now handled by AdvancedFiltersComponent
-
-      console.log('Dados carregados:', {
-        boardId: this.boardId,
-        recordsCount: registros.length,
-        columnsCount: columns.length,
-        formFieldsCount: (this.board as any)?.initialFormFields?.length || 0,
-        registros: registros.slice(0, 3) // Log first 3 registros for debugging
-      });
-
-      // Debug form fields structure
-      if (registros.length > 0 && registros[0].fields) {
-        console.log('📋 Campos disponíveis no primeiro registro:', Object.keys(registros[0].fields));
-      }
 
     } catch (error) {
       console.error('Erro ao carregar dados do relatório:', error);
@@ -216,15 +187,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   generateReport() {
     if (this.isGeneratingReport) return;
-    
-    console.log('📊 === INICIO generateReport ===');
-    console.log('📊 Dados disponíveis:', {
-      records: this.records.length,
-      columns: this.columns.length,
-      filterQuery: this.filterQuery,
-      dynamicFilters: this.dynamicFilters
-    });
-    
+
     this.isGeneratingReport = true;
     try {
       // Apply current filters
@@ -233,11 +196,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.calculateSLAIndicators();
       this.calculatePhaseMetrics();
       this.generateChartData();
-      
+
       // Força a detecção de mudanças para garantir que os gráficos sejam renderizados
       this.cdr.detectChanges();
-      
-      console.log('📊 === FIM generateReport ===');
     } finally {
       this.isGeneratingReport = false;
     }
@@ -327,22 +288,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private calculatePhaseMetrics() {
-    console.log('📊 === INICIO calculatePhaseMetrics ===');
-    console.log('📊 Colunas disponíveis:', this.columns);
-    console.log('📊 Registros filtrados:', this.filteredRecords.length);
-
     this.phaseMetrics = this.columns.map(column => {
       const registrosInPhase = this.filteredRecords.filter(record => record.columnId === column.id);
       const avgTime = this.calculateAverageTimeInPhase(registrosInPhase);
       const conversionRate = this.calculatePhaseConversionRate(column);
-
-      console.log(`📊 Fase ${column.name}:`, {
-        columnId: column.id,
-        registrosInPhase: registrosInPhase.length,
-        avgTime,
-        conversionRate,
-        color: column.color
-      });
 
       return {
         phaseId: column.id!,
@@ -353,8 +302,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
         conversionRate: conversionRate
       };
     });
-
-    console.log('📊 phaseMetrics final:', this.phaseMetrics);
   }
 
   private calculateAverageTimeInPhase(registros: Lead[]): number {
@@ -393,29 +340,12 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   private generateChartData() {
-    console.log('📊 === INICIO generateChartData ===');
-    console.log('📊 phaseMetrics disponíveis:', this.phaseMetrics);
-    console.log('📊 columns disponíveis:', this.columns);
-    console.log('📊 filteredRecords disponíveis:', this.filteredRecords.length);
-
     // Phase distribution
     this.chartData.phaseDistribution = this.phaseMetrics.map(metric => ({
       name: metric.phaseName,
       value: metric.recordsCount,
       color: metric.phaseColor
     }));
-
-    // Debug: Log chart data
-    console.log('📊 Chart Data Generated:', {
-      phaseMetrics: this.phaseMetrics,
-      phaseDistribution: this.chartData.phaseDistribution,
-      columnsCount: this.columns.length,
-      recordsCount: this.filteredRecords.length
-    });
-
-    console.log('📊 phaseDistribution final:', this.chartData.phaseDistribution);
-    console.log('📊 Primeiro item do phaseDistribution:', this.chartData.phaseDistribution[0]);
-    console.log('📊 Segundo item do phaseDistribution:', this.chartData.phaseDistribution[1]);
 
     // Leads over time (simplified)
     this.chartData.registrosOverTime = this.generateLeadsOverTimeData();
@@ -478,7 +408,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
   // Export methods
   async exportReport(format: string) {
     try {
-      console.log(`Exportando relatório em formato ${format}`);
       // TODO: Implement export functionality
       alert(`Exportação em ${format} será implementada em breve!`);
     } catch (error) {
@@ -564,9 +493,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     // Add form fields from the board's initial form configuration
     const formFields = (this.board as any)?.initialFormFields || [];
-    
-    console.log('🔍 Campos do formulário para colunas:', formFields);
-    
+
     // First, add common form fields that we know exist
     const commonFormFields = [
       { name: 'contactName', label: 'Nome do Contato', type: 'text' },
@@ -607,8 +534,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
         }
       }
     });
-
-    console.log('📊 Colunas disponíveis inicializadas:', this.availableColumns);
   }
 
   private loadSelectedColumns() {
@@ -758,31 +683,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
     }
 
     const lead = this.records[0];
-    console.log('🐛 DEBUG COMPLETO DO LEAD:');
-    console.log('🐛 Lead completo:', lead);
-    console.log('🐛 Lead.fields:', lead.fields);
-    console.log('🐛 Chaves dos fields:', lead.fields ? Object.keys(lead.fields) : 'sem fields');
-    console.log('🐛 Valores dos fields:', lead.fields ? Object.entries(lead.fields) : 'sem entries');
 
-    // Testar especificamente os campos problemáticos
-    console.log('🐛 TESTANDO CAMPOS PROBLEMÁTICOS:');
-    console.log('🐛 contactName tentativas:', [
-      lead.fields?.['contactName'],
-      lead.fields?.['name'], 
-      lead.fields?.['nome']
-    ]);
-    console.log('🐛 contactEmail tentativas:', [
-      lead.fields?.['contactEmail'],
-      lead.fields?.['email']
-    ]);
-
-    // Mostrar resultado do método readFieldValue
-    console.log('🐛 RESULTADO DOS MÉTODOS:');
-    console.log('🐛 readFieldValue(contactName):', this.readFieldValue(lead, 'contactName'));
-    console.log('🐛 readFieldValue(contactEmail):', this.readFieldValue(lead, 'contactEmail'));
-    console.log('🐛 readFieldValue(companyName):', this.readFieldValue(lead, 'companyName'));
-
-    // Mostrar no alerta também
+    // Mostrar no alerta
     const debugInfo = {
       leadId: lead.id,
       fieldsKeys: lead.fields ? Object.keys(lead.fields) : 'no fields',
@@ -797,12 +699,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
 
   applyFilters() {
-    console.log('=== APLICANDO FILTROS KANBAN-STYLE ===');
-    console.log('filterQuery:', this.filterQuery);
-    console.log('filterOnlyMine:', this.filterOnlyMine);
-    console.log('dynamicFilters:', this.dynamicFilters);
-    console.log('Total de registros disponíveis:', this.records.length);
-    
     this.filteredRecords = this.records.filter(record => {
       // Search query filter
       if (this.filterQuery && this.filterQuery.trim()) {
@@ -838,21 +734,15 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
       return true;
     });
-    
-    console.log('=== RESULTADO DOS FILTROS ===');
-    console.log(`${this.records.length} registros total -> ${this.filteredRecords.length} registros filtrados`);
-    
+
     // Recalcular métricas dos relatórios após aplicar filtros
     this.calculateSummaryStats();
     this.calculateSLAIndicators();
     this.calculatePhaseMetrics();
     this.generateChartData();
-    
-    console.log('📊 Após applyFilters - chartData.phaseDistribution:', this.chartData.phaseDistribution);
-    
+
     // Regenerar gráfico dinâmico com os registros filtrados
     if (this.selectedChartField) {
-      console.log('📊 Regenerando gráfico dinâmico após aplicar filtros...');
       const chartData = this.generateChartForField(this.selectedChartField);
       this.chartData.dynamicCharts = [chartData];
     }
@@ -917,8 +807,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    console.log(`Exported ${this.filteredRecords.length} records to Excel`);
   }
 
   // Dynamic Charts Methods
@@ -926,19 +814,17 @@ export class ReportsComponent implements OnInit, OnDestroy {
     // Usar apenas os campos configurados com showInFilters: true
     // Baseado nos logs: segmento, origem, temperatura
     const fields = new Set<string>();
-    
+
     // Add default fields
     fields.add('fase');
     fields.add('responsavel');
-    
+
     // Add only the 3 specific fields that are configured
     // These are the only ones with showInFilters: true according to the logs
     fields.add('segmento');
-    fields.add('origem'); 
+    fields.add('origem');
     fields.add('temperatura');
-    
-    console.log('📊 Campos fixos para gráfico dinâmico:', Array.from(fields));
-    
+
     this.availableChartFields = Array.from(fields).sort();
     
     // Set default selection
@@ -958,11 +844,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   private generateChartForField(fieldName: string): any {
     const data = new Map<string, number>();
-    
+
     // IMPORTANTE: Usar this.filteredRecords que já está filtrado pela pesquisa geral
     // e pelos filtros dinâmicos aplicados
-    console.log(`📊 Gerando gráfico para campo "${fieldName}" com ${this.filteredRecords.length} registros filtrados`);
-    
     this.filteredRecords.forEach(record => {
       let value = '';
       
@@ -971,14 +855,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
           value = this.getColumnName(record.columnId) || 'Sem Fase';
           break;
         case 'responsavel':
-          // Debug para ver todos os possíveis campos de responsável
-          console.log(`📊 Debug responsável para registro ${record.id}:`, {
-            responsibleUserName: record.responsibleUserName,
-            responsibleUserId: record.responsibleUserId,
-            responsibleUserEmail: record.responsibleUserEmail,
-            allKeys: Object.keys(record)
-          });
-          
           value = record.responsibleUserName || record.responsibleUserEmail || record.responsibleUserId || 'Não Atribuído';
           break;
         case 'origem':
@@ -1007,9 +883,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
       }))
       .sort((a, b) => b.value - a.value) // Sort by count descending
       .slice(0, 10); // Limit to top 10
-    
-    console.log(`📊 Gráfico para "${fieldName}" gerado com ${chartItems.length} itens:`, chartItems);
-    
+
     return {
       fieldName,
       fieldLabel: this.getFieldLabel(fieldName),

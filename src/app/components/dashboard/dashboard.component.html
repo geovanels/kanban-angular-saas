@@ -98,18 +98,18 @@
 
             <!-- Board Stats -->
             <div class="p-4 bg-gray-50">
-              <div class="flex items-center justify-between text-sm">
-                <div class="flex items-center space-x-4">
-                  <span class="text-gray-600">
+              <div class="flex items-center justify-between text-sm flex-wrap gap-2">
+                <div class="flex items-center space-x-4 whitespace-nowrap">
+                  <span class="text-gray-600 whitespace-nowrap">
                     <i class="fas fa-columns mr-1"></i>
                     {{ getBoardColumnCount(board.id!) }} colunas
                   </span>
-                  <span class="text-gray-600">
+                  <span class="text-gray-600 whitespace-nowrap">
                     <i class="fas fa-tasks mr-1"></i>
-                    {{ getBoardTaskCount(board.id!) }} leads
+                    {{ getBoardTaskCount(board.id!) }} registros
                   </span>
                 </div>
-                <div class="text-xs text-gray-500">
+                <div class="text-xs text-gray-500 whitespace-nowrap">
                   {{ formatDate(board.createdAt) }}
                 </div>
               </div>
