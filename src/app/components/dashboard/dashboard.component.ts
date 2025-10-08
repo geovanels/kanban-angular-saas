@@ -58,12 +58,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       if (!pendingInviteData) return;
 
       const inviteData = JSON.parse(pendingInviteData);
-      console.log('🔄 Debug Dashboard - Processando convite pendente...', inviteData);
 
       // Verificar se o convite não é muito antigo (1 hora)
       const oneHour = 60 * 60 * 1000;
       if (Date.now() - inviteData.timestamp > oneHour) {
-        console.log('⏰ Debug Dashboard - Convite expirado, removendo');
         localStorage.removeItem('pendingInvite');
         return;
       }
@@ -76,10 +74,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       );
 
       if (success) {
-        console.log('✅ Debug Dashboard - Convite processado com sucesso');
         localStorage.removeItem('pendingInvite');
       } else {
-        console.log('❌ Debug Dashboard - Falha ao processar convite');
         // Manter no localStorage para tentar novamente na próxima vez
       }
     } catch (error) {
@@ -99,15 +95,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   async loadBoards() {
     if (!this.currentUser) {
-      console.log('❌ Dashboard - Usuário não autenticado');
       return;
     }
 
-    console.log('🔄 Dashboard - Carregando boards para usuário:', this.currentUser.uid, this.currentUser.email);
     this.isLoading = true;
     try {
       this.boards = await this.firestoreService.getBoards(this.currentUser.uid);
-      console.log('📋 Dashboard - Boards carregados:', this.boards.length, this.boards);
 
       // Carregar estatísticas para cada board
       await this.loadBoardStatistics();

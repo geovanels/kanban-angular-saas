@@ -40,17 +40,17 @@
               </div>
             </div>
             <!-- Campos carregados -->
-            <div *ngIf="!isLoadingFields && fieldsReady" class="space-y-4">
+            <div *ngIf="!isLoadingFields && fieldsReady" class="space-y-4" [formGroup]="leadForm">
               <div *ngFor="let field of getInitialFieldsOnly()" class="text-sm">
                 <div class="text-gray-800 font-semibold">
                   {{ field.label }}
                 </div>
-                
+
                 <!-- Campo somente leitura (não editável) -->
                 <div *ngIf="!field.isEditable" class="break-all text-gray-600">{{ field.value }}</div>
-                
+
                 <!-- Campo editável -->
-                <div *ngIf="field.isEditable" class="mt-1" [formGroup]="leadForm">
+                <div *ngIf="field.isEditable" class="mt-1">
                   <!-- Campo de texto -->
                   <input 
                     *ngIf="field.fieldType === 'text' || field.fieldType === 'email' || field.fieldType === 'tel' || field.fieldType === 'url' || field.fieldType === 'cpf' || field.fieldType === 'cnpj'" 

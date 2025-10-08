@@ -92,7 +92,6 @@ export class LeadDetailModalComponent {
   private static CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
   async show(lead: Lead) {
-
     // RESET COMPLETO DE ESTADO
     this.fullStateReset();
 
@@ -168,7 +167,6 @@ export class LeadDetailModalComponent {
       // Finalizar carregamento
       this.isLoadingFields = false;
       this.fieldsReady = true;
-
 
       // Forçar detecção de mudanças final
       this.cdr.detectChanges();
@@ -370,7 +368,9 @@ export class LeadDetailModalComponent {
             type: field.fieldType,
             label: field.label,
             placeholder: field.placeholder,
-            options: field.options
+            options: field.options,
+            isFromInitialForm: true, // Marcar explicitamente que vem do formulário inicial
+            allowEditInAnyPhase: field.allowEditInAnyPhase // Preservar a configuração
           });
         }
       });
@@ -379,24 +379,34 @@ export class LeadDetailModalComponent {
       allFields.forEach((field: any, index: number) => {
         const key = field.apiFieldName || field.name;
         const currentValue = this.getFieldValue(key) ?? this.getFieldValue(field.name);
-        
-        
-        
+
+        // Determinar se o campo deve estar desabilitado
+        // Um campo está desabilitado se:
+        // 1. Vem do formulário inicial (marcado explicitamente)
+        // 2. Lead não está na fase inicial
+        // 3. Campo não tem allowEditInAnyPhase = true
+        const isFromInitialForm = field.isFromInitialForm === true;
+        const initialPhaseId = this.getInitialPhaseId();
+        const currentColumnId = this.currentLead?.columnId;
+        const isInInitialPhase = currentColumnId === initialPhaseId;
+        const allowedInAnyPhase = field.allowEditInAnyPhase === true;
+        const shouldDisable = isFromInitialForm && !isInInitialPhase && !allowedInAnyPhase;
+
         if (field.type === 'checkbox') {
           // Otimização específica para checkbox - processar de forma mais simples
           const options = field.options || [];
           options.forEach((opt: string, i: number) => {
             const checkboxName = field.name + '_' + i;
             let isChecked = false;
-            
+
             // Verificação simples e rápida
             if (Array.isArray(currentValue)) {
               isChecked = currentValue.includes(opt);
             } else if (typeof currentValue === 'string' && currentValue) {
               isChecked = currentValue.includes(opt);
             }
-            
-            formConfig[checkboxName] = [isChecked];
+
+            formConfig[checkboxName] = shouldDisable ? [{ value: isChecked, disabled: true }] : [isChecked];
           });
         } else if (field.type === 'responsavel') {
           // Campo Responsável: usar email como identificador (já que UIDs estão vazios)
@@ -420,12 +430,12 @@ export class LeadDetailModalComponent {
               responsibleValue = userByName.email;
             }
           }
-          
-          
-          formConfig[field.name] = [responsibleValue];
+
+
+          formConfig[field.name] = shouldDisable ? [{ value: responsibleValue, disabled: true }] : [responsibleValue];
         } else {
           // Outros tipos de campo - processamento normal
-          formConfig[field.name] = [currentValue ?? ''];
+          formConfig[field.name] = shouldDisable ? [{ value: currentValue ?? '', disabled: true }] : [currentValue ?? ''];
         }
       });
 
@@ -440,8 +450,7 @@ export class LeadDetailModalComponent {
       
       this.leadForm.patchValue(patchValues, { emitEvent: false });
       this.formReady = true;
-      
-      
+
       // Forçar detecção de mudanças para atualizar a interface
       this.cdr.detectChanges();
       
@@ -603,9 +612,33 @@ export class LeadDetailModalComponent {
 
     const formConfig: any = {};
     this.formReady = false;
-    
-    // Adicionar campos dinâmicos da fase (se configurados)
+
+    // 1. Adicionar campos do formulário inicial (se configurados)
+    const initialFields = this.initialFormConfig?.fields || [];
+    const initialPhaseId = this.getInitialPhaseId();
+    const currentColumnId = this.currentLead?.columnId;
+
+    initialFields.forEach((field: any) => {
+      const key = field.apiFieldName || field.name;
+      let currentValue = this.getFieldValue(key);
+      if (currentValue === undefined || currentValue === null || (typeof currentValue === 'string' && currentValue.trim() === '')) {
+        currentValue = this.getFieldValue(field.name);
+      }
+
+      // Determinar se o campo deve estar desabilitado
+      const isInInitialPhase = currentColumnId === initialPhaseId;
+      const shouldDisable = !isInInitialPhase && field.allowEditInAnyPhase !== true;
+
+      formConfig[field.name] = [{ value: currentValue ?? '', disabled: shouldDisable }];
+    });
+
+    // 2. Adicionar campos dinâmicos da fase (se configurados)
     (this.currentFormFields || []).forEach((field: any) => {
+      // Evitar duplicar campos que já foram adicionados do formulário inicial
+      if (formConfig[field.name]) {
+        return;
+      }
+
       const key = field.apiFieldName || field.name;
       let currentValue = this.getFieldValue(key);
       if (currentValue === undefined || currentValue === null || (typeof currentValue === 'string' && currentValue.trim() === '')) {
@@ -781,19 +814,23 @@ export class LeadDetailModalComponent {
   }
 
   getInitialFieldsOnly(): any[] {
-    
+
     // Se ainda não temos dados suficientes, retornar array vazio mas logar detalhes
     if (!this.currentLead) {
       return [];
     }
-    
+
     if (!this.initialFormConfig) {
       return [];
     }
-    
+
+    // USAR CACHE para evitar recalcular em cada ciclo de detecção de mudanças
+    if (this.cachedInitialFields.length > 0) {
+      return this.cachedInitialFields;
+    }
+
     // Campos APENAS do formulário inicial (para o lado esquerdo)
     // Não incluir campos globais de outras fases
-    // SEMPRE recalcular para garantir dados atualizados
     try {
       if (this.initialFormConfig?.fields?.length) {
         
@@ -809,9 +846,11 @@ export class LeadDetailModalComponent {
             ? this.formatFieldValue(f, rawValue) 
             : 'Não informado';
           
-          // Um campo inicial é editável apenas se tiver allowEditInAnyPhase = true
-          // Campos da fase inicial devem ser editáveis por padrão, a menos que explicitamente bloqueados
-          const isEditable = f.allowEditInAnyPhase !== false;
+          // Um campo inicial é editável se:
+          // 1. Estamos na fase inicial (lead está na fase onde foi criado) OU
+          // 2. O campo tem allowEditInAnyPhase = true
+          const isInInitialPhase = this.currentLead?.columnId === this.getInitialPhaseId();
+          const isEditable = isInInitialPhase || f.allowEditInAnyPhase === true;
           
           return {
             name: fieldName,
@@ -824,7 +863,9 @@ export class LeadDetailModalComponent {
             options: f.options || (f.type === 'temperatura' ? ['Quente', 'Morno', 'Frio'] : [])
           };
         });
-        
+
+        // Cachear o resultado
+        this.cachedInitialFields = result;
         return result;
       } else {
         // Fallback dinâmico com deduplicação por grupos de sinônimos
@@ -836,6 +877,8 @@ export class LeadDetailModalComponent {
           placeholder: '',
           options: []
         }));
+        // Cachear o resultado
+        this.cachedInitialFields = fallbackFields;
         return fallbackFields;
       }
     } catch (error) {
@@ -847,6 +890,24 @@ export class LeadDetailModalComponent {
     // Verificar se há campos editáveis no formulário inicial
     const initialFields = this.getInitialFieldsOnly();
     return initialFields.some(field => field.isEditable);
+  }
+
+  private getInitialPhaseId(): string | null {
+    // Retorna o ID da primeira fase (fase inicial) do board
+    // Assume que a primeira coluna na ordem é a fase inicial
+    if (!this.columns || this.columns.length === 0) {
+      return null;
+    }
+
+    // Procurar por coluna marcada como isInitialPhase
+    const initialColumn = this.columns.find((col: any) => col.isInitialPhase);
+    if (initialColumn) {
+      return initialColumn.id;
+    }
+
+    // Fallback: retornar a primeira coluna ordenada
+    const sortedColumns = [...this.columns].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    return sortedColumns[0]?.id || null;
   }
 
   async saveGlobalFields() {

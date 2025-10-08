@@ -59,8 +59,6 @@ export class AutomationService {
       return;
     }
 
-    console.log(`🚀 Iniciando monitor global de leads para board ${boardId}`);
-
     // Subscribir diretamente aos leads via Firestore (independente do Kanban)
     const unsubscribe = this.firestoreService.subscribeToLeads(
       ownerId,
@@ -72,7 +70,6 @@ export class AutomationService {
 
         for (const lead of currentLeads) {
           if (!lastProcessed[lead.id]) {
-            console.log(`🆕 NOVO LEAD DETECTADO GLOBALMENTE: ${lead.id} - Processando automações...`);
             try {
               await this.processNewLeadAutomations(lead, boardId, ownerId);
               lastProcessed[lead.id] = true;
@@ -111,7 +108,6 @@ export class AutomationService {
   // Processar automações quando um novo lead é criado
   async processNewLeadAutomations(lead: Lead, boardId: string, ownerId: string): Promise<void> {
     try {
-      console.log(`🆕 PROCESSANDO NOVO LEAD - ID: ${lead.id} - Board: ${boardId} - Owner: ${ownerId}`);
 
       // Chave única para lock de processamento de novo lead
       const newLeadLockKey = `newlead_${ownerId}_${boardId}_${lead.id}`;
@@ -131,13 +127,10 @@ export class AutomationService {
 
       try {
         // Buscar automações ativas do quadro
-        console.log(`🔍 Buscando automações para board ${boardId}...`);
         const automations = await this.firestoreService.getAutomations(ownerId, boardId);
-        console.log(`📋 Total de automações encontradas: ${(automations as Automation[])?.length || 0}`);
 
         const newLeadAutomations = (automations as Automation[]).filter(automation => {
           if (!automation || !automation.active) {
-            console.log(`⚠️ Automação ${automation?.id || 'N/A'} não está ativa ou é inválida`);
             return false;
           }
 
@@ -161,10 +154,6 @@ export class AutomationService {
           return shouldExecute;
         });
 
-        console.log(`🎯 Automações de novo lead filtradas: ${newLeadAutomations.length}`);
-        newLeadAutomations.forEach(auto => {
-          console.log(`  - ${auto.id}: ${auto.name} (${auto.actions?.length || 0} ações)`);
-        });
 
         // Executar cada automação
         for (const automation of newLeadAutomations) {
@@ -210,15 +199,10 @@ export class AutomationService {
           }
         }
 
-        if (newLeadAutomations.length === 0) {
-          console.log(`⚠️ NENHUMA AUTOMAÇÃO DE NOVO LEAD CONFIGURADA para board ${boardId}`);
-        }
-
       } finally {
         // Liberar lock após um breve delay para evitar reentrância
         setTimeout(() => {
           this.newLeadLocks.delete(newLeadLockKey);
-          console.log('🔓 Lock de novo lead liberado:', newLeadLockKey);
         }, 5000); // 5 segundos
       }
     } catch (error) {
@@ -771,13 +755,10 @@ export class AutomationService {
         return;
       }
 
-      console.log(`🔄 Processando automações de tempo para ${leads.length} leads no board ${boardId}`);
-
       const automations = await this.firestoreService.getAutomations(ownerId, boardId);
       const list = (automations as Automation[]).filter(a => a && a.active);
 
       if (list.length === 0) {
-        console.log('ℹ️ Nenhuma automação ativa encontrada');
         return;
       }
 

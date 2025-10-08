@@ -127,7 +127,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.loadFlowConfig();
 
       // Inicializar monitor global de automações para leads da API
-      console.log(`🚀 Iniciando monitor global de automações para board ${this.boardId}`);
       this.automationService.initializeGlobalLeadMonitor(this.boardId, this.ownerId);
       // Agendador periódico para automações de tempo (a cada 60s)
       // Apenas uma instância por board deve executar as automações
@@ -303,7 +302,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
           email: user.email
         }));
 
-      console.log('Usuários carregados:', this.users.length);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       // Fallback para usuário atual se houver erro
@@ -654,11 +652,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
     };
     
     for (const f of fieldsToShow) {
-      const isTitle = isTitleField(f);
       const value = this.readFieldValue(lead, f.apiFieldName || f.name, f.label || f.name);
       const hasValue = value !== undefined && value !== null && `${value}`.trim() !== '';
-      
-      if (!isTitle && hasValue) {
+
+      // Incluir TODOS os campos com valor (não filtrar por título)
+      if (hasValue) {
         const item = { label: f.label || f.name || f.apiFieldName, value, type: (f.type || '').toLowerCase() };
         out.push(item);
       }

@@ -67,6 +67,21 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     transform: translateY(-1px);
   }
+
+  // Permitir que o clique passe através dos elementos internos para o card
+  // Usa * para afetar TODOS os descendentes, não apenas filhos diretos
+  * {
+    pointer-events: none;
+  }
+
+  // Re-habilitar interações para elementos interativos específicos (se houver)
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    pointer-events: auto;
+  }
 }
 
 .card-avatar {

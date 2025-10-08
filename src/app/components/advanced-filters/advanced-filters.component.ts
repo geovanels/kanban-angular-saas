@@ -51,12 +51,10 @@ export class AdvancedFiltersComponent implements OnInit {
       const formConfig = await this.firestoreService.getInitialFormConfig(this.boardId);
       if (formConfig && formConfig.fields) {
         this.initialFormFields = formConfig.fields || [];
-        console.log('📋 [AdvancedFilters] Campos do formulário carregados:', this.initialFormFields);
       } else {
         this.initialFormFields = [];
       }
     } catch (error) {
-      console.log('ℹ️ [AdvancedFilters] Nenhuma configuração de formulário encontrada');
       this.initialFormFields = [];
     }
   }
@@ -79,74 +77,36 @@ export class AdvancedFiltersComponent implements OnInit {
 
   // Migrar campos existentes para incluir showInFilters
   private migrateFieldsToIncludeShowInFilters() {
-    console.log('🔧 [AdvancedFilters] Migrando campos para incluir showInFilters...');
-    
     // Migrar campos do formulário inicial
     if (this.initialFormFields) {
-      let needsMigration = false;
       this.initialFormFields.forEach(field => {
         if (!('showInFilters' in field)) {
           field.showInFilters = false;
-          needsMigration = true;
-          console.log(`🔧 [AdvancedFilters] Adicionado showInFilters: false ao campo ${field.name} (campo antigo)`);
-        } else {
-          console.log(`✅ [AdvancedFilters] Campo ${field.name} já tem showInFilters: ${field.showInFilters}`);
         }
       });
-      
-      if (needsMigration) {
-        console.log('🔧 [AdvancedFilters] Alguns campos do formulário inicial foram migrados em memória');
-      } else {
-        console.log('✅ [AdvancedFilters] Todos os campos do formulário inicial já têm showInFilters');
-      }
     }
-    
+
     // Migrar campos das fases
     Object.entries(this.phaseFormConfigs || {}).forEach(([phaseId, config]: [string, any]) => {
       if (config?.fields) {
-        let needsMigration = false;
         config.fields.forEach((field: any) => {
           if (!('showInFilters' in field)) {
             field.showInFilters = false;
-            needsMigration = true;
-            console.log(`🔧 [AdvancedFilters] Adicionado showInFilters: false ao campo ${field.name} da fase ${phaseId} (campo antigo)`);
-          } else {
-            console.log(`✅ [AdvancedFilters] Campo ${field.name} da fase ${phaseId} já tem showInFilters: ${field.showInFilters}`);
           }
         });
-        
-        if (needsMigration) {
-          console.log(`🔧 [AdvancedFilters] Alguns campos da fase ${phaseId} foram migrados em memória`);
-        } else {
-          console.log(`✅ [AdvancedFilters] Todos os campos da fase ${phaseId} já têm showInFilters`);
-        }
       }
     });
   }
 
   private loadAvailableFilterFields() {
-    console.log('🔍 [AdvancedFilters] loadAvailableFilterFields INICIADO');
-    console.log('🔍 [AdvancedFilters] initialFormFields:', this.initialFormFields);
-    console.log('🔍 [AdvancedFilters] phaseFormConfigs:', this.phaseFormConfigs);
-    
     // Executar migração primeiro
     this.migrateFieldsToIncludeShowInFilters();
-    
+
     const allFields: any[] = [];
-    
+
     // Adicionar campos do formulário inicial que têm showInFilters = true
     if (this.initialFormFields) {
-      console.log('🔍 [AdvancedFilters] Processando campos do formulário inicial...');
       this.initialFormFields.forEach((field, index) => {
-        console.log(`🔍 [AdvancedFilters] Campo inicial ${index + 1}:`, field);
-        console.log(`🔍 [AdvancedFilters] Campo inicial ${index + 1} - Detalhes:`, {
-          name: field.name,
-          type: field.type,
-          showInFilters: field.showInFilters,
-          hasShowInFilters: 'showInFilters' in field,
-          keys: Object.keys(field)
-        });
-        
         if (field.name && field.type && field.showInFilters) {
           const filterField = {
             name: field.name,
@@ -155,30 +115,14 @@ export class AdvancedFiltersComponent implements OnInit {
             source: 'initial'
           };
           allFields.push(filterField);
-          console.log('✅ [AdvancedFilters] Campo adicionado aos filtros:', filterField);
-        } else {
-          console.log('❌ [AdvancedFilters] Campo NÃO adicionado aos filtros (falta name, type ou showInFilters = false)');
         }
       });
-    } else {
-      console.log('⚠️ [AdvancedFilters] Nenhum initialFormFields encontrado');
     }
-    
+
     // Adicionar campos de fases que têm showInFilters = true
-    console.log('🔍 [AdvancedFilters] Processando campos das fases...');
     Object.entries(this.phaseFormConfigs || {}).forEach(([phaseId, config]: [string, any]) => {
-      console.log(`🔍 [AdvancedFilters] Fase ${phaseId}:`, config);
       if (config?.fields) {
         config.fields.forEach((field: any, index: number) => {
-          console.log(`🔍 [AdvancedFilters] Campo da fase ${phaseId} - ${index + 1}:`, field);
-          console.log(`🔍 [AdvancedFilters] Campo da fase ${phaseId} - ${index + 1} - Detalhes:`, {
-            name: field.name,
-            type: field.type,
-            showInFilters: field.showInFilters,
-            hasShowInFilters: 'showInFilters' in field,
-            keys: Object.keys(field)
-          });
-          
           if (field.name && field.type && field.showInFilters && !allFields.find(f => f.name === field.name)) {
             const filterField = {
               name: field.name,
@@ -188,27 +132,17 @@ export class AdvancedFiltersComponent implements OnInit {
               phaseId: phaseId
             };
             allFields.push(filterField);
-            console.log('✅ [AdvancedFilters] Campo da fase adicionado aos filtros:', filterField);
-          } else {
-            console.log('❌ [AdvancedFilters] Campo da fase NÃO adicionado (falta name, type, showInFilters = false, ou já existe)');
           }
         });
       }
     });
-    
-    console.log('🔍 [AdvancedFilters] Todos os campos coletados:', allFields);
-    
+
     // Filtrar apenas campos apropriados para filtro
     this.availableFilterFields = allFields.filter(field => {
       const supportedTypes = ['text', 'email', 'select', 'radio', 'checkbox', 'date', 'number', 'tel', 'cnpj', 'cpf', 'temperatura'];
       const isSupported = supportedTypes.includes(field.type.toLowerCase());
-      console.log(`🔍 [AdvancedFilters] Campo ${field.name} (${field.type}) - Suportado: ${isSupported}`);
       return isSupported;
     });
-    
-    console.log('🔍 [AdvancedFilters] Campos filtrados finais (availableFilterFields):', this.availableFilterFields);
-    console.log('🔍 [AdvancedFilters] availableFilterFields.length:', this.availableFilterFields.length);
-    console.log('🔍 [AdvancedFilters] showAdvancedFilters:', this.showAdvancedFilters);
   }
 
   // Obter opções disponíveis para um campo

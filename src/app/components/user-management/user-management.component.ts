@@ -59,11 +59,8 @@ export class UserManagementComponent implements OnInit {
   private async forceAddCurrentUser() {
     const currentUser = this.authService.getCurrentUser();
     const company = this.currentCompany();
-    
-    console.log('Force adding current user - User:', currentUser?.email, 'Company:', company?.name, 'ID:', company?.id);
-    
+
     if (!currentUser || !company || !currentUser.email || !company.id) {
-      console.log('Missing data for force add user');
       return;
     }
 
@@ -71,17 +68,13 @@ export class UserManagementComponent implements OnInit {
       // Verificar se usuário já existe antes de adicionar
       const existingUsers = await this.companyService.getCompanyUsers(company.id);
       const userExists = existingUsers.some(u => u.email === currentUser.email);
-      
-      console.log('User already exists in company:', userExists);
-      
+
       if (!userExists) {
         // Determinar role baseado no email do proprietário
         const role = currentUser.email === company.ownerEmail ? 'admin' : 'user';
-        console.log('Adding user with role:', role);
-        
+
         // Forçar adição do usuário à empresa
         await this.companyService.addUserToCompany(company.id, currentUser.email, role);
-        console.log('User added successfully');
       }
     } catch (error) {
       console.error('Error in forceAddCurrentUser:', error);
@@ -174,8 +167,7 @@ export class UserManagementComponent implements OnInit {
       // Se falhou por permissões, criar usuário fake baseado no usuário atual
       if (users.length === 0) {
         const currentUser = this.authService.getCurrentUser();
-        console.log('No users found, current user:', currentUser);
-        
+
         if (currentUser && currentUser.email) {
           // Criar usuário para mostrar na interface enquanto não temos acesso ao Firestore
           const role: 'admin' | 'manager' | 'user' = currentUser.email === company.ownerEmail ? 'admin' : 'user';
@@ -244,20 +236,7 @@ export class UserManagementComponent implements OnInit {
       
       this.users.set(enrichedUsers);
       this.pendingInvites.set(pendingUsers);
-      
-      console.log('📊 Debug Users Loaded:', {
-        total: allUsers.length,
-        active: enrichedUsers.length,
-        pending: pendingUsers.length,
-        pendingDetails: pendingUsers.map(u => ({ 
-          email: u.email, 
-          name: u.displayName, 
-          status: u.inviteStatus,
-          joinedAt: u.joinedAt,
-          token: u.inviteToken ? 'present' : 'missing'
-        }))
-      });
-      
+
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       this.pendingInvites.set([]);
@@ -352,15 +331,10 @@ export class UserManagementComponent implements OnInit {
   }
 
   removeUser(userEmail: string) {
-    console.log('🚀 Debug - removeUser chamado para:', userEmail);
     const company = this.currentCompany();
     const currentUser = this.currentUser();
-    
-    console.log('🏢 Debug - Company:', !!company);
-    console.log('👤 Debug - Current user:', !!currentUser);
-    
+
     if (!company || !currentUser) {
-      console.log('❌ Debug - Company ou usuário não encontrado');
       return;
     }
     
@@ -396,24 +370,18 @@ export class UserManagementComponent implements OnInit {
       return;
     }
 
-    console.log('🗑️ Debug - Iniciando remoção do usuário:', { userEmail, companyId: company.id });
-
     this.isLoading.set(true);
     try {
-      console.log('🔄 Debug - Chamando removeUserFromCompany...');
       await this.companyService.removeUserFromCompany(company.id!, userEmail);
-      console.log('✅ Debug - Usuário removido do Firestore');
-      
-      console.log('🔄 Debug - Recarregando lista de usuários...');
+
       await this.loadCompanyUsers();
-      console.log('✅ Debug - Lista de usuários recarregada');
-      
+
       // Mostrar mensagem de sucesso
       this.inviteSuccess.set(`Usuário ${userEmail} removido com sucesso.`);
       setTimeout(() => {
         this.inviteSuccess.set(null);
       }, 3000);
-      
+
     } catch (error) {
       console.error('❌ Debug - Erro ao remover usuário:', error);
       
@@ -644,30 +612,22 @@ export class UserManagementComponent implements OnInit {
   }
 
   showConfirmation(title: string, message: string, action: () => void, buttonText: string = 'Confirmar', buttonClass: string = 'btn-danger') {
-    console.log('📱 Debug Modal - Mostrando confirmação:', { title, buttonText });
     this.confirmTitle.set(title);
     this.confirmMessage.set(message);
     this.confirmAction.set(action);
     this.confirmButtonText.set(buttonText);
     this.confirmButtonClass.set(buttonClass);
     this.showConfirmModal.set(true);
-    console.log('✅ Debug Modal - Modal configurado e aberto');
   }
 
   confirmModalAction() {
-    console.log('🔄 Debug Modal - Confirmando ação...');
     const action = this.confirmAction();
-    console.log('🎯 Debug Modal - Ação encontrada:', !!action);
-    
+
     if (action) {
-      console.log('▶️ Debug Modal - Executando ação...');
       action();
-    } else {
-      console.log('❌ Debug Modal - Nenhuma ação para executar');
     }
-    
+
     this.showConfirmModal.set(false);
-    console.log('✅ Debug Modal - Modal fechado');
   }
 
   cancelModalAction() {
