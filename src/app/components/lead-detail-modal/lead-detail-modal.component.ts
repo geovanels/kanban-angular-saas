@@ -671,7 +671,7 @@ export class LeadDetailModalComponent {
       if (Array.isArray(value)) {
         return value.length > 0 ? value.join(', ') : 'Nenhuma opção selecionada';
       }
-      
+
       // Se o valor for uma string, pode ser um array serializado ou string simples
       if (value && typeof value === 'string') {
         // Tentar parsing JSON primeiro
@@ -681,21 +681,27 @@ export class LeadDetailModalComponent {
             return parsed.length > 0 ? parsed.join(', ') : 'Nenhuma opção selecionada';
           }
         } catch {}
-        
+
         // Se não é JSON, pode ser uma string com valores separados por vírgula
         if (value.includes(',')) {
           const options = value.split(',').map(v => v.trim()).filter(v => v);
           return options.length > 0 ? options.join(', ') : 'Nenhuma opção selecionada';
         }
-        
+
         // String simples
         return value;
       }
-      
+
       // Valor vazio ou null
       return 'Nenhuma opção selecionada';
     }
-    
+
+    // Se for um campo de responsável, converter o ID para nome
+    if (field.type === 'responsavel' && value) {
+      const user = this.users.find(u => u.uid === value || u.id === value);
+      return user ? (user.displayName || user.email || user.name) : value;
+    }
+
     return value !== null && value !== undefined ? String(value) : 'Não informado';
   }
 
