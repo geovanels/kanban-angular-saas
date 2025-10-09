@@ -58,6 +58,7 @@ export class LeadDetailModalComponent {
   isLoading = false;
   isSaving = false;
   errorMessage = '';
+  successMessage = '';
   currentLead: Lead | null = null;
   cachedInitialFields: any[] = [];
   formReady = false;
@@ -409,27 +410,8 @@ export class LeadDetailModalComponent {
             formConfig[checkboxName] = shouldDisable ? [{ value: isChecked, disabled: true }] : [isChecked];
           });
         } else if (field.type === 'responsavel') {
-          // Campo Responsável: usar email como identificador (já que UIDs estão vazios)
-          let responsibleValue = '';
-          
-          // Primeiro tentar encontrar pelo UID
-          const userByUid = this.users.find(u => u.uid === this.currentLead?.responsibleUserId);
-          if (userByUid) {
-            responsibleValue = userByUid.email; // Usar email do usuário encontrado
-          }
-          // Se não encontrar pelo UID, tentar pelo email
-          else if (this.currentLead?.responsibleUserEmail) {
-            responsibleValue = this.currentLead.responsibleUserEmail;
-          }
-          // Fallback para email do usuário encontrado pelo nome
-          else if (this.currentLead?.responsibleUserName) {
-            const userByName = this.users.find(u => 
-              (u.displayName || '').toLowerCase() === this.currentLead?.responsibleUserName?.toLowerCase()
-            );
-            if (userByName) {
-              responsibleValue = userByName.email;
-            }
-          }
+          // Campo Responsável: usar UID como identificador
+          let responsibleValue = this.currentLead?.responsibleUserId || '';
 
 
           formConfig[field.name] = shouldDisable ? [{ value: responsibleValue, disabled: true }] : [responsibleValue];
@@ -441,15 +423,16 @@ export class LeadDetailModalComponent {
 
       // Criar formulário completamente novo
       this.leadForm = this.fb.group(formConfig);
-      
+
       // Aplicar valores usando patchValue para garantir sincronização
       const patchValues: any = {};
       Object.keys(formConfig).forEach(key => {
         patchValues[key] = formConfig[key][0]; // Extrair valor do array [valor]
       });
-      
+
       this.leadForm.patchValue(patchValues, { emitEvent: false });
       this.formReady = true;
+
 
       // Forçar detecção de mudanças para atualizar a interface
       this.cdr.detectChanges();
@@ -618,6 +601,7 @@ export class LeadDetailModalComponent {
     const initialPhaseId = this.getInitialPhaseId();
     const currentColumnId = this.currentLead?.columnId;
 
+
     initialFields.forEach((field: any) => {
       const key = field.apiFieldName || field.name;
       let currentValue = this.getFieldValue(key);
@@ -625,9 +609,15 @@ export class LeadDetailModalComponent {
         currentValue = this.getFieldValue(field.name);
       }
 
+      // Campo Responsável: usar responsibleUserId do lead
+      if (field.type === 'responsavel') {
+        currentValue = this.currentLead?.responsibleUserId || currentValue || '';
+      }
+
       // Determinar se o campo deve estar desabilitado
       const isInInitialPhase = currentColumnId === initialPhaseId;
       const shouldDisable = !isInInitialPhase && field.allowEditInAnyPhase !== true;
+
 
       formConfig[field.name] = [{ value: currentValue ?? '', disabled: shouldDisable }];
     });
@@ -772,44 +762,79 @@ export class LeadDetailModalComponent {
     // Retornar todos os campos relevantes para exibir na parte central:
     // 1. Campos da fase atual
     // 2. Campos globais de outras fases (que podem ser editados em qualquer fase)
-    
+    // 3. Campos do formulário inicial
+
     const phaseFields = this.currentFormFields || [];
     const globalFields = this.getGlobalFields() || [];
-    
+    const initialFields = this.initialFormConfig?.fields || [];
+
     // Evitar duplicatas comparando por nome do campo
     const allFields = [...phaseFields];
-    const phaseFieldNames = new Set(phaseFields.map((f: any) => f.name || f.apiFieldName));
-    
+    const fieldNames = new Set(phaseFields.map((f: any) => f.name || f.apiFieldName));
+
+    // Adicionar campos globais
     globalFields.forEach((globalField: any) => {
       const fieldName = globalField.name || globalField.apiFieldName;
-      if (!phaseFieldNames.has(fieldName)) {
+      if (!fieldNames.has(fieldName)) {
         allFields.push(globalField);
+        fieldNames.add(fieldName);
       }
     });
-    
+
+    // Adicionar campos do formulário inicial
+    initialFields.forEach((initialField: any) => {
+      const fieldName = initialField.name || initialField.apiFieldName;
+      if (!fieldNames.has(fieldName)) {
+        allFields.push(initialField);
+        fieldNames.add(fieldName);
+      }
+    });
+
     return allFields;
   }
 
   getCentralFields(): any[] {
-    
-    // Campos para exibir na parte central: 
-    // 1. Campos da fase atual (apenas os NÃO globais)
-    // 2. TODOS os campos globais
+
+    // Campos para exibir na parte central:
+    // 1. Campos do formulário inicial com allowEditInAnyPhase
+    // 2. Campos da fase atual (apenas os NÃO globais)
+    // 3. TODOS os campos globais
+    const initialFields = this.initialFormConfig?.fields || [];
     const phaseOnlyFields = this.getPhaseSpecificFields() || []; // Apenas campos não-globais da fase
     const globalFields = this.getGlobalFields() || [];
-    
-    
-    // Começar com campos apenas da fase (não-globais)
-    const centralFields = [...phaseOnlyFields];
-    const fieldNames = new Set(phaseOnlyFields.map((f: any) => f.name || f.apiFieldName));
-    
-    // Adicionar TODOS os campos globais
+
+    const centralFields: any[] = [];
+    const fieldNames = new Set<string>();
+
+    // 1. Adicionar campos do formulário inicial editáveis
+    initialFields.forEach((field: any) => {
+      if (field.allowEditInAnyPhase) {
+        const fieldName = field.name || field.apiFieldName;
+        if (!fieldNames.has(fieldName)) {
+          centralFields.push(field);
+          fieldNames.add(fieldName);
+        }
+      }
+    });
+
+    // 2. Adicionar campos apenas da fase (não-globais)
+    phaseOnlyFields.forEach((field: any) => {
+      const fieldName = field.name || field.apiFieldName;
+      if (!fieldNames.has(fieldName)) {
+        centralFields.push(field);
+        fieldNames.add(fieldName);
+      }
+    });
+
+    // 3. Adicionar TODOS os campos globais
     globalFields.forEach((globalField: any) => {
       const fieldName = globalField.name || globalField.apiFieldName;
-      centralFields.push(globalField);
-      fieldNames.add(fieldName);
+      if (!fieldNames.has(fieldName)) {
+        centralFields.push(globalField);
+        fieldNames.add(fieldName);
+      }
     });
-    
+
     return centralFields;
   }
 
@@ -852,7 +877,7 @@ export class LeadDetailModalComponent {
           const isInInitialPhase = this.currentLead?.columnId === this.getInitialPhaseId();
           const isEditable = isInInitialPhase || f.allowEditInAnyPhase === true;
           
-          return {
+          const result = {
             name: fieldName,
             label: f.label || f.name || f.apiFieldName,
             value: formattedValue,
@@ -862,6 +887,9 @@ export class LeadDetailModalComponent {
             placeholder: f.placeholder,
             options: f.options || (f.type === 'temperatura' ? ['Quente', 'Morno', 'Frio'] : [])
           };
+
+
+          return result;
         });
 
         // Cachear o resultado
@@ -1068,7 +1096,7 @@ export class LeadDetailModalComponent {
       const formData = this.leadForm.value;
       // Mapear apiFieldName -> name para persistir com a chave correta usada na API quando existir
       const mapped: any = { ...formData };
-      
+
       // Mapear todos os campos relevantes (fase atual + globais)
       const relevantFields = this.getAllRelevantFields();
       relevantFields.forEach((f: any) => {
@@ -1096,23 +1124,45 @@ export class LeadDetailModalComponent {
       const respFieldDef = relevantFields.find((f: any) => f.type === 'responsavel');
       const respFieldName = respFieldDef?.name;
       const newRespId = respFieldName ? formData[respFieldName] : formData.responsibleUserId;
-      if (newRespId && newRespId !== this.currentLead.responsibleUserId) {
-        const selectedUser = this.users.find(u => u.uid === newRespId);
-        updateData.responsibleUserId = newRespId;
-        updateData.responsibleUserName = selectedUser?.displayName || '';
-        updateData.responsibleUserEmail = selectedUser?.email || '';
 
-        // Adicionar ao histórico
-        await this.firestoreService.addLeadHistory(
-          this.ownerId,
-          this.boardId,
-          this.currentLead.id!,
-          {
-            type: 'update',
-            text: `Responsável alterado para <strong>${selectedUser?.displayName || 'Ninguém'}</strong>`,
-            user: currentUser.displayName || currentUser.email
-          }
-        );
+      // Atualizar se mudou OU se tinha responsável e foi removido
+      const responsibleChanged = newRespId !== this.currentLead.responsibleUserId;
+      if (responsibleChanged) {
+        if (newRespId) {
+          const selectedUser = this.users.find(u => u.uid === newRespId);
+          updateData.responsibleUserId = newRespId;
+          updateData.responsibleUserName = selectedUser?.displayName || '';
+          updateData.responsibleUserEmail = selectedUser?.email || '';
+
+          // Adicionar ao histórico
+          await this.firestoreService.addLeadHistory(
+            this.ownerId,
+            this.boardId,
+            this.currentLead.id!,
+            {
+              type: 'update',
+              text: `Responsável alterado para <strong>${selectedUser?.displayName || 'Ninguém'}</strong>`,
+              user: currentUser.displayName || currentUser.email
+            }
+          );
+        } else {
+          // Responsável foi removido
+          updateData.responsibleUserId = '';
+          updateData.responsibleUserName = '';
+          updateData.responsibleUserEmail = '';
+
+          // Adicionar ao histórico
+          await this.firestoreService.addLeadHistory(
+            this.ownerId,
+            this.boardId,
+            this.currentLead.id!,
+            {
+              type: 'update',
+              text: `Responsável removido`,
+              user: currentUser.displayName || currentUser.email
+            }
+          );
+        }
       }
 
       // Registrar diffs de campos (histórico) — incluindo campos da fase e globais
@@ -1165,16 +1215,32 @@ export class LeadDetailModalComponent {
         ...(this.currentLead.fields || {}),
         ...mapped
       } as any;
+
+      // Atualizar responsibleUserId se foi alterado
+      if (responsibleChanged && newRespId) {
+        this.currentLead.responsibleUserId = newRespId;
+      } else if (responsibleChanged && !newRespId) {
+        this.currentLead.responsibleUserId = undefined;
+      }
+
       const afterValues: any = {};
       // Atualizar valores de todos os campos relevantes
       relevantFields.forEach((f: any) => {
         const key = f.apiFieldName || f.name;
-        afterValues[f.name] = mapped.hasOwnProperty(key) ? mapped[key] : (this.getFieldValue(key) ?? '');
+        if (f.type === 'responsavel') {
+          // Para campo responsável, usar o responsibleUserId atualizado
+          afterValues[f.name] = this.currentLead.responsibleUserId || '';
+        } else {
+          afterValues[f.name] = mapped.hasOwnProperty(key) ? mapped[key] : (this.getFieldValue(key) ?? '');
+        }
       });
       if (Object.keys(afterValues).length) {
         this.leadForm.patchValue(afterValues, { emitEvent: false });
       }
       this.leadUpdated.emit();
+
+      // Mostrar mensagem de sucesso
+      this.showSuccessMessage('Alterações salvas com sucesso!');
 
     } catch (error: any) {
       this.errorMessage = 'Erro ao salvar alterações. Tente novamente.';
@@ -1426,8 +1492,23 @@ export class LeadDetailModalComponent {
   copyPublicLink() {
     if (this.publicLink) {
       navigator.clipboard.writeText(this.publicLink);
-      // Aqui você pode adicionar uma notificação de que o link foi copiado
+      this.showSuccessMessage('Link copiado para a área de transferência!');
     }
+  }
+
+  showSuccessMessage(message: string) {
+    this.successMessage = message;
+    this.cdr.detectChanges();
+    setTimeout(() => {
+      this.successMessage = '';
+      this.cdr.detectChanges();
+    }, 3000);
+  }
+
+  onResponsavelChange(event: any, fieldName: string) {
+    const selectedValue = event.target.value;
+    const selectedIndex = event.target.selectedIndex;
+    const selectedOption = event.target.options[selectedIndex];
   }
 
   async deleteLead() {

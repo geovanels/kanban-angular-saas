@@ -36,6 +36,7 @@ export class LeadModalComponent {
   @Input() ownerId: string = '';
   @Input() boardId: string = '';
   @Input() columns: Column[] = [];
+  @Input() users: any[] = [];
   
   @Output() leadCreated = new EventEmitter<void>();
   @Output() leadUpdated = new EventEmitter<void>();

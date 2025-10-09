@@ -96,6 +96,7 @@
                   <select
                     *ngIf="field.fieldType === 'responsavel'"
                     [formControlName]="field.formControlName"
+                    (change)="onResponsavelChange($event, field.formControlName)"
                     class="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Selecione o responsável...</option>
                     <option *ngFor="let u of users" [value]="u.uid">{{ u.displayName || u.email }}</option>
@@ -283,13 +284,15 @@
                 </div>
 
                 <!-- Campo Responsável (lista de usuários da empresa) -->
-                <select
-                  *ngIf="field.type === 'responsavel'"
-                  [formControlName]="field.name"
-                  class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                  <option value="">Selecione o responsável...</option>
-                  <option *ngFor="let u of users" [value]="u.uid">{{ u.displayName || u.email }}</option>
-                </select>
+                <div *ngIf="field.type === 'responsavel'">
+                  <select
+                    [formControlName]="field.name"
+                    (change)="onResponsavelChange($event, field.name)"
+                    class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Selecione o responsável...</option>
+                    <option *ngFor="let u of users" [value]="u.uid">{{ u.displayName || u.email }}</option>
+                  </select>
+                </div>
               </div>
             </ng-container>
             </form>
@@ -378,16 +381,17 @@
                   </div>
 
                   <!-- Campo Responsável -->
-                  <select
-                    *ngIf="field.type === 'responsavel'"
-                    [formControlName]="field.name"
-                    class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Selecione o responsável...</option>
-                    <!-- Usuários ativos - usando email como valor -->
-                    <option *ngFor="let u of users" [value]="u.email">
-                      {{ u.displayName || u.email }}
-                    </option>
-                  </select>
+                  <div *ngIf="field.type === 'responsavel'">
+                    <select
+                      [formControlName]="field.name"
+                      (change)="onResponsavelChange($event, field.name)"
+                      class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                      <option value="">Selecione o responsável...</option>
+                      <option *ngFor="let u of users" [value]="u.uid">
+                        {{ u.displayName || u.email }}
+                      </option>
+                    </select>
+                  </div>
                 </div>
               </ng-container>
             </form>
@@ -538,6 +542,11 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Mensagem de sucesso -->
+        <div *ngIf="successMessage" class="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm mt-3">
+          {{ successMessage }}
         </div>
 
         <!-- Mensagem de erro -->

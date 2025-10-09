@@ -1118,10 +1118,11 @@ Authorization: Bearer {{ apiToken }}
 </app-main-layout>
 
 <!-- Modal de Lead -->
-<app-lead-modal 
+<app-lead-modal
   [ownerId]="ownerId"
   [boardId]="boardId"
   [columns]="columns"
+  [users]="users"
   (leadCreated)="onLeadCreated()"
   (leadUpdated)="onLeadUpdated()"
   (closeModal)="onLeadUpdated()">
