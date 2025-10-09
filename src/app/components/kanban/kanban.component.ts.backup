@@ -1258,19 +1258,28 @@ export class KanbanComponent implements OnInit, OnDestroy {
   async onFlowReorder(event: CdkDragDrop<string[]>) {
     
     if (event.previousIndex === event.currentIndex) {
+      console.log('❌ onFlowReorder - Movimento aparentemente para o mesmo índice');
+      console.log('⚠️ Vamos investigar se realmente é o mesmo local...');
       
       // Verificar se há diferença real nos dados do container
       const containerIds = event.container.data;
       const previousContainerIds = event.previousContainer.data;
       
+      console.log('🔍 Container atual:', containerIds);
+      console.log('🔍 Container anterior:', previousContainerIds);
+      console.log('🔍 Fases com nomes:', containerIds.map((id, index) => `${index}: ${this.getColumnById(id)?.name}`));
       
       // Se os containers são diferentes ou se há mudança real, continuar
       if (event.container !== event.previousContainer || 
           JSON.stringify(containerIds) !== JSON.stringify(previousContainerIds)) {
+        console.log('✅ Detectada mudança real, continuando reordenação...');
       } else {
+        console.log('❌ Nenhuma mudança real detectada');
+        console.log('💡 Tentativa: Vou tentar forçar o movimento manualmente...');
         
         // Tentar detectar se há intenção de movimento baseado no local do mouse
         // Se o usuário arrastou para uma posição diferente, vamos tentar processar
+        console.log('⚠️ FORÇANDO movimento para testar...');
         // Não retornar aqui, deixar continuar para testar
       }
     }
@@ -1285,10 +1294,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
     // Atualizar ordem local
     moveItemInArray(this.flowOrder, event.previousIndex, event.currentIndex);
     
+    console.log('🔄 Flow Reorder - flowOrder imediatamente após moveItemInArray:', [...this.flowOrder]);
     
     // Forçar detecção de mudanças para atualizar DOM
     this.cdr.detectChanges();
-
+    console.log('🔄 Flow Reorder - DOM atualizado, ordem visual deve refletir:', [...this.flowOrder]);
+    
+        return { id, from: originalIndex, to: index, changed: originalIndex !== index };
+      })
+    });
+    
     try {
       // Persistir nova ordem no banco de dados - atualizar TODOS os índices
       const updatePromises = this.flowOrder.map(async (columnId, newIndex) => {
@@ -1296,6 +1311,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         const originalIndex = originalOrder.indexOf(columnId);
         
         if (column && originalIndex !== newIndex) {
+          console.log(`🔄 Atualizando coluna "${column.name}" - posição: ${originalIndex} → ${newIndex}`);
           await this.firestoreService.updateColumn(this.ownerId, this.boardId, columnId, { order: newIndex });
           // Atualizar também o objeto local
           column.order = newIndex;
@@ -1308,8 +1324,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.columns.sort((a, b) => (a.order || 0) - (b.order || 0));
       
       
+      console.log('✅ Flow Reorder - Aguardando para resetar flag isManualReorder');
       // Aguardar menos tempo para permitir que subscriptions sejam processadas
       setTimeout(() => {
+        console.log('🔄 Flow Reorder - Resetando flag isManualReorder para false');
         this.isManualReorder = false;
       }, 500);
       
@@ -1328,6 +1346,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private syncFlowOrderWithColumns() {
     // Não interferir durante reordenação manual
     if (this.isManualReorder) {
+      console.log('🔄 syncFlowOrderWithColumns - Pulando sincronização durante reordenação manual');
       return;
     }
     
@@ -1344,6 +1363,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const flowOrderMatchesColumnOrder = this.flowOrder.every((id, index) => sortedIds[index] === id);
     
     if (flowOrderMatchesColumnOrder) {
+      console.log('🔄 syncFlowOrderWithColumns - FlowOrder já está sincronizado, não alterando');
       return;
     }
     
@@ -1359,11 +1379,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
       if (!existing.has(id)) {
         const phaseName = this.getColumnById(id)?.name || 'Nome não encontrado';
         this.flowOrder.push(id);
+        console.log(`🔄 syncFlowOrderWithColumns - Adicionada nova fase: ${id} (${phaseName})`);
       }
     }
     
     // Forçar atualização visual se houve mudanças
     if (this.flowOrder.length !== existing.size) {
+      console.log('🔄 syncFlowOrderWithColumns - Forçando atualização visual após mudanças');
       this.cdr.detectChanges();
     }
     
@@ -1648,16 +1670,20 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   async saveInitialForm() {
     try {
+      console.log('💾 saveInitialForm INICIADO');
+      console.log('💾 this.initialFormFields antes de salvar:', this.initialFormFields);
       
       // Log detalhado de cada campo que será salvo
       this.initialFormFields?.forEach((field, index) => {
       });
       
       const dataToSave = { fields: this.initialFormFields };
+      console.log('💾 Dados que serão enviados ao Firestore:', dataToSave);
       
       await this.firestoreService.saveInitialFormConfig(this.boardId, dataToSave);
       
       // Recarregar campos disponíveis para filtro após salvar
+      console.log('💾 Recarregando filtros após salvar formulário inicial...');
       this.loadAvailableFilterFields();
       
       this.toast.success('Formulário inicial salvo.');
@@ -1668,6 +1694,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   onInitialFieldsChanged(fields: any[]) {
+    console.log('🔄 onInitialFieldsChanged CHAMADO com:', fields);
     
     // Log detalhado de cada campo recebido
     fields.forEach((field, index) => {
@@ -1676,6 +1703,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.initialFormFields = fields;
     
     // Recarregar filtros quando campos mudam
+    console.log('🔄 Recarregando filtros após mudança de campos...');
     this.loadAvailableFilterFields();
     
     this.buildApiExampleFromFields();
@@ -1749,11 +1777,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
         if (!('showInFilters' in field)) {
           field.showInFilters = false;
           needsMigration = true;
+          console.log(`🔧 Adicionado showInFilters: false ao campo ${field.name} (campo antigo)`);
         } else {
         }
       });
       
       if (needsMigration) {
+        console.log('🔧 Alguns campos do formulário inicial foram migrados em memória');
       } else {
       }
     }
@@ -1766,12 +1796,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
           if (!('showInFilters' in field)) {
             field.showInFilters = false;
             needsMigration = true;
+            console.log(`🔧 Adicionado showInFilters: false ao campo ${field.name} da fase ${phaseId} (campo antigo)`);
           } else {
+            console.log(`✅ Campo ${field.name} da fase ${phaseId} já tem showInFilters: ${field.showInFilters}`);
           }
         });
         
         if (needsMigration) {
+          console.log(`🔧 Alguns campos da fase ${phaseId} foram migrados em memória`);
         } else {
+          console.log(`✅ Todos os campos da fase ${phaseId} já têm showInFilters`);
         }
       }
     });
@@ -1801,6 +1835,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         }
       });
     } else {
+      console.log('⚠️ Nenhum initialFormFields encontrado');
     }
     
     // Adicionar campos de fases que têm showInFilters = true
@@ -2292,17 +2327,21 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   // Métodos para debugging de drag
   onDragEntered() {
+    console.log('🔄 Drag entered flow area');
   }
 
   onDragExited() {
+    console.log('🔄 Drag exited flow area');
   }
 
   onDragStarted(phaseId: string) {
     const phaseName = this.getColumnById(phaseId)?.name;
     const currentIndex = this.flowOrder.indexOf(phaseId);
+    console.log('🔄 Drag started for phase:', phaseName, 'at index:', currentIndex);
   }
 
   onDragEnded(phaseId: string) {
+    console.log('🔄 Drag ended for phase:', this.getColumnById(phaseId)?.name);
   }
 
   // Funções de reordenação com botões
@@ -2342,6 +2381,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       const updatePromises = this.flowOrder.map(async (columnId, newIndex) => {
         const column = this.columns.find(c => c.id === columnId);
         if (column && column.order !== newIndex) {
+          console.log(`💾 Salvando ${column.name} na posição ${newIndex}`);
           await this.firestoreService.updateColumn(this.ownerId, this.boardId, columnId, { order: newIndex });
           column.order = newIndex;
         }
@@ -2349,6 +2389,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       
       await Promise.all(updatePromises);
       
+      console.log('✅ Reordenação salva com sucesso!');
       
       setTimeout(() => {
         this.isManualReorder = false;
@@ -2643,6 +2684,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       event.stopPropagation();
     }
 
+    console.log('🔧 Editando automação (ANTES do JSON.parse):', automation);
 
     // Passar cópia profunda para evitar duplicação/efeitos colaterais no array
     this.selectedAutomation = JSON.parse(JSON.stringify(automation));
@@ -2708,6 +2750,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       try {
         // Buscar e excluir todos os emails do outbox
         await this.firestoreService.clearOutboxEmails(this.ownerId, this.boardId);
+        console.log('✅ Caixa de saída limpa com sucesso');
       } catch (error) {
         console.error('Erro ao limpar caixa de saída:', error);
         alert('Erro ao limpar caixa de saída. Tente novamente.');
