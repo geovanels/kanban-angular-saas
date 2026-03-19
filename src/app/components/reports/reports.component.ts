@@ -430,7 +430,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   // View methods
-  setView(view: 'overview' | 'sla' | 'phases' | 'registros') {
+  setView(view: 'overview' | 'sla' | 'phases' | 'health' | 'registros') {
     this.currentView = view;
   }
 
