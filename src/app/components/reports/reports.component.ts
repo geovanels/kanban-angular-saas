@@ -94,6 +94,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   // Report data
   filteredRecords: Lead[] = [];
+  groupedRecords: { column: Column; leads: Lead[] }[] = [];
+  groupByPhase = true;
   slaIndicators: SLAIndicator[] = [];
   phaseMetrics: PhaseMetric[] = [];
   summaryStats = {
@@ -911,6 +913,19 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.leadsOverTimeChart = Array.from(dayMap.entries()).map(([label, value]) => ({ label, value }));
   }
 
+  private groupRecordsByPhase() {
+    this.groupedRecords = this.columns
+      .map(col => ({
+        column: col,
+        leads: this.filteredRecords.filter(r => r.columnId === col.id)
+      }))
+      .filter(g => g.leads.length > 0);
+  }
+
+  toggleGroupByPhase() {
+    this.groupByPhase = !this.groupByPhase;
+  }
+
   getLeadsOverTimeMax(): number {
     if (this.leadsOverTimeChart.length === 0) return 0;
     return Math.max(...this.leadsOverTimeChart.map(d => d.value), 1);
@@ -962,6 +977,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.calculateUserPerformance();
     this.calculateFunnelStages();
     this.calculateLeadsOverTime();
+    this.groupRecordsByPhase();
 
     // Regenerar gráfico dinâmico com os registros filtrados
     if (this.selectedChartField) {

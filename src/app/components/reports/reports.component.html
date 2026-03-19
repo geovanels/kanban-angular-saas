@@ -1189,6 +1189,21 @@
 
               <!-- Action buttons -->
               <div class="flex items-center gap-2">
+                <!-- Group by phase toggle -->
+                <button
+                  (click)="toggleGroupByPhase()"
+                  class="inline-flex items-center px-3 py-2 border shadow-sm text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  [class.border-blue-500]="groupByPhase"
+                  [class.bg-blue-50]="groupByPhase"
+                  [class.text-blue-700]="groupByPhase"
+                  [class.border-gray-300]="!groupByPhase"
+                  [class.bg-white]="!groupByPhase"
+                  [class.text-gray-700]="!groupByPhase"
+                  [class.hover:bg-gray-50]="!groupByPhase">
+                  <i class="fas fa-layer-group mr-2"></i>
+                  Agrupar por Fase
+                </button>
+
                 <!-- Export to Excel button -->
                 <button
                   (click)="exportToExcel()"
@@ -1261,46 +1276,109 @@
               </div>
             </div>
 
-            <div class="overflow-x-auto border border-gray-200 rounded-lg">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th *ngFor="let column of getSelectedColumns()"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                      {{ column.label }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  <tr *ngFor="let lead of filteredRecords | slice:0:50" class="hover:bg-gray-50">
-                    <td *ngFor="let column of getSelectedColumns()" class="px-6 py-4 whitespace-nowrap">
-                      <div *ngIf="column.key === 'currentPhase'" class="flex items-center">
-                        <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
-                        <span class="text-sm text-gray-900">{{ getColumnValue(lead, column) }}</span>
-                      </div>
-                      <div *ngIf="column.key === 'status'">
-                        <span
-                          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                          [class.bg-green-100]="isLeadConcluded(lead)"
-                          [class.text-green-800]="isLeadConcluded(lead)"
-                          [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
-                          [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
-                          [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
-                          [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
-                          {{ getColumnValue(lead, column) }}
-                        </span>
-                      </div>
-                      <div *ngIf="column.key !== 'currentPhase' && column.key !== 'status'" class="text-sm text-gray-900">
-                        {{ getColumnValue(lead, column) }}
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- === VISUALIZAÇÃO AGRUPADA POR FASE === -->
+            <div *ngIf="groupByPhase" class="space-y-4">
+              <div *ngFor="let group of groupedRecords" class="border border-gray-200 rounded-lg overflow-hidden">
+                <!-- Phase Header -->
+                <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full" [style.background-color]="group.column.color"></div>
+                    <span class="text-sm font-semibold text-gray-900">{{ group.column.name }}</span>
+                  </div>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-600">
+                    {{ group.leads.length }} {{ group.leads.length === 1 ? 'registro' : 'registros' }}
+                  </span>
+                </div>
+
+                <!-- Phase Table -->
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50/50">
+                      <tr>
+                        <th *ngFor="let column of getSelectedColumns()"
+                            class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                          {{ column.label }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                      <tr *ngFor="let lead of group.leads" class="hover:bg-gray-50">
+                        <td *ngFor="let column of getSelectedColumns()" class="px-5 py-3 whitespace-nowrap">
+                          <div *ngIf="column.key === 'currentPhase'" class="flex items-center">
+                            <div class="w-2.5 h-2.5 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
+                            <span class="text-sm text-gray-900">{{ getColumnValue(lead, column) }}</span>
+                          </div>
+                          <div *ngIf="column.key === 'status'">
+                            <span
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                              [class.bg-green-100]="isLeadConcluded(lead)"
+                              [class.text-green-800]="isLeadConcluded(lead)"
+                              [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                              [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                              [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
+                              [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
+                              {{ getColumnValue(lead, column) }}
+                            </span>
+                          </div>
+                          <div *ngIf="column.key !== 'currentPhase' && column.key !== 'status'" class="text-sm text-gray-900">
+                            {{ getColumnValue(lead, column) }}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div *ngIf="groupedRecords.length === 0" class="text-center py-8">
+                <i class="fas fa-search text-3xl text-gray-300 mb-3"></i>
+                <p class="text-gray-400 text-sm">Nenhum registro encontrado</p>
+              </div>
             </div>
 
-            <div *ngIf="filteredRecords.length > 50" class="mt-3 text-center">
-              <p class="text-xs text-gray-400">Exibindo 50 de {{ filteredRecords.length }} registros. Use os filtros para refinar a busca ou exporte para ver todos.</p>
+            <!-- === VISUALIZAÇÃO LISTA PLANA === -->
+            <div *ngIf="!groupByPhase">
+              <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th *ngFor="let column of getSelectedColumns()"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        {{ column.label }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <tr *ngFor="let lead of filteredRecords | slice:0:50" class="hover:bg-gray-50">
+                      <td *ngFor="let column of getSelectedColumns()" class="px-6 py-4 whitespace-nowrap">
+                        <div *ngIf="column.key === 'currentPhase'" class="flex items-center">
+                          <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getColumnColor(lead.columnId)"></div>
+                          <span class="text-sm text-gray-900">{{ getColumnValue(lead, column) }}</span>
+                        </div>
+                        <div *ngIf="column.key === 'status'">
+                          <span
+                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                            [class.bg-green-100]="isLeadConcluded(lead)"
+                            [class.text-green-800]="isLeadConcluded(lead)"
+                            [class.bg-red-100]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                            [class.text-red-800]="isLeadOverdue(lead) && !isLeadConcluded(lead)"
+                            [class.bg-blue-100]="!isLeadConcluded(lead) && !isLeadOverdue(lead)"
+                            [class.text-blue-800]="!isLeadConcluded(lead) && !isLeadOverdue(lead)">
+                            {{ getColumnValue(lead, column) }}
+                          </span>
+                        </div>
+                        <div *ngIf="column.key !== 'currentPhase' && column.key !== 'status'" class="text-sm text-gray-900">
+                          {{ getColumnValue(lead, column) }}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div *ngIf="filteredRecords.length > 50" class="mt-3 text-center">
+                <p class="text-xs text-gray-400">Exibindo 50 de {{ filteredRecords.length }} registros. Use os filtros para refinar a busca ou exporte para ver todos.</p>
+              </div>
             </div>
           </div>
         </div>
