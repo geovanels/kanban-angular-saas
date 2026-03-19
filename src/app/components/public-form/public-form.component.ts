@@ -19,7 +19,22 @@ import { AuthService } from '../../services/auth.service';
         <div *ngIf="companyLogo" class="mb-6 text-center">
           <img [src]="companyLogo" alt="Logo da empresa" class="h-10 inline-block" />
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+
+        <!-- Tela de sucesso após envio -->
+        <div *ngIf="submitted()" class="bg-white border border-gray-200 rounded-xl shadow-sm">
+          <div class="p-10 text-center">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full" [style.background-color]="primaryColor() + '1A'">
+              <svg class="h-8 w-8" [style.color]="primaryColor()" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">Formulário enviado com sucesso!</h2>
+            <p class="text-sm text-gray-500">Suas respostas foram registradas. Obrigado por preencher o formulário.</p>
+          </div>
+        </div>
+
+        <!-- Formulário -->
+        <div *ngIf="!submitted()" class="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h1 class="text-lg font-semibold text-gray-900">Formulário</h1>
             <span class="text-xs text-gray-500" *ngIf="companyName()">{{ companyName() }}</span>
@@ -71,7 +86,7 @@ import { AuthService } from '../../services/auth.service';
 
               <div class="pt-2">
                 <button type="submit" [disabled]="saving()" class="px-4 py-2 text-white rounded-lg" [style.background-color]="primaryColor()">
-                  {{ saving() ? 'Salvando...' : 'Salvar' }}
+                  {{ saving() ? 'Enviando...' : 'Enviar' }}
                 </button>
               </div>
             </form>
@@ -98,6 +113,7 @@ export class PublicFormComponent implements OnInit {
   loading = signal(true);
   saving = signal(false);
   fieldsLoaded = signal(false);
+  submitted = signal(false);
   companyName = signal<string | null>(null);
   primaryColor = signal<string>(this.subdomain.getCurrentCompany()?.brandingConfig?.primaryColor || '#3B82F6');
   companyLogo: string | null = null;
@@ -370,10 +386,10 @@ export class PublicFormComponent implements OnInit {
       }
 
       await this.fs.updateLead(this.userId, this.boardId, this.leadId, updates);
-      try { this.toast.success('Formulário salvo.'); } catch {}
+      this.saving.set(false);
+      this.submitted.set(true);
     } catch (e) {
       try { this.toast.error('Erro ao salvar formulário.'); } catch {}
-    } finally {
       this.saving.set(false);
     }
   }
