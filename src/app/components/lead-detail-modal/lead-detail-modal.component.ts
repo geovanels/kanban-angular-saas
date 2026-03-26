@@ -922,8 +922,12 @@ export class LeadDetailModalComponent {
 
   isContatoPeloSite(): boolean {
     if (!this.currentLead) return false;
-    const origem = this.currentLead.fields?.['origem'] || this.currentLead.fields?.['origin'] || this.currentLead.fields?.['source'] || '';
-    return origem === 'Contato pelo Site';
+    const origem = (this.currentLead.fields?.['origem'] || this.currentLead.fields?.['origin'] || this.currentLead.fields?.['source'] || '').toString().toLowerCase().trim();
+    return origem.includes('contato') || origem.includes('site') || origem.includes('formulario') || origem.includes('formulário');
+  }
+
+  hasAssuntoOuMensagem(): boolean {
+    return !!(this.getAssunto() || this.getMensagem());
   }
 
   getAssunto(): string {

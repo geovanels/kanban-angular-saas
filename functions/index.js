@@ -244,6 +244,11 @@ exports.leadIntakeHttp = onRequest({
       }
     });
 
+    // Se não tiver origem definida, usar "Contato pelo Site" como padrão para leads via API
+    if (!processedFields['origem'] || (typeof processedFields['origem'] === 'string' && processedFields['origem'].trim() === '')) {
+      processedFields['origem'] = 'Contato pelo Site';
+    }
+
     const normalized = { fields: processedFields };
 
     const leadDoc = {
@@ -631,45 +636,72 @@ exports.onLeadCreated = onDocumentCreated({
       return;
     }
 
-    // Verificar se já executou automação (proteção contra duplicatas)
+    // Verificar se já executou automação (proteção contra duplicatas e retriggers)
     if (leadData.executedAutomations && Object.keys(leadData.executedAutomations).length > 0) {
       logger.info(`🔄 Lead ${leadId} já tem automações executadas, pulando`);
       return;
     }
 
-    logger.info(`🆕 NOVO LEAD CRIADO: ${leadId} - Board: ${boardId} - Company: ${companyId}`);
-
-    // Buscar automações ativas para novo lead
-    const automationsRef = admin.firestore()
+    // Lock com transaction para evitar execução duplicada (Cloud Functions pode disparar mais de uma vez)
+    const leadRef = admin.firestore()
       .collection('companies').doc(companyId)
       .collection('boards').doc(boardId)
-      .collection('automations');
+      .collection('leads').doc(leadId);
 
-    const automationsSnapshot = await automationsRef
-      .where('active', '==', true)
-      .where('triggerType', '==', 'new-lead-created')
-      .get();
-
-    logger.info(`📋 Automações encontradas: ${automationsSnapshot.size}`);
-
-    // Executar cada automação
-    for (const autoDoc of automationsSnapshot.docs) {
-      const automation = { id: autoDoc.id, ...autoDoc.data() };
-
-      logger.info(`▶️ Executando automação: ${automation.id} - ${automation.name}`);
-
-      // Verificar se automação tem fase específica
-      const triggerPhase = automation.triggerPhase;
-      if (triggerPhase && leadData.columnId !== triggerPhase) {
-        logger.info(`⏭️ Lead não está na fase configurada (${triggerPhase}), pulando automação`);
-        continue;
+    const lockAcquired = await admin.firestore().runTransaction(async (transaction) => {
+      const leadSnap = await transaction.get(leadRef);
+      if (!leadSnap.exists) return false;
+      const currentData = leadSnap.data();
+      if (currentData._automationProcessing || (currentData.executedAutomations && Object.keys(currentData.executedAutomations).length > 0)) {
+        return false; // Já está sendo processado ou já foi processado
       }
+      transaction.update(leadRef, { _automationProcessing: true });
+      return true;
+    });
 
-      // Executar ações da automação
-      await executeAutomationActions(automation, leadData, companyId, boardId, leadId);
+    if (!lockAcquired) {
+      logger.info(`🔒 Lead ${leadId} já está sendo processado por outra instância, pulando`);
+      return;
+    }
 
-      // Registrar execução no histórico
-      await addAutomationHistory(companyId, boardId, automation, leadData, 'success');
+    logger.info(`🆕 NOVO LEAD CRIADO: ${leadId} - Board: ${boardId} - Company: ${companyId}`);
+
+    try {
+      // Buscar automações ativas para novo lead
+      const automationsRef = admin.firestore()
+        .collection('companies').doc(companyId)
+        .collection('boards').doc(boardId)
+        .collection('automations');
+
+      const automationsSnapshot = await automationsRef
+        .where('active', '==', true)
+        .where('triggerType', '==', 'new-lead-created')
+        .get();
+
+      logger.info(`📋 Automações encontradas: ${automationsSnapshot.size}`);
+
+      // Executar cada automação
+      for (const autoDoc of automationsSnapshot.docs) {
+        const automation = { id: autoDoc.id, ...autoDoc.data() };
+
+        logger.info(`▶️ Executando automação: ${automation.id} - ${automation.name}`);
+
+        // Verificar se automação tem fase específica
+        const triggerPhase = automation.triggerPhase;
+        if (triggerPhase && leadData.columnId !== triggerPhase) {
+          logger.info(`⏭️ Lead não está na fase configurada (${triggerPhase}), pulando automação`);
+          continue;
+        }
+
+        // Executar ações da automação
+        await executeAutomationActions(automation, leadData, companyId, boardId, leadId);
+
+        // Registrar execução no histórico
+        await addAutomationHistory(companyId, boardId, automation, leadData, 'success');
+      }
+    } finally {
+      // Remover flag de processamento
+      await leadRef.update({ _automationProcessing: admin.firestore.FieldValue.delete() });
     }
 
     if (automationsSnapshot.empty) {
