@@ -153,13 +153,16 @@ export class UserManagementComponent implements OnInit {
       
       // Separar usuários ativos e convites pendentes
       const activeUsers = allUsers.filter(user => {
-        return !user.inviteStatus || 
-               user.inviteStatus === 'accepted' || 
-               (user.uid && user.uid.trim() !== '');
+        // Considerar ativo se: status é 'accepted', não tem status definido, ou tem uid preenchido (aceitou mas status não atualizou)
+        if (user.inviteStatus === 'pending') return false;
+        if (user.inviteStatus === 'inactive') return false;
+        if (user.inviteStatus === 'expired') return false;
+        return true;
       });
-      
+
       const pendingUsers = allUsers.filter(user => {
-        return user.inviteStatus === 'pending';
+        // Pendente apenas se o status é 'pending' E não tem uid (não aceitou ainda)
+        return user.inviteStatus === 'pending' && (!user.uid || user.uid.trim() === '');
       });
       
       let users = activeUsers;

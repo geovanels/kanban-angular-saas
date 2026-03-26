@@ -88,7 +88,7 @@
           </select>
 
           <!-- Temperatura Select -->
-          <select 
+          <select
             *ngIf="field.type === 'temperatura'"
             [id]="field.name"
             [formControlName]="field.name"
@@ -98,6 +98,20 @@
             <option value="">Selecione a temperatura</option>
             <option *ngFor="let option of (field.options || ['Quente', 'Morno', 'Frio'])" [value]="option">
               {{ option }}
+            </option>
+          </select>
+
+          <!-- Responsavel Select -->
+          <select
+            *ngIf="field.type === 'responsavel'"
+            [id]="field.name"
+            [formControlName]="field.name"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            [class.border-red-500]="leadForm.get(field.name)?.invalid && leadForm.get(field.name)?.touched"
+            [disabled]="isLoading">
+            <option value="">Selecione o responsável...</option>
+            <option *ngFor="let u of users" [value]="u.uid">
+              {{ u.displayName || u.email }}
             </option>
           </select>
 

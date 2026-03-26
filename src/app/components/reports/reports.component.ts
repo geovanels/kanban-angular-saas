@@ -29,6 +29,33 @@ interface PhaseMetric {
   conversionRate: number;
 }
 
+interface UserPerformance {
+  name: string;
+  email: string;
+  totalLeads: number;
+  concludedLeads: number;
+  overdueLeads: number;
+  activeLeads: number;
+  winRate: number;
+  avgConversionDays: number;
+}
+
+interface StagnantLead {
+  lead: Lead;
+  daysInPhase: number;
+  phaseName: string;
+  phaseColor: string;
+  contactName: string;
+}
+
+interface FunnelStage {
+  phase: string;
+  color: string;
+  count: number;
+  percentage: number;
+  dropOff: number;
+}
+
 @Component({
   selector: 'app-reports',
   standalone: true,
@@ -67,6 +94,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   // Report data
   filteredRecords: Lead[] = [];
+  groupedRecords: { column: Column; leads: Lead[] }[] = [];
+  groupByPhase = true;
   slaIndicators: SLAIndicator[] = [];
   phaseMetrics: PhaseMetric[] = [];
   summaryStats = {
@@ -92,15 +121,25 @@ export class ReportsComponent implements OnInit, OnDestroy {
   chartType: 'bar' | 'pie' = 'bar';
 
   // Display options
-  currentView: 'overview' | 'sla' | 'phases' | 'registros' = 'overview';
+  currentView: 'overview' | 'sla' | 'phases' | 'health' | 'registros' = 'overview';
   exportFormats = ['PDF', 'Excel', 'CSV'];
-  
+
+  // Health & Performance data
+  winRate = 0;
+  lossRate = 0;
+  leadVelocity = 0;
+  stagnantLeads: StagnantLead[] = [];
+  userPerformance: UserPerformance[] = [];
+  funnelStages: FunnelStage[] = [];
+  leadsOverTimeChart: { label: string; value: number }[] = [];
+
   // Column management for registros table
   availableColumns: any[] = [];
   selectedColumns: string[] = [];
   showColumnSelector = false;
   viewTabs = [
     { key: 'overview', name: 'Visão Geral', icon: 'fa-chart-pie' },
+    { key: 'health', name: 'Saúde dos Leads', icon: 'fa-heartbeat' },
     { key: 'sla', name: 'SLA', icon: 'fa-clock' },
     { key: 'phases', name: 'Fases', icon: 'fa-columns' },
     { key: 'registros', name: 'Registros', icon: 'fa-users' }
@@ -196,6 +235,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.calculateSLAIndicators();
       this.calculatePhaseMetrics();
       this.generateChartData();
+      this.calculateHealthMetrics();
+      this.calculateUserPerformance();
+      this.calculateFunnelStages();
+      this.calculateLeadsOverTime();
 
       // Força a detecção de mudanças para garantir que os gráficos sejam renderizados
       this.cdr.detectChanges();
@@ -389,7 +432,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   // View methods
-  setView(view: 'overview' | 'sla' | 'phases' | 'registros') {
+  setView(view: 'overview' | 'sla' | 'phases' | 'health' | 'registros') {
     this.currentView = view;
   }
 
@@ -698,6 +741,196 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
 
+  private calculateHealthMetrics() {
+    const total = this.filteredRecords.length;
+    if (total === 0) {
+      this.winRate = 0;
+      this.lossRate = 0;
+      this.leadVelocity = 0;
+      this.stagnantLeads = [];
+      return;
+    }
+
+    // Win/Loss rates
+    const concluded = this.filteredRecords.filter(r => this.isLeadConcluded(r));
+    const lost = concluded.filter(r => {
+      const col = this.columns.find(c => c.id === r.columnId);
+      return col?.endStageType === 'fail';
+    });
+    const won = concluded.filter(r => {
+      const col = this.columns.find(c => c.id === r.columnId);
+      return col?.endStageType === 'success';
+    });
+
+    this.winRate = total > 0 ? Math.round((won.length / total) * 100) : 0;
+    this.lossRate = total > 0 ? Math.round((lost.length / total) * 100) : 0;
+
+    // Lead velocity (avg days from creation to conclusion)
+    if (won.length > 0) {
+      const totalDays = won.reduce((sum, lead) => {
+        const created = this.getLeadDate(lead);
+        const moved = lead.movedToCurrentColumnAt?.toDate ?
+          lead.movedToCurrentColumnAt.toDate() :
+          (lead.movedToCurrentColumnAt?.seconds ?
+            new Date(lead.movedToCurrentColumnAt.seconds * 1000) : new Date());
+        return sum + (moved.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+      }, 0);
+      this.leadVelocity = Math.round(totalDays / won.length);
+    } else {
+      this.leadVelocity = 0;
+    }
+
+    // Stagnant leads (active leads in same phase > 7 days)
+    const activeLeads = this.filteredRecords.filter(r => !this.isLeadConcluded(r));
+    this.stagnantLeads = activeLeads
+      .map(lead => {
+        const movedDate = lead.movedToCurrentColumnAt?.toDate ?
+          lead.movedToCurrentColumnAt.toDate() :
+          (lead.movedToCurrentColumnAt?.seconds ?
+            new Date(lead.movedToCurrentColumnAt.seconds * 1000) :
+            this.getLeadDate(lead));
+        const daysInPhase = Math.round((Date.now() - movedDate.getTime()) / (1000 * 60 * 60 * 24));
+        const col = this.columns.find(c => c.id === lead.columnId);
+        return {
+          lead,
+          daysInPhase,
+          phaseName: col?.name || 'Desconhecida',
+          phaseColor: col?.color || '#6B7280',
+          contactName: this.readFieldValue(lead, 'contactName')
+        };
+      })
+      .filter(s => s.daysInPhase >= 7)
+      .sort((a, b) => b.daysInPhase - a.daysInPhase)
+      .slice(0, 20);
+  }
+
+  private calculateUserPerformance() {
+    const userMap = new Map<string, { name: string; email: string; leads: Lead[] }>();
+
+    this.filteredRecords.forEach(lead => {
+      const userId = lead.responsibleUserId || '_unassigned';
+      const name = lead.responsibleUserName || lead.responsibleUserEmail || 'Não atribuído';
+      const email = lead.responsibleUserEmail || '';
+
+      if (!userMap.has(userId)) {
+        userMap.set(userId, { name, email, leads: [] });
+      }
+      userMap.get(userId)!.leads.push(lead);
+    });
+
+    this.userPerformance = Array.from(userMap.entries()).map(([_, data]) => {
+      const total = data.leads.length;
+      const concluded = data.leads.filter(l => this.isLeadConcluded(l));
+      const won = concluded.filter(l => {
+        const col = this.columns.find(c => c.id === l.columnId);
+        return col?.endStageType === 'success';
+      });
+      const overdue = data.leads.filter(l => this.isLeadOverdue(l) && !this.isLeadConcluded(l));
+      const active = data.leads.filter(l => !this.isLeadConcluded(l));
+
+      let avgDays = 0;
+      if (concluded.length > 0) {
+        const totalDays = concluded.reduce((sum, lead) => {
+          const created = this.getLeadDate(lead);
+          const moved = lead.movedToCurrentColumnAt?.toDate ?
+            lead.movedToCurrentColumnAt.toDate() : new Date();
+          return sum + (moved.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+        }, 0);
+        avgDays = Math.round(totalDays / concluded.length);
+      }
+
+      return {
+        name: data.name,
+        email: data.email,
+        totalLeads: total,
+        concludedLeads: won.length,
+        overdueLeads: overdue.length,
+        activeLeads: active.length,
+        winRate: total > 0 ? Math.round((won.length / total) * 100) : 0,
+        avgConversionDays: avgDays
+      };
+    }).sort((a, b) => b.totalLeads - a.totalLeads);
+  }
+
+  private calculateFunnelStages() {
+    const firstPhaseCount = this.filteredRecords.length;
+    if (firstPhaseCount === 0) {
+      this.funnelStages = [];
+      return;
+    }
+
+    let cumulativeFromRight = 0;
+    const reversedColumns = [...this.columns].reverse();
+    const cumulativeCounts = new Map<string, number>();
+
+    reversedColumns.forEach(col => {
+      const count = this.filteredRecords.filter(r => r.columnId === col.id).length;
+      cumulativeFromRight += count;
+      cumulativeCounts.set(col.id!, cumulativeFromRight);
+    });
+
+    let prevCount = firstPhaseCount;
+    this.funnelStages = this.columns.map((col, index) => {
+      const passedThrough = cumulativeCounts.get(col.id!) || 0;
+      const count = this.filteredRecords.filter(r => r.columnId === col.id).length;
+      const percentage = firstPhaseCount > 0 ? Math.round((passedThrough / firstPhaseCount) * 100) : 0;
+      const dropOff = index > 0 ? Math.round(((prevCount - passedThrough) / prevCount) * 100) : 0;
+      prevCount = passedThrough;
+      return {
+        phase: col.name,
+        color: col.color,
+        count,
+        percentage,
+        dropOff
+      };
+    });
+  }
+
+  private calculateLeadsOverTime() {
+    const now = new Date();
+    const daysBack = 30;
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    const dayMap = new Map<string, number>();
+    for (let i = 0; i <= daysBack; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const key = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+      dayMap.set(key, 0);
+    }
+
+    this.filteredRecords.forEach(record => {
+      const date = this.getLeadDate(record);
+      if (date >= startDate && date <= now) {
+        const key = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        if (dayMap.has(key)) {
+          dayMap.set(key, (dayMap.get(key) || 0) + 1);
+        }
+      }
+    });
+
+    this.leadsOverTimeChart = Array.from(dayMap.entries()).map(([label, value]) => ({ label, value }));
+  }
+
+  private groupRecordsByPhase() {
+    this.groupedRecords = this.columns
+      .map(col => ({
+        column: col,
+        leads: this.filteredRecords.filter(r => r.columnId === col.id)
+      }))
+      .filter(g => g.leads.length > 0);
+  }
+
+  toggleGroupByPhase() {
+    this.groupByPhase = !this.groupByPhase;
+  }
+
+  getLeadsOverTimeMax(): number {
+    if (this.leadsOverTimeChart.length === 0) return 0;
+    return Math.max(...this.leadsOverTimeChart.map(d => d.value), 1);
+  }
+
   applyFilters() {
     this.filteredRecords = this.records.filter(record => {
       // Search query filter
@@ -740,6 +973,11 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.calculateSLAIndicators();
     this.calculatePhaseMetrics();
     this.generateChartData();
+    this.calculateHealthMetrics();
+    this.calculateUserPerformance();
+    this.calculateFunnelStages();
+    this.calculateLeadsOverTime();
+    this.groupRecordsByPhase();
 
     // Regenerar gráfico dinâmico com os registros filtrados
     if (this.selectedChartField) {

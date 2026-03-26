@@ -138,19 +138,112 @@ interface CompanyLink {
               </div>
             </div>
 
-            <!-- Webhook Configuration -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
-              <h4 class="text-md font-medium text-gray-900 mb-4">Webhook (Opcional)</h4>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">URL do Webhook</label>
-                <input
-                  type="url"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  [(ngModel)]="webhookUrl"
-                  (input)="webhookUrl.set($any($event.target).value)"
-                  placeholder="https://exemplo.com/webhook">
-                <p class="text-xs text-gray-500 mt-1">URL que receberá notificações quando um novo lead for criado via API</p>
+          </div>
+        </div>
+
+        <!-- Documentação e Exemplos -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+          <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+              <i class="fas fa-book text-purple-500 mr-2"></i>
+              Documentação da API
+            </h3>
+            <p class="text-sm text-gray-600 mt-1">Como enviar leads para o sistema via API</p>
+          </div>
+
+          <div class="p-6 space-y-6">
+            <!-- Campos disponíveis -->
+            <div>
+              <h4 class="text-sm font-semibold text-gray-900 mb-3">Campos disponíveis</h4>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <thead>
+                    <tr class="bg-gray-50">
+                      <th class="px-4 py-2 text-left font-medium text-gray-600">Campo</th>
+                      <th class="px-4 py-2 text-left font-medium text-gray-600">Obrigatório</th>
+                      <th class="px-4 py-2 text-left font-medium text-gray-600">Descrição</th>
+                      <th class="px-4 py-2 text-left font-medium text-gray-600">Sinônimos aceitos</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">contactName</td>
+                      <td class="px-4 py-2"><span class="text-orange-600 font-medium">Recomendado</span></td>
+                      <td class="px-4 py-2 text-gray-600">Nome do contato</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">name, nome, nomeLead</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">contactEmail</td>
+                      <td class="px-4 py-2"><span class="text-orange-600 font-medium">Recomendado</span></td>
+                      <td class="px-4 py-2 text-gray-600">E-mail do contato</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">email, emailLead</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">contactPhone</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">Telefone do contato</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">phone, telefone, celular</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">companyName</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">Nome da empresa</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">empresa, company, nomeEmpresa</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">cnpj</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">CNPJ da empresa</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">cnpjCompany</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">origem</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">Origem do lead</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">origin, source, fonte, canal</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">temperature</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">Temperatura / qualificação</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">temperatura, qualificacao</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+            </div>
+
+            <!-- Exemplo cURL -->
+            <div>
+              <h4 class="text-sm font-semibold text-gray-900 mb-2 flex items-center justify-between">
+                <span><i class="fas fa-terminal text-gray-500 mr-1"></i> Exemplo cURL</span>
+                <button class="text-xs text-blue-600 hover:text-blue-800" (click)="copyToClipboard(getCurlExample())">
+                  <i class="fas fa-copy mr-1"></i> Copiar
+                </button>
+              </h4>
+              <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">{{ getCurlExample() }}</pre>
+            </div>
+
+            <!-- Exemplo JavaScript -->
+            <div>
+              <h4 class="text-sm font-semibold text-gray-900 mb-2 flex items-center justify-between">
+                <span><i class="fab fa-js text-yellow-500 mr-1"></i> Exemplo JavaScript</span>
+                <button class="text-xs text-blue-600 hover:text-blue-800" (click)="copyToClipboard(getJsExample())">
+                  <i class="fas fa-copy mr-1"></i> Copiar
+                </button>
+              </h4>
+              <pre class="bg-gray-900 text-blue-300 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">{{ getJsExample() }}</pre>
+            </div>
+
+            <!-- Exemplo PHP -->
+            <div>
+              <h4 class="text-sm font-semibold text-gray-900 mb-2 flex items-center justify-between">
+                <span><i class="fab fa-php text-indigo-400 mr-1"></i> Exemplo PHP</span>
+                <button class="text-xs text-blue-600 hover:text-blue-800" (click)="copyToClipboard(getPhpExample())">
+                  <i class="fas fa-copy mr-1"></i> Copiar
+                </button>
+              </h4>
+              <pre class="bg-gray-900 text-purple-300 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">{{ getPhpExample() }}</pre>
             </div>
           </div>
         </div>
@@ -172,7 +265,6 @@ export class ApiLinksConfigComponent implements OnInit {
   currentCompany = signal<Company | null>(null);
   apiEnabled = signal(false);
   apiToken = signal<string>('');
-  webhookUrl = signal<string>('');
   showApiToken = signal(false);
   isSaving = signal(false);
   successMessage = signal<string | null>(null);
@@ -189,7 +281,6 @@ export class ApiLinksConfigComponent implements OnInit {
       this.currentCompany.set(company);
       this.apiEnabled.set(company.apiConfig?.enabled || false);
       this.apiToken.set(company.apiConfig?.token || this.generateApiToken());
-      this.webhookUrl.set(company.apiConfig?.webhookUrl || '');
     }
   }
 
@@ -208,8 +299,7 @@ export class ApiLinksConfigComponent implements OnInit {
         apiConfig: {
           enabled: this.apiEnabled(),
           token: this.apiToken(),
-          endpoint: this.getLeadIntakeUrl(),
-          webhookUrl: this.webhookUrl()
+          endpoint: this.getLeadIntakeUrl()
         }
       };
 
@@ -319,6 +409,82 @@ export class ApiLinksConfigComponent implements OnInit {
         this.showError('Erro ao copiar para a área de transferência.');
       });
     }
+  }
+
+  getCurlExample(): string {
+    const url = this.getLeadIntakeUrl();
+    const token = this.apiToken();
+    return `curl -X POST "${url}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${token}" \\
+  -d '{
+    "leadData": {
+      "fields": {
+        "contactName": "João Silva",
+        "contactEmail": "joao@email.com",
+        "contactPhone": "(11) 99999-0000",
+        "companyName": "Empresa Exemplo",
+        "origem": "Site Institucional"
+      }
+    }
+  }'`;
+  }
+
+  getJsExample(): string {
+    const url = this.getLeadIntakeUrl();
+    const token = this.apiToken();
+    return `const response = await fetch("${url}", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer ${token}"
+  },
+  body: JSON.stringify({
+    leadData: {
+      fields: {
+        contactName: document.getElementById("nome").value,
+        contactEmail: document.getElementById("email").value,
+        contactPhone: document.getElementById("telefone").value,
+        origem: "Formulário do Site"
+      }
+    }
+  })
+});
+
+const data = await response.json();
+console.log("Lead criado:", data.leadId);`;
+  }
+
+  getPhpExample(): string {
+    const url = this.getLeadIntakeUrl();
+    const token = this.apiToken();
+    return `<?php
+$url = "${url}";
+$data = [
+  "leadData" => [
+    "fields" => [
+      "contactName" => $_POST["nome"],
+      "contactEmail" => $_POST["email"],
+      "contactPhone" => $_POST["telefone"],
+      "origem" => "Site PHP"
+    ]
+  ]
+];
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+  "Content-Type: application/json",
+  "Authorization: Bearer ${token}"
+]);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+curl_close($ch);
+
+$result = json_decode($response, true);
+echo "Lead criado: " . $result["leadId"];`;
   }
 
   private generateApiToken(): string {
