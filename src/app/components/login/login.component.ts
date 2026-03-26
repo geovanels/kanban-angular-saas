@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
@@ -28,6 +28,7 @@ export class LoginComponent implements OnInit {
   private companyService = inject(CompanyService);
   private subdomainService = inject(SubdomainService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
 
   // Forms
@@ -307,23 +308,27 @@ export class LoginComponent implements OnInit {
           // Definir contexto da empresa
           this.subdomainService.setCurrentCompany(userCompany);
           
+          // Verificar se há uma URL de retorno (caso o usuário tenha sido redirecionado do guard)
+          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+
           // Em desenvolvimento, apenas navegar localmente
           if (this.subdomainService.isDevelopment()) {
             // Definir subdomínio no localStorage
             localStorage.setItem('dev-subdomain', userCompany.subdomain);
-            this.router.navigate(['/dashboard']);
+            this.router.navigateByUrl(returnUrl);
           } else {
             // Em produção, redirecionar para o subdomínio correto da empresa
             const companyUrl = this.subdomainService.getCompanyUrl(userCompany.subdomain);
-            window.location.href = companyUrl + '/dashboard';
+            window.location.href = companyUrl + returnUrl;
           }
         } else {
           // Usuário não tem empresa
           this.errorMessage.set('Usuário não pertence a nenhuma empresa. Entre em contato com o suporte.');
         }
       } catch (searchError) {
-        // Em caso de erro de busca, redirecionar para dashboard mesmo assim
-        this.router.navigate(['/dashboard']);
+        // Em caso de erro de busca, redirecionar para returnUrl ou dashboard
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+        this.router.navigateByUrl(returnUrl);
       }
       
     } catch (error) {
