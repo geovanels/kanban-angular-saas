@@ -1687,6 +1687,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
       const key = (field.apiFieldName && field.apiFieldName.trim()) ? field.apiFieldName.trim() : (field.name || 'campo');
       body[key] = this.getSampleForField(field);
     }
+    // Sempre incluir origem no exemplo se não estiver presente
+    if (!body['origem'] && !body['origin'] && !body['source']) {
+      body['origem'] = 'Site Institucional';
+    }
     this.apiExampleJson = JSON.stringify(body, null, 2);
   }
 

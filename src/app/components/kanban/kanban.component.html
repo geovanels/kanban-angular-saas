@@ -863,60 +863,86 @@ Authorization: Bearer {{ apiToken }}
         </div>
       </div>
       
-      <!-- Webhooks -->
+      <!-- Documentação -->
       <div class="bg-white rounded-lg shadow mb-6">
         <div class="p-6 border-b border-gray-200">
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">
-            <i class="fas fa-broadcast-tower mr-2 text-purple-500"></i>Webhooks (Em breve)
+          <h3 class="text-lg font-semibold text-gray-900 mb-3">
+            <i class="fas fa-book mr-2 text-purple-500"></i>Documentação da API
           </h3>
-          <p class="text-sm text-gray-600">
-            Receba notificações quando leads mudarem de fase, forem criados ou atualizados.
-          </p>
         </div>
-        
         <div class="p-6">
-          <div class="text-center py-8 text-gray-500">
-            <i class="fas fa-construction text-4xl mb-3"></i>
-            <h4 class="font-semibold mb-2">Funcionalidade em Desenvolvimento</h4>
-            <p class="text-sm">Webhooks estarão disponíveis em breve para integração avançada.</p>
+          <div class="overflow-x-auto mb-6">
+            <table class="min-w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50">
+                  <th class="px-4 py-2 text-left font-medium text-gray-600">Campo</th>
+                  <th class="px-4 py-2 text-left font-medium text-gray-600">Obrigatório</th>
+                  <th class="px-4 py-2 text-left font-medium text-gray-600">Descrição</th>
+                  <th class="px-4 py-2 text-left font-medium text-gray-600">Sinônimos aceitos</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">contactName</td>
+                  <td class="px-4 py-2"><span class="text-orange-600 font-medium">Recomendado</span></td>
+                  <td class="px-4 py-2 text-gray-600">Nome do contato</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">name, nome, nomeLead</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">contactEmail</td>
+                  <td class="px-4 py-2"><span class="text-orange-600 font-medium">Recomendado</span></td>
+                  <td class="px-4 py-2 text-gray-600">E-mail do contato</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">email, emailLead</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">contactPhone</td>
+                  <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                  <td class="px-4 py-2 text-gray-600">Telefone do contato</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">phone, telefone, celular</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">companyName</td>
+                  <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                  <td class="px-4 py-2 text-gray-600">Nome da empresa</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">empresa, company, nomeEmpresa</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">cnpj</td>
+                  <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                  <td class="px-4 py-2 text-gray-600">CNPJ da empresa</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">cnpjCompany</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">origem</td>
+                  <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                  <td class="px-4 py-2 text-gray-600">Origem do lead</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">origin, source, fonte, canal</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-2 font-mono text-xs text-blue-700">temperature</td>
+                  <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                  <td class="px-4 py-2 text-gray-600">Temperatura / qualificação</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs">temperatura, qualificacao</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
-      </div>
-      
-      <!-- Documentação -->
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-blue-900 mb-3">
-          <i class="fas fa-book mr-2"></i>Documentação da API
-        </h3>
-        <div class="space-y-3 text-sm text-blue-800">
-          <div class="flex items-start space-x-3">
-            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
-            <div>
-              <strong>Método:</strong> POST para criar novos leads
+          <div class="space-y-2 text-sm text-gray-600">
+            <div class="flex items-start space-x-2">
+              <i class="fas fa-check-circle mt-0.5 text-green-500"></i>
+              <span><strong>Método:</strong> POST</span>
             </div>
-          </div>
-          <div class="flex items-start space-x-3">
-            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
-            <div>
-              <strong>Content-Type:</strong> application/json obrigatório
+            <div class="flex items-start space-x-2">
+              <i class="fas fa-check-circle mt-0.5 text-green-500"></i>
+              <span><strong>Content-Type:</strong> application/json</span>
             </div>
-          </div>
-          <div class="flex items-start space-x-3">
-            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
-            <div>
-              <strong>Autenticação:</strong> Bearer token no header Authorization
+            <div class="flex items-start space-x-2">
+              <i class="fas fa-check-circle mt-0.5 text-green-500"></i>
+              <span><strong>Autenticação:</strong> Bearer token no header Authorization</span>
             </div>
-          </div>
-          <div class="flex items-start space-x-3">
-            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
-            <div>
-              <strong>Campos obrigatórios:</strong> companyName, contactName, contactEmail
-            </div>
-          </div>
-          <div class="flex items-start space-x-3">
-            <i class="fas fa-check-circle mt-0.5 text-blue-600"></i>
-            <div>
-              <strong>Resposta de sucesso:</strong> Status 201 com dados do lead criado
+            <div class="flex items-start space-x-2">
+              <i class="fas fa-check-circle mt-0.5 text-green-500"></i>
+              <span><strong>Resposta:</strong> Status 201 com leadId</span>
             </div>
           </div>
         </div>
