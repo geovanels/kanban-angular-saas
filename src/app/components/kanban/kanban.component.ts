@@ -1687,9 +1687,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
       const key = (field.apiFieldName && field.apiFieldName.trim()) ? field.apiFieldName.trim() : (field.name || 'campo');
       body[key] = this.getSampleForField(field);
     }
-    // Sempre incluir origem no exemplo se não estiver presente
+    // Sempre incluir campos extras no exemplo se não estiverem presentes
     if (!body['origem'] && !body['origin'] && !body['source']) {
-      body['origem'] = 'Site Institucional';
+      body['origem'] = 'Contato pelo Site';
+    }
+    if (!body['assunto'] && !body['subject']) {
+      body['assunto'] = 'Interesse no produto X';
+    }
+    if (!body['mensagem'] && !body['message']) {
+      body['mensagem'] = 'Gostaria de mais informações sobre...';
     }
     this.apiExampleJson = JSON.stringify(body, null, 2);
   }

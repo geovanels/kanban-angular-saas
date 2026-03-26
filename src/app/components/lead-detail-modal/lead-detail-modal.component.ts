@@ -920,6 +920,20 @@ export class LeadDetailModalComponent {
     }
   }
 
+  isContatoPeloSite(): boolean {
+    if (!this.currentLead) return false;
+    const origem = this.currentLead.fields?.['origem'] || this.currentLead.fields?.['origin'] || this.currentLead.fields?.['source'] || '';
+    return origem === 'Contato pelo Site';
+  }
+
+  getAssunto(): string {
+    return this.getFieldValue('assunto') || '';
+  }
+
+  getMensagem(): string {
+    return this.getFieldValue('mensagem') || '';
+  }
+
   hasEditableGlobalFields(): boolean {
     // Verificar se há campos editáveis no formulário inicial
     const initialFields = this.getInitialFieldsOnly();
@@ -1645,7 +1659,9 @@ export class LeadDetailModalComponent {
       contactName: ['contactName', 'name', 'nome', 'nomeLead', 'nameLead', 'leadName'],
       contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail', 'leadEmail'],
       contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead', 'telefoneContato'],
-      temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature']
+      temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature'],
+      assunto: ['assunto', 'subject', 'titulo', 'title'],
+      mensagem: ['mensagem', 'message', 'corpo', 'body', 'descricao', 'description']
     };
 
     const lowerMap: { [k: string]: string } = Object.keys(fields).reduce((acc: any, k: string) => {

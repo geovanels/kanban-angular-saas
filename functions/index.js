@@ -179,7 +179,9 @@ exports.leadIntakeHttp = onRequest({
       contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail', 'leadEmail'],
       contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead', 'telefoneContato'],
       temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature'],
-      origem: ['origem', 'origin', 'source', 'fonte', 'canal', 'channel', 'utmSource', 'utm_source']
+      origem: ['origem', 'origin', 'source', 'fonte', 'canal', 'channel', 'utmSource', 'utm_source'],
+      assunto: ['assunto', 'subject', 'titulo', 'title'],
+      mensagem: ['mensagem', 'message', 'corpo', 'body', 'descricao', 'description']
     };
 
     const lowerKeyMap = Object.keys(baseFields || {}).reduce((acc, k) => {
@@ -231,7 +233,7 @@ exports.leadIntakeHttp = onRequest({
     }
 
     // Aplicar mapeamento canônico por sinônimos mesmo sem configuração de formulário
-    const canonicalKeys = ['companyName', 'cnpj', 'contactName', 'contactEmail', 'contactPhone', 'temperature', 'origem'];
+    const canonicalKeys = ['companyName', 'cnpj', 'contactName', 'contactEmail', 'contactPhone', 'temperature', 'origem', 'assunto', 'mensagem'];
     canonicalKeys.forEach((key) => {
       const current = processedFields[key];
       if (current === undefined || current === null || (typeof current === 'string' && current.trim() === '')) {

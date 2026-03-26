@@ -203,6 +203,18 @@ interface CompanyLink {
                       <td class="px-4 py-2 text-gray-400 text-xs">origin, source, fonte, canal</td>
                     </tr>
                     <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">assunto</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">Assunto do contato</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">subject, titulo, title</td>
+                    </tr>
+                    <tr>
+                      <td class="px-4 py-2 font-mono text-xs text-blue-700">mensagem</td>
+                      <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
+                      <td class="px-4 py-2 text-gray-600">Mensagem do contato</td>
+                      <td class="px-4 py-2 text-gray-400 text-xs">message, corpo, body, descricao</td>
+                    </tr>
+                    <tr>
                       <td class="px-4 py-2 font-mono text-xs text-blue-700">temperature</td>
                       <td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td>
                       <td class="px-4 py-2 text-gray-600">Temperatura / qualificação</td>
@@ -424,7 +436,9 @@ export class ApiLinksConfigComponent implements OnInit {
         "contactEmail": "joao@email.com",
         "contactPhone": "(11) 99999-0000",
         "companyName": "Empresa Exemplo",
-        "origem": "Site Institucional"
+        "origem": "Contato pelo Site",
+        "assunto": "Interesse no produto X",
+        "mensagem": "Gostaria de mais informações sobre..."
       }
     }
   }'`;
@@ -445,7 +459,9 @@ export class ApiLinksConfigComponent implements OnInit {
         contactName: document.getElementById("nome").value,
         contactEmail: document.getElementById("email").value,
         contactPhone: document.getElementById("telefone").value,
-        origem: "Formulário do Site"
+        origem: "Contato pelo Site",
+        assunto: document.getElementById("assunto").value,
+        mensagem: document.getElementById("mensagem").value
       }
     }
   })
@@ -466,7 +482,9 @@ $data = [
       "contactName" => $_POST["nome"],
       "contactEmail" => $_POST["email"],
       "contactPhone" => $_POST["telefone"],
-      "origem" => "Site PHP"
+      "origem" => "Contato pelo Site",
+      "assunto" => $_POST["assunto"],
+      "mensagem" => $_POST["mensagem"]
     ]
   ]
 ];
