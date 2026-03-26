@@ -1664,6 +1664,7 @@ export class LeadDetailModalComponent {
       contactEmail: ['contactEmail', 'email', 'emailLead', 'contatoEmail', 'leadEmail'],
       contactPhone: ['contactPhone', 'phone', 'telefone', 'celular', 'phoneLead', 'telefoneContato'],
       temperature: ['temperature', 'temperatura', 'qualificacao', 'leadTemperature'],
+      origem: ['origem', 'origin', 'source', 'fonte', 'canal', 'channel'],
       assunto: ['assunto', 'subject', 'titulo', 'title'],
       mensagem: ['mensagem', 'message', 'corpo', 'body', 'descricao', 'description']
     };
