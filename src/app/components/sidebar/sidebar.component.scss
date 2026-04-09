@@ -31,10 +31,17 @@ $transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
     width: $sidebar-collapsed-width;
 
     .sidebar-header {
-      padding: 16px 12px;
-      justify-content: center;
+      padding: 12px 8px;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
     }
     .logo-area {
+      justify-content: center;
+    }
+    .collapse-btn {
+      width: 100%;
+      display: flex;
       justify-content: center;
     }
     .nav-item {
@@ -109,6 +116,15 @@ $transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 700;
   font-size: 13px;
   flex-shrink: 0;
+  text-transform: uppercase;
+
+  .collapsed & {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+    border-radius: 10px;
+    letter-spacing: 0;
+  }
 }
 
 .company-name {

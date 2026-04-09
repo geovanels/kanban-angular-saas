@@ -85,6 +85,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
     return words.slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
   }
 
+  getCompanyFirstLetter(): string {
+    const company = this.company;
+    if (!company?.name) return 'T';
+    return company.name.trim()[0].toUpperCase();
+  }
+
   getUserInitials(): string {
     const user = this.currentUser();
     const name = user?.displayName || user?.email || '';

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -28,7 +28,7 @@ interface FormField {
   templateUrl: './visual-form-builder.html',
   styleUrls: ['./visual-form-builder.scss']
 })
-export class VisualFormBuilderComponent implements OnInit {
+export class VisualFormBuilderComponent implements OnInit, OnChanges {
   @Input() fields: FormField[] = [];
   @Output() fieldsChanged = new EventEmitter<FormField[]>();
 
@@ -98,6 +98,17 @@ export class VisualFormBuilderComponent implements OnInit {
     // Inicializar com campos existentes se fornecidos
     if (this.fields && this.fields.length > 0) {
       this.emitFieldsChange();
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['fields'] && !changes['fields'].firstChange) {
+      // Reset edit state when fields change externally
+      this.editingIndex = -1;
+      this.editingField = null;
+      this.selectedField = null;
+      this.selectedFieldType = '';
+      this.resetForm();
     }
   }
 

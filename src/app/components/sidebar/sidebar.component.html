@@ -18,7 +18,7 @@
     </div>
     <div class="logo-area" *ngIf="collapsed">
       <div class="company-initials" [style.background-color]="getPrimaryColor()">
-        {{ getCompanyInitials() }}
+        {{ getCompanyFirstLetter() }}
       </div>
     </div>
     <button class="collapse-btn" (click)="toggleSidebar()" [title]="collapsed ? 'Expandir' : 'Recolher'">

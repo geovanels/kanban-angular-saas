@@ -10,8 +10,8 @@ import { SubdomainService } from '../../services/subdomain.service';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, VisualFormBuilderComponent],
   template: `
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
-         [class.hidden]="!isVisible" (click)="onCloseModal()">
+    <div *ngIf="isVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         (click)="onCloseModal()">
       <div class="bg-white rounded-lg p-6 w-full max-w-7xl max-h-[95vh] overflow-hidden" 
            (click)="$event.stopPropagation()">
         

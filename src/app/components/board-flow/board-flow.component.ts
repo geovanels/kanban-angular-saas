@@ -55,6 +55,7 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
     this.subs.push(this.boardStore.automations$.subscribe(a => this.automations = a));
     this.subs.push(this.boardStore.phaseFormConfigs$.subscribe(c => this.phaseFormConfigs = c));
     this.loadFlowConfig();
+    this.boardStore.loadAllPhaseFormConfigs();
   }
 
   ngOnDestroy() {
@@ -182,8 +183,17 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
   onColumnSaved() {}
 
   // Phase form
-  showColumnForm(column: Column) {
-    this.phaseFormModal.showModal(column);
+  async showColumnForm(column: Column) {
+    // Tenta usar config em cache, senão busca direto do Firestore
+    let existingConfig = this.phaseFormConfigs[column.id!] || null;
+    if (!existingConfig) {
+      try {
+        existingConfig = await this.firestoreService.getPhaseFormConfig(
+          this.boardStore.ownerId, this.boardStore.boardId, column.id!
+        );
+      } catch {}
+    }
+    this.phaseFormModal.showModal(column, existingConfig);
   }
 
   onPhaseFormConfigSaved() {
