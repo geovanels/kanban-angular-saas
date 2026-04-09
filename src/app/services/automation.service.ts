@@ -624,9 +624,12 @@ export class AutomationService {
     let processed = template;
     
     // Substituir variáveis do lead
+    const companyName = (lead.fields as any).companyName || (lead.fields as any).nameCompany || (lead.fields as any).empresa || '';
     const variables: Record<string, string> = {
       '{{contactName}}': (lead.fields as any).contactName || '',
-      '{{companyName}}': (lead.fields as any).companyName || '',
+      '{{companyName}}': companyName,
+      '{{nameCompany}}': companyName,
+      '{{empresa}}': companyName,
       '{{contactEmail}}': (lead.fields as any).contactEmail || '',
       '{{contactPhone}}': (lead.fields as any).contactPhone || '',
       '{{cnpj}}': (lead.fields as any).cnpj || ''

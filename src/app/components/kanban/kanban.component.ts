@@ -124,8 +124,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // Carregar fluxo de transições
       this.loadFlowConfig();
 
-      // Inicializar monitor global de automações para leads da API
-      this.automationService.initializeGlobalLeadMonitor(this.boardId, this.ownerId);
+      // Automações são gerenciadas pelo BoardStoreService
       // Agendador periódico para automações de tempo (a cada 60s)
       // Apenas uma instância por board deve executar as automações
       try {
@@ -347,48 +346,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.ownerId,
       this.boardId,
       async (leads) => {
-        // Detectar novos leads e mudanças de fase para acionar automações
-        const currentById: Record<string, Lead> = Object.create(null);
-        for (const l of leads as any) currentById[l.id!] = l as any;
-
-        if (!this._leadsStreamInitialized) {
-          // Primeira carga: somente inicializa o snapshot anterior
-          this._lastLeadsById = currentById;
-          this._leadsStreamInitialized = true;
-        } else {
-          // Novos leads
-          const newLeads: Lead[] = [];
-          // Movidos de fase
-          const moved: Array<{ lead: Lead; from: string; to: string }> = [];
-
-          const prev = this._lastLeadsById || {};
-          // Detect additions and moves
-          for (const [id, lead] of Object.entries(currentById)) {
-            const prevLead = prev[id];
-            if (!prevLead) {
-              newLeads.push(lead as Lead);
-            } else if (prevLead.columnId !== (lead as Lead).columnId) {
-              moved.push({ lead: lead as Lead, from: prevLead.columnId, to: (lead as Lead).columnId });
-            }
-          }
-
-          // Atualizar snapshot anterior antes de executar para evitar reentrância
-          this._lastLeadsById = currentById;
-
-          try {
-            // Processar automações fora do ciclo de render
-            for (const nl of newLeads) {
-              try {
-                await this.automationService.processNewLeadAutomations(nl, this.boardId, this.ownerId);
-              } catch (e) { console.warn('Falha ao processar automação de novo lead:', e); }
-            }
-            for (const mv of moved) {
-              try {
-                await this.automationService.processPhaseChangeAutomations(mv.lead, mv.to, mv.from, this.boardId, this.ownerId);
-              } catch (e) { console.warn('Falha ao processar automação de mudança de fase:', e); }
-            }
-          } catch {}
-        }
+        // Automações são processadas pelo BoardStoreService — aqui apenas atualizar a UI
 
         // Enriquecer contadores simples com base no histórico (se disponível em cache ou structure) — placeholder 0
         this.leads = (leads as any).map((l: any) => ({
