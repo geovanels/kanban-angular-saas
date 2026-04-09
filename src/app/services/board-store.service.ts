@@ -50,6 +50,7 @@ export class BoardStoreService implements OnDestroy {
     // Cleanup previous board subscriptions if re-initializing
     this.cleanup();
 
+    this.isLoading$.next(true);
     this.currentUser = this.authService.getCurrentUser();
     this.boardId = boardId;
     this.ownerId = ownerId || this.currentUser?.uid || '';
@@ -86,6 +87,10 @@ export class BoardStoreService implements OnDestroy {
 
   private async loadBoardData() {
     try {
+      // Load board info
+      const board = await this.firestoreService.getBoard(this.ownerId, this.boardId);
+      this.board$.next(board || null);
+
       await this.loadUsers();
       this.isLoading$.next(false);
     } catch (error) {

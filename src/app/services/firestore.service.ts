@@ -205,6 +205,43 @@ export class FirestoreService {
     }
   }
 
+  async getBoard(ownerId: string, boardId: string): Promise<Board | null> {
+    try {
+      let companyId = this.currentCompanyId;
+      if (!companyId) {
+        try {
+          await this.initializeCompanyContext();
+          companyId = this.currentCompanyId;
+        } catch { return null; }
+      }
+      if (!companyId) return null;
+
+      // Try new structure first
+      const boardRef = runInInjectionContext(this.injector, () =>
+        doc(this.firestore, 'companies', companyId, 'boards', boardId)
+      );
+      const boardSnap = await runInInjectionContext(this.injector, () => getDoc(boardRef));
+      if (boardSnap.exists()) {
+        return { id: boardSnap.id, ...boardSnap.data(), companyId } as Board;
+      }
+
+      // Fallback to old structure
+      try {
+        const oldRef = runInInjectionContext(this.injector, () =>
+          doc(this.firestore, 'users', ownerId, 'boards', boardId)
+        );
+        const oldSnap = await runInInjectionContext(this.injector, () => getDoc(oldRef));
+        if (oldSnap.exists()) {
+          return { id: oldSnap.id, ...oldSnap.data(), companyId } as Board;
+        }
+      } catch {}
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
 
   async createBoard(userId: string, board: Omit<Board, 'id' | 'userId'>) {
     try {
