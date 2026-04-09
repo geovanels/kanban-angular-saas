@@ -16,6 +16,7 @@
             <option value="form-not-answered">Formulário da fase não respondido</option>
             <option value="form-answered">Formulário da fase respondido</option>
             <option value="sla-overdue">SLA da fase venceu</option>
+            <option value="deadline-overdue">Prazo/Vencimento do card ultrapassado</option>
           </ng-container>
           <ng-container *ngIf="effectiveAllowedTriggerTypes && effectiveAllowedTriggerTypes.length > 0">
             <option *ngIf="effectiveAllowedTriggerTypes.includes('new-lead-created')" value="new-lead-created">Criar novo registro (apenas fase inicial)</option>
@@ -24,6 +25,7 @@
             <option *ngIf="effectiveAllowedTriggerTypes.includes('form-not-answered')" value="form-not-answered">Formulário da fase não respondido</option>
             <option *ngIf="effectiveAllowedTriggerTypes.includes('form-answered')" value="form-answered">Formulário da fase respondido</option>
             <option *ngIf="effectiveAllowedTriggerTypes.includes('sla-overdue')" value="sla-overdue">SLA da fase venceu</option>
+            <option *ngIf="effectiveAllowedTriggerTypes.includes('deadline-overdue')" value="deadline-overdue">Prazo/Vencimento do card ultrapassado</option>
           </ng-container>
         </select>
         
@@ -52,6 +54,9 @@
           <div class="text-xs text-gray-500 mt-1" *ngIf="automationForm.get('triggerType')?.value === 'form-answered'">
             Após esse prazo, se pelo menos um campo do formulário da fase tiver sido preenchido, a automação será executada. (0 = imediato)
           </div>
+        </div>
+        <div class="text-xs text-gray-500 mt-2" *ngIf="automationForm.get('triggerType')?.value === 'deadline-overdue'">
+          Dispara quando a data de um campo marcado como "Prazo/Vencimento" no formulário for ultrapassada. Configure o campo de data no construtor de formulários.
         </div>
       </div>
 

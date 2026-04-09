@@ -306,7 +306,8 @@ export class AutomationModal implements OnInit {
       'card-in-phase-for-time': 'Um card está na fase por um tempo',
       'form-not-answered': 'Formulário da fase não respondido',
       'form-answered': 'Formulário da fase respondido',
-      'sla-overdue': 'SLA Vencido'
+      'sla-overdue': 'SLA Vencido',
+      'deadline-overdue': 'Prazo/Vencimento do card ultrapassado'
     };
     return types[triggerType] || 'Sem Nome';
   }

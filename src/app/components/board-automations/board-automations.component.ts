@@ -53,7 +53,8 @@ export class BoardAutomationsComponent implements OnInit, OnDestroy {
       'card-enters-phase': 'Quando registro entra em uma fase',
       'card-in-phase-for-time': 'Quando registro fica muito tempo na fase',
       'form-not-answered': 'Quando formulário não é respondido',
-      'sla-overdue': 'Quando SLA da fase vence'
+      'sla-overdue': 'Quando SLA da fase vence',
+      'deadline-overdue': 'Quando prazo/vencimento do card é ultrapassado'
     };
     const type = trigger.type || automationOrTrigger.triggerType;
     let desc = descriptions[type] || type || 'Não especificado';

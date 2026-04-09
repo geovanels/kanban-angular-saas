@@ -121,6 +121,14 @@
             <span>{{ getSlaStatus(lead).text }}</span>
           </div>
 
+          <!-- Prazo da atividade -->
+          <div *ngIf="getDeadlineStatus(lead) as dl"
+               class="flex items-center text-xs font-medium mb-2 px-1.5 py-0.5 rounded-md w-fit"
+               [class]="dl.colorClass">
+            <i [class]="dl.iconClass + ' mr-1 text-[10px]'"></i>
+            <span>{{ dl.text }}</span>
+          </div>
+
           <!-- Temperatura -->
           <div *ngIf="getTemperatureGlobalItem(lead) as temp" class="flex items-center text-xs font-medium mb-2">
             <span [ngClass]="{

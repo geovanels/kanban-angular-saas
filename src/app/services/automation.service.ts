@@ -6,7 +6,7 @@ import { CompanyService } from './company.service';
 import { Observable, from } from 'rxjs';
 
 export interface AutomationTrigger {
-  type: 'new-lead-created' | 'card-enters-phase' | 'card-in-phase-for-time' | 'form-not-answered' | 'form-answered' | 'sla-overdue';
+  type: 'new-lead-created' | 'card-enters-phase' | 'card-in-phase-for-time' | 'form-not-answered' | 'form-answered' | 'sla-overdue' | 'deadline-overdue';
   phaseId?: string;
   days?: number;
 }
@@ -740,7 +740,7 @@ export class AutomationService {
   }
 
   // Método para processar automações de tempo (SLA, tempo em fase)
-  async processTimeBasedAutomations(leads: Lead[], columns: Column[], boardId: string, ownerId: string): Promise<void> {
+  async processTimeBasedAutomations(leads: Lead[], columns: Column[], boardId: string, ownerId: string, formConfigs?: { initialFormFields?: any[], phaseFormConfigs?: Record<string, any> }): Promise<void> {
     const lockKey = `${ownerId}-${boardId}`;
 
     // Verificar se já está executando para este board
@@ -1149,6 +1149,22 @@ export class AutomationService {
                   }))
                 });
               }
+            } else if (type === 'deadline-overdue') {
+              // Buscar campo de prazo/deadline no lead
+              const deadlineValue = this.findDeadlineValue(lead, formConfigs);
+              if (!deadlineValue) continue;
+
+              const deadline = new Date(deadlineValue);
+              if (isNaN(deadline.getTime())) continue;
+
+              const deadlineDay = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate()).getTime();
+              const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
+
+              if (deadlineDay < today && !this.hasRecentlyExecuted(lead, automation.id, DAY)) {
+                console.log(`📅 Prazo vencido para lead ${lead.id} - deadline: ${deadline.toISOString()}`);
+                await this.executeAutomation(automation, lead, boardId, ownerId);
+                await this.markExecuted(ownerId, boardId, lead, automation.id);
+              }
             }
           } catch (e) {
             console.warn('Falha ao avaliar automação baseada em tempo para lead:', lead.id, e);
@@ -1161,6 +1177,37 @@ export class AutomationService {
       // Liberar lock
       this.timeAutomationLocks.delete(lockKey);
     }
+  }
+
+  private findDeadlineValue(lead: Lead, formConfigs?: { initialFormFields?: any[], phaseFormConfigs?: Record<string, any> }): string | null {
+    const deadlineKeys = ['prazo', 'deadline', 'datalimite', 'datavencimento', 'duedate',
+      'vencimento', 'dataentrega', 'dataprazo', 'previsao', 'dataprevisao'];
+
+    const fields = (lead as any).fields || {};
+
+    // 1. Buscar por convenção de nome
+    for (const [key, val] of Object.entries(fields)) {
+      if (!val) continue;
+      const norm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (deadlineKeys.some(dk => norm.includes(dk))) {
+        return String(val);
+      }
+    }
+
+    // 2. Buscar campos marcados como isDeadline nos form configs
+    if (formConfigs) {
+      const allFormFields = [
+        ...(formConfigs.initialFormFields || []),
+        ...Object.values(formConfigs.phaseFormConfigs || {}).flatMap((c: any) => c?.fields || [])
+      ];
+      const deadlineField = allFormFields.find((f: any) => f?.isDeadline === true && f?.type === 'date');
+      if (deadlineField) {
+        const key = deadlineField.apiFieldName || deadlineField.name;
+        return fields[key] ? String(fields[key]) : null;
+      }
+    }
+
+    return null;
   }
 
   private hasRecentlyExecuted(lead: Lead, automationId: string, withinMs: number): boolean {

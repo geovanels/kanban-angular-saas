@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
 import { BoardStoreService } from '../../services/board-store.service';
 import { FirestoreService } from '../../services/firestore.service';
@@ -136,6 +137,7 @@ export class BoardOutboxComponent implements OnInit, OnDestroy {
   boardStore = inject(BoardStoreService);
   private firestoreService = inject(FirestoreService);
   private toast = inject(ToastService);
+  private sanitizer = inject(DomSanitizer);
   private sub?: Subscription;
 
   outboxEmails: any[] = [];
@@ -153,6 +155,9 @@ export class BoardOutboxComponent implements OnInit, OnDestroy {
 
   showDeleteConfirm = false;
   emailPendingDelete: any = null;
+
+  // View email modal
+  selectedEmail: any = null;
 
   ngOnInit() {
     this.sub = this.boardStore.outboxEmails$.subscribe(emails => {
@@ -217,9 +222,23 @@ export class BoardOutboxComponent implements OnInit, OnDestroy {
   }
 
   viewEmail(email: any) {
-    const sentAt = email.delivery?.endTime ? new Date(email.delivery.endTime.seconds * 1000).toLocaleString('pt-BR') : '---';
-    const createdAt = email.createdAt ? new Date(email.createdAt.seconds * 1000).toLocaleString('pt-BR') : '---';
-    alert(`Visualizar Email:\n\nPara: ${email.to || 'Não especificado'}\nAssunto: ${email.subject || 'Sem assunto'}\nStatus: ${this.getEmailStatusLabel(email)}\nCriado em: ${createdAt}\nEnviado em: ${sentAt}\n\nConteúdo:\n${email.html || email.text || 'Sem conteúdo disponível'}`);
+    this.selectedEmail = email;
+  }
+
+  closeViewEmail() {
+    this.selectedEmail = null;
+  }
+
+  getEmailDate(ts: any): string {
+    if (!ts) return '---';
+    try {
+      const date = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+      return date.toLocaleString('pt-BR');
+    } catch { return '---'; }
+  }
+
+  getSafeHtml(html: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
   async retryEmail(email: any) {

@@ -71,6 +71,7 @@
               <span *ngIf="field.required" class="badge badge-red">Obrigatório</span>
               <span *ngIf="field.showInCard" class="badge badge-blue">Card</span>
               <span *ngIf="field.showInFilters" class="badge badge-purple">Filtro</span>
+              <span *ngIf="field.isDeadline" class="badge badge-orange">Prazo</span>
               <span *ngIf="field.includeInApi !== false" class="badge badge-gray"><i class="fas fa-plug text-[8px]"></i></span>
               <button (click)="openRemoveField(i); $event.stopPropagation()" class="remove-btn">
                 <i class="fas fa-trash text-[10px]"></i>
@@ -162,6 +163,10 @@
               <label class="config-check">
                 <input type="checkbox" formControlName="allowEditInAnyPhase" class="config-checkbox">
                 <span>Edição em qualquer fase</span>
+              </label>
+              <label class="config-check" *ngIf="selectedFieldType?.startsWith('date')">
+                <input type="checkbox" formControlName="isDeadline" class="config-checkbox">
+                <span>Usar como prazo/vencimento</span>
               </label>
             </div>
 

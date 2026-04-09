@@ -132,7 +132,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
           try {
             // Só executar se tiver leads carregados e dados válidos
             if (this.leads && this.leads.length > 0 && this.columns && this.columns.length > 0) {
-              await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId);
+              await this.automationService.processTimeBasedAutomations(this.leads, this.columns, this.boardId, this.ownerId, {
+                initialFormFields: this.initialFormFields,
+                phaseFormConfigs: this.phaseFormConfigs
+              });
             }
           } catch (error) {
             console.warn('Erro nas automações de tempo:', error);
@@ -2395,6 +2398,104 @@ export class KanbanComponent implements OnInit, OnDestroy {
         borderClass: 'border-l-green-500'
       };
     }
+  }
+
+  // Prazo da atividade (campo de data do formulário)
+  getDeadlineStatus(lead: Lead): { status: string; text: string; colorClass: string; iconClass: string } | null {
+    // Buscar campo de data que represente prazo/deadline nos campos do lead
+    const deadlineKeys = ['prazo', 'deadline', 'data_limite', 'datalimite', 'data_vencimento',
+      'datavencimento', 'due_date', 'duedate', 'vencimento', 'data_entrega', 'dataentrega',
+      'data_prazo', 'dataprazo', 'previsao', 'data_previsao', 'dataprevisao'];
+
+    const fields = lead.fields || {};
+    let deadlineValue: string | null = null;
+    let deadlineLabel: string = 'Prazo';
+
+    // Buscar campo de prazo nos fields do lead
+    for (const [key, val] of Object.entries(fields)) {
+      if (!val) continue;
+      const norm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (deadlineKeys.some(dk => norm.includes(dk.replace(/[^a-z0-9]/g, '')))) {
+        deadlineValue = String(val);
+        // Buscar o label real do campo nos configs
+        const fieldConfig = this.findDeadlineFieldConfig(key);
+        if (fieldConfig) deadlineLabel = fieldConfig.label || fieldConfig.name || 'Prazo';
+        break;
+      }
+    }
+
+    // Se não encontrou por nome, buscar campos tipo 'date' marcados como isDeadline
+    if (!deadlineValue) {
+      const allFormFields = [
+        ...(this.initialFormFields || []),
+        ...Object.values(this.phaseFormConfigs || {}).flatMap((c: any) => c?.fields || [])
+      ];
+      const deadlineField = allFormFields.find((f: any) => f?.isDeadline === true && f?.type === 'date');
+      if (deadlineField) {
+        const key = deadlineField.apiFieldName || deadlineField.name;
+        deadlineValue = fields[key] ? String(fields[key]) : null;
+        deadlineLabel = deadlineField.label || deadlineField.name || 'Prazo';
+      }
+    }
+
+    if (!deadlineValue) return null;
+
+    // Parsear a data
+    const deadline = new Date(deadlineValue);
+    if (isNaN(deadline.getTime())) return null;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const deadlineDay = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+    const diffMs = deadlineDay.getTime() - today.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      const overdue = Math.abs(diffDays);
+      return {
+        status: 'overdue',
+        text: `${deadlineLabel}: Atrasado ${overdue}d`,
+        colorClass: 'text-red-600 bg-red-50',
+        iconClass: 'fas fa-exclamation-circle'
+      };
+    } else if (diffDays === 0) {
+      return {
+        status: 'today',
+        text: `${deadlineLabel}: Vence hoje`,
+        colorClass: 'text-orange-600 bg-orange-50',
+        iconClass: 'fas fa-exclamation-triangle'
+      };
+    } else if (diffDays <= 2) {
+      return {
+        status: 'soon',
+        text: `${deadlineLabel}: ${diffDays}d restante${diffDays > 1 ? 's' : ''}`,
+        colorClass: 'text-yellow-600 bg-yellow-50',
+        iconClass: 'fas fa-clock'
+      };
+    } else {
+      return {
+        status: 'ok',
+        text: `${deadlineLabel}: ${diffDays}d restantes`,
+        colorClass: 'text-green-600 bg-green-50',
+        iconClass: 'far fa-calendar-check'
+      };
+    }
+  }
+
+  private findDeadlineFieldConfig(fieldKey: string): any {
+    // Buscar nos campos do formulário inicial
+    const initial = (this.initialFormFields || []).find((f: any) =>
+      (f.apiFieldName || f.name) === fieldKey
+    );
+    if (initial) return initial;
+    // Buscar nas fases
+    for (const config of Object.values(this.phaseFormConfigs || {})) {
+      const found = ((config as any)?.fields || []).find((f: any) =>
+        (f.apiFieldName || f.name) === fieldKey
+      );
+      if (found) return found;
+    }
+    return null;
   }
 
   getLeadStatusColor(lead: Lead): string {

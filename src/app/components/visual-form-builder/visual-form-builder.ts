@@ -19,6 +19,7 @@ interface FormField {
   showInAllPhases?: boolean; // Exibir em todas as fases
   showInFilters?: boolean; // Exibir nos filtros avançados
   allowEditInAnyPhase?: boolean; // Permitir edição em qualquer fase (campos globais)
+  isDeadline?: boolean; // Marcar como campo de prazo/vencimento
 }
 
 @Component({
@@ -76,7 +77,8 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       requiredToAdvance: [false],
       showInAllPhases: [false],
       showInFilters: [false], // Por padrão, não exibir nos filtros
-      allowEditInAnyPhase: [false] // Por padrão, não permitir edição em qualquer fase
+      allowEditInAnyPhase: [false], // Por padrão, não permitir edição em qualquer fase
+      isDeadline: [false] // Por padrão, não é campo de prazo
     });
 
     // Listener para automaticamente marcar "showInAllPhases" quando "showInCard" for marcado
@@ -175,7 +177,8 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       requiredToAdvance: false,
       showInAllPhases: false,
       showInFilters: false,
-      allowEditInAnyPhase: false
+      allowEditInAnyPhase: false,
+      isDeadline: false
     });
   }
 
@@ -308,7 +311,8 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       requiredToAdvance: formValue.requiredToAdvance || false,
       showInAllPhases: showInAllPhases,
       showInFilters: formValue.showInFilters || false,
-      allowEditInAnyPhase: formValue.allowEditInAnyPhase || false, // IMPORTANTE: Adicionar aqui
+      allowEditInAnyPhase: formValue.allowEditInAnyPhase || false,
+      isDeadline: formValue.isDeadline || false,
       // Só incluir propriedades que não sejam undefined
       ...(formValue.placeholder && formValue.placeholder.trim() && { placeholder: formValue.placeholder.trim() }),
       ...(formValue.apiFieldName && formValue.apiFieldName.trim() && { apiFieldName: formValue.apiFieldName.trim() })
@@ -363,6 +367,7 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
     this.editingField = { ...field };
     this.selectedFieldType = field.type;
     this.selectedField = field;
+    console.log('✏️ selectedFieldType setado para:', this.selectedFieldType, '| isDeadline visível:', this.selectedFieldType?.startsWith('date'));
 
     const patchValues = {
       name: field.name,
@@ -377,7 +382,8 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       requiredToAdvance: field.requiredToAdvance || false,
       showInAllPhases: field.showInAllPhases || false,
       showInFilters: field.showInFilters || false,
-      allowEditInAnyPhase: field.allowEditInAnyPhase || false
+      allowEditInAnyPhase: field.allowEditInAnyPhase || false,
+      isDeadline: field.isDeadline || false
     };
     
     console.log('✏️ Valores sendo aplicados ao formulário:', patchValues);
