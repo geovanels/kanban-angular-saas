@@ -1,0 +1,63 @@
+<div class="p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Templates de Email</h2>
+      <button (click)="createTemplate()" class="px-4 py-2 text-white rounded-lg font-medium transition-colors hover:brightness-90" [style.background-color]="boardStore.getPrimaryColor()">
+        <i class="fas fa-plus mr-2"></i>
+        Novo Template
+      </button>
+    </div>
+
+    <div *ngIf="emailTemplates.length > 0" class="grid gap-4">
+      <div *ngFor="let template of emailTemplates"
+           class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">
+              {{ template.name || 'Template sem nome' }}
+            </h3>
+            <p class="text-sm text-gray-600 mb-3">
+              <strong>Assunto:</strong> {{ template.subject || 'Sem assunto' }}
+            </p>
+            <p class="text-xs text-gray-500 mb-4">
+              <strong>Para:</strong> {{ template.recipients || 'Não especificado' }}
+            </p>
+            <div class="flex items-center text-xs text-gray-500 space-x-4">
+              <span>
+                <i class="far fa-calendar-alt mr-1"></i>
+                Criado em {{ formatDate(template.createdAt) }}
+              </span>
+              <span *ngIf="template.updatedAt">
+                <i class="fas fa-edit mr-1"></i>
+                Atualizado em {{ formatDate(template.updatedAt) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2 ml-4">
+            <button (click)="editTemplate(template)" class="text-blue-600 hover:text-blue-800 px-3 py-1 text-sm font-medium">
+              <i class="fas fa-edit mr-1"></i>Editar
+            </button>
+            <button (click)="deleteTemplate(template)" class="text-red-600 hover:text-red-800 px-3 py-1 text-sm font-medium">
+              <i class="fas fa-trash mr-1"></i>Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="emailTemplates.length === 0" class="bg-white rounded-xl shadow-sm p-6">
+      <div class="text-center py-12 text-gray-500">
+        <i class="fas fa-envelope text-6xl mb-4"></i>
+        <h3 class="text-xl font-semibold mb-2">Nenhum template encontrado</h3>
+        <p>Crie templates personalizados para automações de email</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-template-modal
+  [boardId]="boardStore.boardId"
+  [ownerId]="boardStore.ownerId"
+  (templateSaved)="onTemplateSaved()">
+</app-template-modal>

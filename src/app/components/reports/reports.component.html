@@ -1,5 +1,5 @@
 <!-- Standalone Reports (accessed via URL) -->
-<app-main-layout *ngIf="boardId && isStandaloneView()">
+<ng-container *ngIf="boardId && isStandaloneView()">
   <!-- Breadcrumb -->
   <app-company-breadcrumb [title]="'Relatórios - ' + (board?.name || 'Quadro')">
   </app-company-breadcrumb>
@@ -614,7 +614,7 @@
 
     </div>
   </div>
-</app-main-layout>
+</ng-container>
 
 <!-- Inline Reports (used within kanban) -->
 <div *ngIf="boardId && !isStandaloneView()" class="p-4 md:p-8">

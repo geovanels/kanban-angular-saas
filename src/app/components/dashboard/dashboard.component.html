@@ -1,117 +1,113 @@
-<app-main-layout>
-  <!-- Company Breadcrumb -->
-  <app-company-breadcrumb title="Meus quadros Kanban">
-    <div class="flex space-x-2">
-      <button 
-        (click)="showCreateBoardModal()"
-        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center">
-        <i class="fas fa-plus mr-2"></i>
-        Novo Quadro
-      </button>
+<div>
+  <!-- Page Header -->
+  <div class="bg-white border-b border-gray-200">
+    <div class="px-6 lg:px-8 py-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">Meus Quadros</h1>
+          <p class="text-sm text-gray-500 mt-0.5">Gerencie seus quadros Kanban</p>
+        </div>
+        <button
+          (click)="showCreateBoardModal()"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm hover:shadow flex items-center gap-2">
+          <i class="fas fa-plus text-xs"></i>
+          Novo Quadro
+        </button>
+      </div>
     </div>
-  </app-company-breadcrumb>
-
+  </div>
 
   <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="px-6 lg:px-8 py-6">
     @if (isLoading) {
-      <!-- Loading State -->
-      <div class="flex items-center justify-center py-12">
+      <div class="flex items-center justify-center py-20">
         <div class="text-center">
-          <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
-          <p class="text-gray-600">Carregando seus quadros...</p>
+          <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p class="text-sm text-gray-500">Carregando quadros...</p>
         </div>
       </div>
     } @else if (boards.length === 0) {
-      <!-- Empty State -->
-      <div class="text-center py-12">
-        <div class="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <i class="fas fa-th-large text-3xl text-gray-400"></i>
+      <div class="text-center py-20">
+        <div class="w-20 h-20 mx-auto bg-gray-100 rounded-2xl flex items-center justify-center mb-5">
+          <i class="fas fa-th-large text-2xl text-gray-400"></i>
         </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">Nenhum quadro encontrado</h3>
-        <p class="text-gray-600 mb-6">Crie seu primeiro quadro Kanban para começar a organizar suas tarefas.</p>
-        <button 
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Nenhum quadro ainda</h3>
+        <p class="text-sm text-gray-500 mb-6 max-w-sm mx-auto">Crie seu primeiro quadro Kanban para organizar seus leads e tarefas.</p>
+        <button
           (click)="showCreateBoardModal()"
-          class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+          class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm hover:shadow">
           <i class="fas fa-plus mr-2"></i>
           Criar Primeiro Quadro
         </button>
       </div>
     } @else {
-      <!-- Boards Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         @for (board of boards; track board.id) {
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer group"
+          <div class="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 cursor-pointer group overflow-hidden"
                (click)="openBoard(board.id!)">
-            <!-- Board Header -->
-            <div class="p-6 border-b border-gray-100">
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
-                  <h3 class="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                    {{ board.name }}
-                  </h3>
-                  @if (board.description) {
-                    <p class="text-sm text-gray-600 mt-1 line-clamp-2">
-                      {{ board.description }}
-                    </p>
-                  }
+
+            <!-- Color accent bar -->
+            <div class="h-1 bg-gradient-to-r from-blue-500 to-blue-400 group-hover:from-blue-600 group-hover:to-blue-500 transition-all"></div>
+
+            <!-- Board Content -->
+            <div class="p-5">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                  <div class="w-9 h-9 rounded-lg bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <i class="fas fa-columns text-blue-600 text-sm"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <h3 class="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+                      {{ board.name }}
+                    </h3>
+                    @if (board.description) {
+                      <p class="text-xs text-gray-500 mt-0.5 line-clamp-1">{{ board.description }}</p>
+                    }
+                  </div>
                 </div>
-                
-                <!-- Board Actions -->
-                <div class="relative ml-4 board-menu-container">
-                  <button 
+
+                <!-- Board Menu -->
+                <div class="relative board-menu-container flex-shrink-0">
+                  <button
                     (click)="$event.stopPropagation(); toggleBoardMenu(board.id!)"
-                    class="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-all"
-                    style="display: flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px;">
-                    <i class="fas fa-ellipsis-v"></i>
+                    class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                    <i class="fas fa-ellipsis-v text-xs"></i>
                   </button>
-                  
+
                   @if (activeBoardMenu === board.id) {
-                    <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50" 
-                         style="box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);">
-                      <div class="py-1">
-                        <button 
-                          (click)="$event.stopPropagation(); editBoard(board)"
-                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          <i class="fas fa-edit mr-2"></i>
-                          Editar
-                        </button>
-                        <button 
-                          (click)="$event.stopPropagation(); duplicateBoard(board)"
-                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          <i class="fas fa-copy mr-2"></i>
-                          Duplicar
-                        </button>
-                        <hr class="my-1">
-                        <button 
-                          (click)="$event.stopPropagation(); deleteBoard(board.id!)"
-                          class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">
-                          <i class="fas fa-trash mr-2"></i>
-                          Excluir
-                        </button>
-                      </div>
+                    <div class="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-gray-200 z-50 py-1 overflow-hidden">
+                      <button
+                        (click)="$event.stopPropagation(); editBoard(board)"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                        <i class="fas fa-edit text-gray-400"></i>Editar
+                      </button>
+                      <button
+                        (click)="$event.stopPropagation(); duplicateBoard(board)"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                        <i class="fas fa-copy text-gray-400"></i>Duplicar
+                      </button>
+                      <div class="border-t border-gray-100 my-1"></div>
+                      <button
+                        (click)="$event.stopPropagation(); deleteBoard(board.id!)"
+                        class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                        <i class="fas fa-trash text-red-400"></i>Excluir
+                      </button>
                     </div>
                   }
                 </div>
               </div>
-            </div>
 
-            <!-- Board Stats -->
-            <div class="p-4 bg-gray-50">
-              <div class="flex items-center justify-between text-sm flex-wrap gap-2">
-                <div class="flex items-center space-x-4 whitespace-nowrap">
-                  <span class="text-gray-600 whitespace-nowrap">
-                    <i class="fas fa-columns mr-1"></i>
-                    {{ getBoardColumnCount(board.id!) }} colunas
-                  </span>
-                  <span class="text-gray-600 whitespace-nowrap">
-                    <i class="fas fa-tasks mr-1"></i>
-                    {{ getBoardTaskCount(board.id!) }} registros
-                  </span>
-                </div>
-                <div class="text-xs text-gray-500 whitespace-nowrap">
-                  {{ formatDate(board.createdAt) }}
-                </div>
+              <!-- Stats -->
+              <div class="flex items-center gap-4 text-xs text-gray-500 pt-3 border-t border-gray-100">
+                <span class="flex items-center gap-1.5">
+                  <i class="fas fa-layer-group"></i>
+                  {{ getBoardColumnCount(board.id!) }} fases
+                </span>
+                <span class="flex items-center gap-1.5">
+                  <i class="fas fa-user-friends"></i>
+                  {{ getBoardTaskCount(board.id!) }} registros
+                </span>
+                <span class="ml-auto text-gray-400">{{ formatDate(board.createdAt) }}</span>
               </div>
             </div>
           </div>
@@ -122,10 +118,10 @@
 
   <!-- Create Board Modal -->
   @if (showCreateModal) {
-    <app-create-board-modal 
+    <app-create-board-modal
       #createBoardModal
       (boardCreated)="onBoardCreated($event)"
       (closeModal)="showCreateModal = false">
     </app-create-board-modal>
   }
-</app-main-layout>
+</div>

@@ -1,0 +1,95 @@
+<div class="p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Automações</h2>
+      <button (click)="createAutomation($event)" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+        <i class="fas fa-plus mr-2"></i>Nova Automação
+      </button>
+    </div>
+
+    <div *ngIf="getValidAutomations().length > 0" class="grid gap-4">
+      <div *ngFor="let automation of getValidAutomations()"
+           class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <div class="flex items-center mb-2">
+              <h3 class="text-lg font-semibold text-gray-900 mr-3">{{ automation.name }}</h3>
+              <span class="px-2 py-1 text-xs font-medium rounded-full"
+                    [class.bg-green-100]="automation.active" [class.text-green-800]="automation.active"
+                    [class.bg-red-100]="!automation.active" [class.text-red-800]="!automation.active">
+                {{ automation.active ? 'Ativa' : 'Inativa' }}
+              </span>
+            </div>
+            <div class="space-y-2 mb-4">
+              <p class="text-sm text-gray-600"><i class="fas fa-bolt mr-2"></i><strong>Gatilho:</strong> {{ getTriggerDescription(automation.trigger) }}</p>
+              <p class="text-sm text-gray-600"><i class="fas fa-play mr-2"></i><strong>Ações:</strong> {{ getActionsCount(automation.actions) }} ação(ões)</p>
+            </div>
+            <div class="flex items-center text-xs text-gray-500 space-x-4">
+              <span><i class="far fa-calendar-alt mr-1"></i>Criada em {{ formatDate(automation.createdAt) }}</span>
+              <span *ngIf="automation.lastExecuted"><i class="fas fa-play mr-1"></i>Última: {{ formatDate(automation.lastExecuted) }}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2 ml-4">
+            <button (click)="showAutomationHistory(automation, $event)" class="text-gray-500 hover:text-blue-600 px-3 py-1 text-sm font-medium">
+              <i class="fas fa-history mr-1"></i>Histórico
+            </button>
+            <button (click)="editAutomation(automation, $event)" class="text-blue-600 hover:text-blue-800 px-3 py-1 text-sm font-medium">
+              <i class="fas fa-edit mr-1"></i>Editar
+            </button>
+            <button (click)="toggleAutomation(automation)" class="px-3 py-1 text-sm font-medium"
+                    [class.text-red-600]="automation.active" [class.text-green-600]="!automation.active">
+              <i class="fas mr-1" [class.fa-pause]="automation.active" [class.fa-play]="!automation.active"></i>
+              {{ automation.active ? 'Pausar' : 'Ativar' }}
+            </button>
+            <button (click)="openDeleteConfirm(automation, $event)" class="text-red-600 hover:text-red-800 px-3 py-1 text-sm font-medium">
+              <i class="fas fa-trash mr-1"></i>Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="getValidAutomations().length === 0" class="bg-white rounded-xl shadow-sm p-6">
+      <div class="text-center py-12 text-gray-500">
+        <i class="fas fa-gears text-6xl mb-4"></i>
+        <h3 class="text-xl font-semibold mb-2">Nenhuma automação encontrada</h3>
+        <p>Configure automações para disparar ações quando leads mudarem de fase</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div *ngIf="showDeleteConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" (click)="cancelDelete()">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" (click)="$event.stopPropagation()">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Excluir automação</h3>
+    <p class="text-sm text-gray-600 mb-6">Tem certeza que deseja excluir <strong>{{ automationPendingDelete?.name }}</strong>?</p>
+    <div class="flex justify-end gap-3">
+      <button class="px-4 py-2 rounded-lg border border-gray-300" (click)="cancelDelete()">Cancelar</button>
+      <button class="px-4 py-2 rounded-lg bg-red-600 text-white" (click)="confirmDelete()">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Automation Modal -->
+<app-automation-modal
+  [isVisible]="showAutomationModal"
+  [automation]="selectedAutomation"
+  [phases]="columns"
+  [emailTemplates]="(boardStore.emailTemplates$ | async) || []"
+  [users]="(boardStore.users$ | async) || []"
+  [allowedTransitions]="(boardStore.columns$ | async) ? {} : {}"
+  (saveAutomation)="onSaveAutomation($event)"
+  (closeModalEvent)="onCloseAutomationModal()">
+</app-automation-modal>
+
+<!-- History Modal -->
+<app-automation-history-modal
+  [isVisible]="showHistoryModal"
+  [automationId]="selectedAutomationForHistory?.id || ''"
+  [automationName]="selectedAutomationForHistory?.name || ''"
+  [ownerId]="boardStore.ownerId"
+  [boardId]="boardStore.boardId"
+  (closeModalEvent)="onCloseHistoryModal()">
+</app-automation-history-modal>

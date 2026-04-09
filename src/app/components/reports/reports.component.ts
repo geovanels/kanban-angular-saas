@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column, Board } from '../../services/firestore.service';
-import { MainLayoutComponent } from '../main-layout/main-layout.component';
 import { CompanyBreadcrumbComponent } from '../company-breadcrumb/company-breadcrumb.component';
 import { AdvancedFiltersComponent } from '../advanced-filters/advanced-filters.component';
 
@@ -59,7 +58,7 @@ interface FunnelStage {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, MainLayoutComponent, CompanyBreadcrumbComponent, AdvancedFiltersComponent],
+  imports: [CommonModule, FormsModule, CompanyBreadcrumbComponent, AdvancedFiltersComponent],
   templateUrl: './reports.component.html',
   styleUrls: ['./reports.component.scss']
 })

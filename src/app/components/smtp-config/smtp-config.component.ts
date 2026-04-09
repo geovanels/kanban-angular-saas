@@ -8,15 +8,13 @@ import { Company } from '../../models/company.model';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../toast/toast.service';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
-import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 @Component({
   selector: 'app-smtp-config',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfigHeaderComponent, MainLayoutComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfigHeaderComponent],
   template: `
-    <app-main-layout>
-      <app-config-header title="Configuração SMTP">
+    <app-config-header title="Configuração SMTP">
         <div class="flex items-center space-x-3">
           <button 
             class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -275,7 +273,6 @@ import { MainLayoutComponent } from '../main-layout/main-layout.component';
           </div>
         </div>
       </div>
-    </app-main-layout>
   `,
   styles: [`
     :host {

@@ -1,0 +1,51 @@
+<!-- Loading -->
+<div *ngIf="boardStore.isLoading$ | async" class="flex justify-center items-center py-20">
+  <div class="animate-spin rounded-full h-10 w-10 border-b-2" [style.border-color]="boardStore.getPrimaryColor()"></div>
+</div>
+
+<!-- Shell -->
+<div *ngIf="!(boardStore.isLoading$ | async)" class="kanban-shell">
+
+  <!-- Tab navigation bar -->
+  <nav class="tab-bar">
+    <div class="tab-bar-inner">
+      <!-- Desktop tabs -->
+      <div class="hidden md:flex items-center gap-1">
+        <a *ngFor="let tab of tabs"
+           [routerLink]="tab.path"
+           routerLinkActive="active"
+           [routerLinkActiveOptions]="{ exact: tab.exact }"
+           class="tab-item">
+          <i class="fas {{ tab.icon }}"></i>
+          <span>{{ tab.name }}</span>
+        </a>
+      </div>
+
+      <!-- Mobile: current tab + dropdown -->
+      <div class="md:hidden flex items-center w-full">
+        <button class="tab-item active flex-1 justify-center" (click)="toggleMobileTabs()">
+          <span>Menu</span>
+          <i class="fas fa-chevron-down text-xs ml-1" [class.rotate-180]="mobileTabsOpen"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile dropdown -->
+    <div *ngIf="mobileTabsOpen" class="md:hidden mobile-tabs-dropdown">
+      <a *ngFor="let tab of tabs"
+         [routerLink]="tab.path"
+         routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: tab.exact }"
+         class="mobile-tab-item"
+         (click)="mobileTabsOpen = false">
+        <i class="fas {{ tab.icon }}"></i>
+        <span>{{ tab.name }}</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Child route content -->
+  <div class="shell-content">
+    <router-outlet></router-outlet>
+  </div>
+</div>

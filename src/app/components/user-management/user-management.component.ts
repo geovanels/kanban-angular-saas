@@ -6,12 +6,11 @@ import { AuthService } from '../../services/auth.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { CompanyUser, Company } from '../../models/company.model';
 import { ConfigHeaderComponent } from '../config-header/config-header.component';
-import { MainLayoutComponent } from '../main-layout/main-layout.component';
 
 @Component({
   selector: 'app-user-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfigHeaderComponent, MainLayoutComponent],
+  imports: [CommonModule, FormsModule, ConfigHeaderComponent],
   templateUrl: './user-management.component.html',
   styleUrls: ['./user-management.component.scss']
 })

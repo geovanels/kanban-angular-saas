@@ -14,19 +14,13 @@ import { LeadModalComponent } from '../lead-modal/lead-modal.component';
 import { ColumnModalComponent } from '../column-modal/column-modal.component';
 import { PhaseFormModalComponent } from '../phase-form-modal/phase-form-modal.component';
 import { LeadDetailModalComponent } from '../lead-detail-modal/lead-detail-modal.component';
-import { TemplateModalComponent } from '../template-modal/template-modal.component';
-import { AutomationModal } from '../automation-modal/automation-modal';
-import { AutomationHistoryModal } from '../automation-history-modal/automation-history-modal';
-import { MainLayoutComponent } from '../main-layout/main-layout.component';
-import { VisualFormBuilderComponent } from '../visual-form-builder/visual-form-builder';
-import { ReportsComponent } from '../reports/reports.component';
 import { AdvancedFiltersComponent } from '../advanced-filters/advanced-filters.component';
 import { ToastService } from '../toast/toast.service';
 
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent, TemplateModalComponent, AutomationModal, AutomationHistoryModal, MainLayoutComponent, VisualFormBuilderComponent, ReportsComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, LeadModalComponent, ColumnModalComponent, PhaseFormModalComponent, LeadDetailModalComponent],
   templateUrl: './kanban.component.html',
   styleUrls: ['./kanban.component.scss']
 })
@@ -47,8 +41,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
   @ViewChild(ColumnModalComponent) columnModal!: ColumnModalComponent;
   @ViewChild(PhaseFormModalComponent) phaseFormModal!: PhaseFormModalComponent;
   @ViewChild(LeadDetailModalComponent) leadDetailModal!: LeadDetailModalComponent;
-  @ViewChild(TemplateModalComponent) templateModal!: TemplateModalComponent;
-  @ViewChild(AutomationModal) automationModal!: AutomationModal;
   @ViewChild('flowScroller') flowScrollerRef!: ElementRef<HTMLDivElement>;
   @ViewChild('kanbanBoard') kanbanBoardRef!: ElementRef<HTMLDivElement>;
   flowThumbPercent = 10;
@@ -105,6 +97,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.boardId = this.route.snapshot.paramMap.get('boardId') || '';
     try { localStorage.setItem('last-board-id', this.boardId); } catch {}
     this.ownerId = this.route.snapshot.queryParamMap.get('ownerId') || this.currentUser?.uid || '';
+
+    // Restaurar aba ativa a partir do fragment da URL (ex: #flow)
+    const fragment = this.route.snapshot.fragment;
+    if (fragment && this.tabs.some(t => t.id === fragment)) {
+      this.activeTab = fragment;
+    }
     
     
     // Definir contexto da empresa no FirestoreService
@@ -1061,6 +1059,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   switchTab(tabId: string) {
     this.activeTab = tabId;
+    // Atualizar fragment na URL sem recarregar a página
+    this.router.navigate([], { fragment: tabId, replaceUrl: true });
   }
 
   getActiveLeads(): Lead[] {
@@ -1341,8 +1341,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
     
     // Verificar se flowOrder está sincronizado com a ordem atual das colunas
-    const flowOrderMatchesColumnOrder = this.flowOrder.every((id, index) => sortedIds[index] === id);
-    
+    const flowOrderMatchesColumnOrder = this.flowOrder.length === sortedIds.length && this.flowOrder.every((id, index) => sortedIds[index] === id);
+
     if (flowOrderMatchesColumnOrder) {
       return;
     }
@@ -2603,14 +2603,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Métodos para Templates
-  createTemplate() {
-    this.templateModal.showCreateModal();
-  }
+  // Métodos para Templates (moved to board-templates component)
+  createTemplate() {}
 
-  editTemplate(template: any) {
-    this.templateModal.showEditModal(template);
-  }
+  editTemplate(template: any) {}
 
   async deleteTemplate(template: any) {
     if (confirm('Tem certeza que deseja excluir este template?')) {

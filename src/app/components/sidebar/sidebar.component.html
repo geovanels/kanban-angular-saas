@@ -1,0 +1,136 @@
+<aside
+  class="sidebar"
+  [class.collapsed]="collapsed"
+  [class.mobile-open]="mobileOpen">
+
+  <!-- Logo & Collapse Toggle -->
+  <div class="sidebar-header">
+    <div class="logo-area" *ngIf="!collapsed">
+      <img *ngIf="hasCompanyLogo()" [src]="getCompanyLogo()" alt="Logo" class="company-logo">
+      <div *ngIf="!hasCompanyLogo()" class="company-initials" [style.background-color]="getPrimaryColor()">
+        {{ getCompanyInitials() }}
+      </div>
+      <span class="company-name">{{ company?.name || 'Task Board' }}</span>
+    </div>
+    <div class="logo-area" *ngIf="collapsed">
+      <div *ngIf="hasCompanyLogo()" class="company-initials-img">
+        <img [src]="getCompanyLogo()" alt="Logo" class="w-8 h-8 rounded object-cover">
+      </div>
+      <div *ngIf="!hasCompanyLogo()" class="company-initials" [style.background-color]="getPrimaryColor()">
+        {{ getCompanyInitials() }}
+      </div>
+    </div>
+    <button class="collapse-btn" (click)="toggleSidebar()" [title]="collapsed ? 'Expandir' : 'Recolher'">
+      <i class="fas" [ngClass]="collapsed ? 'fa-angles-right' : 'fa-angles-left'"></i>
+    </button>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    <!-- Boards Section -->
+    <div class="nav-section">
+      <div class="nav-section-title" *ngIf="!collapsed">
+        <i class="fas fa-th-large"></i>
+        <span>Quadros</span>
+      </div>
+      <div class="nav-section-title" *ngIf="collapsed" title="Quadros">
+        <i class="fas fa-th-large"></i>
+      </div>
+
+      <div class="board-list" *ngIf="!collapsed">
+        <button
+          *ngFor="let board of boards"
+          class="nav-item board-item"
+          [class.active]="isBoardActive(board.id!)"
+          [style.--active-color]="getPrimaryColor()"
+          (click)="openBoard(board.id!)">
+          <div class="board-icon" [style.background-color]="isBoardActive(board.id!) ? getPrimaryColor() : ''">
+            <i class="fas fa-columns"></i>
+          </div>
+          <span class="nav-label">{{ board.name }}</span>
+        </button>
+      </div>
+
+      <div class="board-list" *ngIf="collapsed">
+        <button
+          *ngFor="let board of boards"
+          class="nav-item board-item"
+          [class.active]="isBoardActive(board.id!)"
+          [style.--active-color]="getPrimaryColor()"
+          [title]="board.name"
+          (click)="openBoard(board.id!)">
+          <div class="board-icon" [style.background-color]="isBoardActive(board.id!) ? getPrimaryColor() : ''">
+            <i class="fas fa-columns"></i>
+          </div>
+        </button>
+      </div>
+
+      <button class="nav-item add-board" (click)="navigateTo('/dashboard')" [title]="collapsed ? 'Ver todos os quadros' : ''">
+        <i class="fas fa-plus-circle"></i>
+        <span class="nav-label" *ngIf="!collapsed">Ver todos</span>
+      </button>
+    </div>
+
+    <!-- Divider -->
+    <div class="nav-divider"></div>
+
+    <!-- Settings Section -->
+    <div class="nav-section">
+      <button class="nav-section-title clickable" (click)="toggleSettings()" *ngIf="!collapsed">
+        <i class="fas fa-cog"></i>
+        <span>Configurações</span>
+        <i class="fas fa-chevron-down section-arrow" [class.rotated]="settingsOpen"></i>
+      </button>
+      <div class="nav-section-title" *ngIf="collapsed" title="Configurações">
+        <i class="fas fa-cog"></i>
+      </div>
+
+      <div class="settings-list" [class.open]="settingsOpen || collapsed">
+        <button class="nav-item" [class.active]="isActiveRoute('/settings/branding')" (click)="navigateTo('/settings/branding')" [title]="collapsed ? 'Minha Empresa' : ''">
+          <i class="fas fa-palette"></i>
+          <span class="nav-label" *ngIf="!collapsed">Minha Empresa</span>
+        </button>
+        <button class="nav-item" [class.active]="isActiveRoute('/settings/smtp')" (click)="navigateTo('/settings/smtp')" [title]="collapsed ? 'SMTP' : ''">
+          <i class="fas fa-envelope"></i>
+          <span class="nav-label" *ngIf="!collapsed">SMTP</span>
+        </button>
+        <button class="nav-item" [class.active]="isActiveRoute('/settings/integrations')" (click)="navigateTo('/settings/integrations')" [title]="collapsed ? 'Integrações' : ''">
+          <i class="fas fa-plug"></i>
+          <span class="nav-label" *ngIf="!collapsed">Integrações</span>
+        </button>
+        <button class="nav-item" [class.active]="isActiveRoute('/settings/users')" (click)="navigateTo('/settings/users')" [title]="collapsed ? 'Usuários' : ''">
+          <i class="fas fa-users"></i>
+          <span class="nav-label" *ngIf="!collapsed">Usuários</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- User Section (bottom) -->
+  <div class="sidebar-footer">
+    <button class="user-section" (click)="toggleUserMenu(); $event.stopPropagation()">
+      <div class="user-avatar" [style.background-color]="getPrimaryColor()">
+        <img *ngIf="currentUser()?.photoURL" [src]="currentUser()?.photoURL" class="avatar-img">
+        <span *ngIf="!currentUser()?.photoURL">{{ getUserInitials() }}</span>
+      </div>
+      <div class="user-info" *ngIf="!collapsed">
+        <span class="user-name">{{ currentUser()?.displayName || 'Usuário' }}</span>
+        <span class="user-email">{{ currentUser()?.email }}</span>
+      </div>
+      <i class="fas fa-ellipsis-vertical user-menu-icon" *ngIf="!collapsed"></i>
+    </button>
+
+    <!-- User popup menu -->
+    <div class="user-popup" *ngIf="userMenuOpen" (click)="$event.stopPropagation()">
+      <div class="user-popup-header">
+        <span class="user-popup-name">{{ currentUser()?.displayName || 'Usuário' }}</span>
+        <span class="user-popup-email">{{ currentUser()?.email }}</span>
+      </div>
+      <div class="user-popup-divider"></div>
+      <button class="user-popup-item danger" (click)="logout()">
+        <i class="fas fa-sign-out-alt"></i>
+        <span>Sair</span>
+      </button>
+    </div>
+  </div>
+</aside>

@@ -1,0 +1,46 @@
+.flow-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.flow-phase-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  border-top: 4px solid var(--phase-color, #94a3b8);
+  transition: all 200ms;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+}
+
+.flow-custombar {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+}
+
+.flow-thumb {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 4px;
+  min-width: 20px;
+  transition: left 100ms;
+
+  &:hover {
+    background: #64748b;
+  }
+}

@@ -1,0 +1,98 @@
+<div class="p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Configuração da API</h2>
+      <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
+        <i class="fas fa-check-circle mr-1"></i>Ativa
+      </span>
+    </div>
+
+    <!-- Endpoint -->
+    <div class="bg-white rounded-xl shadow-sm mb-6">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+          <i class="fas fa-link mr-2 text-blue-500"></i>Endpoint para Novos Leads
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">Use este endpoint para enviar novos leads diretamente para o seu kanban via API REST.</p>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">URL do Endpoint:</span>
+            <button (click)="copyToClipboard(apiEndpoint)" class="text-blue-600 hover:text-blue-800 text-sm">
+              <i class="fas fa-copy mr-1"></i>Copiar
+            </button>
+          </div>
+          <code class="bg-blue-50 text-blue-800 text-sm p-2 rounded border block break-all">{{ apiEndpoint }}</code>
+        </div>
+      </div>
+
+      <!-- Token -->
+      <div class="p-6 border-b border-gray-200">
+        <h4 class="text-md font-semibold text-gray-900 mb-2">
+          <i class="fas fa-key mr-2 text-yellow-500"></i>Token de Autenticação
+        </h4>
+        <p class="text-sm text-gray-600 mb-3">Inclua este token no header <code class="bg-gray-100 px-1 rounded">Authorization</code> de suas requisições.</p>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">Bearer Token:</span>
+            <button (click)="copyToClipboard(apiToken)" class="text-blue-600 hover:text-blue-800 text-sm">
+              <i class="fas fa-copy mr-1"></i>Copiar
+            </button>
+          </div>
+          <code class="bg-yellow-50 text-yellow-800 text-sm p-2 rounded border block font-mono break-all">{{ apiToken }}</code>
+        </div>
+      </div>
+
+      <!-- Example -->
+      <div class="p-6">
+        <h4 class="text-md font-semibold text-gray-900 mb-2">
+          <i class="fas fa-code mr-2 text-green-500"></i>Exemplo de Requisição
+        </h4>
+        <div class="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto">
+          <pre class="text-sm"><code>POST {{ apiEndpoint }}
+Content-Type: application/json
+Authorization: Bearer {{ apiToken }}
+
+{{ apiExampleJson }}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documentation -->
+    <div class="bg-white rounded-xl shadow-sm mb-6">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fas fa-book mr-2 text-purple-500"></i>Documentação da API
+        </h3>
+      </div>
+      <div class="p-6">
+        <div class="overflow-x-auto mb-6">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50">
+                <th class="px-4 py-2 text-left font-medium text-gray-600">Campo</th>
+                <th class="px-4 py-2 text-left font-medium text-gray-600">Obrigatório</th>
+                <th class="px-4 py-2 text-left font-medium text-gray-600">Descrição</th>
+                <th class="px-4 py-2 text-left font-medium text-gray-600">Sinônimos</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">contactName</td><td class="px-4 py-2"><span class="text-orange-600 font-medium">Recomendado</span></td><td class="px-4 py-2 text-gray-600">Nome do contato</td><td class="px-4 py-2 text-gray-400 text-xs">name, nome, nomeLead</td></tr>
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">contactEmail</td><td class="px-4 py-2"><span class="text-orange-600 font-medium">Recomendado</span></td><td class="px-4 py-2 text-gray-600">E-mail do contato</td><td class="px-4 py-2 text-gray-400 text-xs">email, emailLead</td></tr>
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">contactPhone</td><td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td><td class="px-4 py-2 text-gray-600">Telefone do contato</td><td class="px-4 py-2 text-gray-400 text-xs">phone, telefone, celular</td></tr>
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">companyName</td><td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td><td class="px-4 py-2 text-gray-600">Nome da empresa</td><td class="px-4 py-2 text-gray-400 text-xs">empresa, company</td></tr>
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">cnpj</td><td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td><td class="px-4 py-2 text-gray-600">CNPJ da empresa</td><td class="px-4 py-2 text-gray-400 text-xs">cnpjCompany</td></tr>
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">origem</td><td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td><td class="px-4 py-2 text-gray-600">Origem do lead</td><td class="px-4 py-2 text-gray-400 text-xs">origin, source, fonte</td></tr>
+              <tr><td class="px-4 py-2 font-mono text-xs text-blue-700">temperatura</td><td class="px-4 py-2"><span class="text-gray-400">Opcional</span></td><td class="px-4 py-2 text-gray-600">Temperatura / qualificação</td><td class="px-4 py-2 text-gray-400 text-xs">temperature, qualificacao</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="space-y-2 text-sm text-gray-600">
+          <div class="flex items-start space-x-2"><i class="fas fa-check-circle mt-0.5 text-green-500"></i><span><strong>Método:</strong> POST</span></div>
+          <div class="flex items-start space-x-2"><i class="fas fa-check-circle mt-0.5 text-green-500"></i><span><strong>Content-Type:</strong> application/json</span></div>
+          <div class="flex items-start space-x-2"><i class="fas fa-check-circle mt-0.5 text-green-500"></i><span><strong>Autenticação:</strong> Bearer token no header Authorization</span></div>
+          <div class="flex items-start space-x-2"><i class="fas fa-check-circle mt-0.5 text-green-500"></i><span><strong>Resposta:</strong> Status 201 com leadId</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

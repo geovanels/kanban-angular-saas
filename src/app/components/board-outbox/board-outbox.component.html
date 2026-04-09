@@ -1,0 +1,85 @@
+<div class="p-4 md:p-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Caixa de Saída</h2>
+      <button (click)="clearOutbox()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+        <i class="fas fa-trash mr-2"></i>Limpar
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm">
+      <!-- Status tabs -->
+      <div class="border-b border-gray-200">
+        <nav class="flex space-x-8 px-6">
+          <button *ngFor="let status of emailStatuses"
+                  (click)="activeEmailStatus = status.id"
+                  class="py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200"
+                  [class.border-blue-500]="activeEmailStatus === status.id"
+                  [class.text-blue-600]="activeEmailStatus === status.id"
+                  [class.border-transparent]="activeEmailStatus !== status.id"
+                  [class.text-gray-500]="activeEmailStatus !== status.id">
+            {{ status.name }}
+            <span class="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">{{ status.count }}</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="p-6">
+        <!-- Empty -->
+        <div *ngIf="getFilteredEmails().length === 0" class="text-center py-12 text-gray-500">
+          <i class="fas fa-paper-plane text-6xl mb-4"></i>
+          <h3 class="text-xl font-semibold mb-2">Nenhum email encontrado</h3>
+          <p>Emails enviados aparecerão aqui</p>
+        </div>
+
+        <!-- List -->
+        <div *ngIf="getFilteredEmails().length > 0" class="space-y-4">
+          <div *ngFor="let email of getFilteredEmails()"
+               class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <div class="flex items-center space-x-3">
+                  <div class="w-3 h-3 rounded-full"
+                       [class.bg-yellow-400]="!email.delivery || email.delivery.state === 'PENDING'"
+                       [class.bg-green-400]="email.delivery?.state === 'SUCCESS'"
+                       [class.bg-red-400]="email.delivery?.state === 'ERROR'"></div>
+                  <h4 class="font-medium text-gray-900">{{ email.subject || 'Sem assunto' }}</h4>
+                  <span class="px-2 py-1 text-xs rounded-full"
+                        [class.bg-yellow-100]="!email.delivery || email.delivery.state === 'PENDING'"
+                        [class.text-yellow-800]="!email.delivery || email.delivery.state === 'PENDING'"
+                        [class.bg-green-100]="email.delivery?.state === 'SUCCESS'"
+                        [class.text-green-800]="email.delivery?.state === 'SUCCESS'"
+                        [class.bg-red-100]="email.delivery?.state === 'ERROR'"
+                        [class.text-red-800]="email.delivery?.state === 'ERROR'">
+                    {{ getEmailStatusLabel(email) }}
+                  </span>
+                </div>
+                <div class="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                  <span><i class="fas fa-envelope mr-1"></i>Para: {{ email.to }}</span>
+                  <span><i class="fas fa-clock mr-1"></i>{{ formatDateTime(getEmailDisplayDate(email)) }}</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button (click)="viewEmail(email)" class="text-blue-600 hover:text-blue-800"><i class="fas fa-eye"></i></button>
+                <button *ngIf="email.delivery?.state === 'ERROR' || !email.delivery" (click)="retryEmail(email)" class="text-green-600 hover:text-green-800"><i class="fas fa-redo"></i></button>
+                <button (click)="openDeleteConfirm(email, $event)" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div *ngIf="showDeleteConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" (click)="cancelDelete()">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" (click)="$event.stopPropagation()">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Excluir mensagem</h3>
+    <p class="text-sm text-gray-600 mb-6">Tem certeza que deseja excluir esta mensagem da Caixa de Saída?</p>
+    <div class="flex justify-end gap-3">
+      <button class="px-4 py-2 rounded-lg border border-gray-300" (click)="cancelDelete()">Cancelar</button>
+      <button class="px-4 py-2 rounded-lg bg-red-600 text-white" (click)="confirmDelete()">Excluir</button>
+    </div>
+  </div>
+</div>
