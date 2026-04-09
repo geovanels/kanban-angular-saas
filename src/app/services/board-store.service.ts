@@ -231,7 +231,7 @@ export class BoardStoreService implements OnDestroy {
     for (const column of columns) {
       try {
         const config = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
-        if (config?.fields) {
+        if (config) {
           configs[column.id!] = config;
         }
       } catch {}
