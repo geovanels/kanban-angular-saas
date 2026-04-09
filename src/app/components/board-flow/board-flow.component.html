@@ -138,6 +138,7 @@
 
 <!-- Automation modal -->
 <app-automation-modal
+  *ngIf="showAutomationModal"
   [isVisible]="showAutomationModal"
   [automation]="selectedAutomation"
   [phases]="columns"

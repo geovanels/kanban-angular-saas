@@ -15,8 +15,8 @@ import { AuthService } from '../../services/auth.service';
   imports: [CommonModule, RouterModule, SidebarComponent, ToastContainerComponent],
   template: `
     <div class="app-shell">
-      <!-- Mobile top bar -->
-      <div class="mobile-topbar lg:hidden">
+      <!-- Mobile top bar (hidden when sidebar is visible) -->
+      <div class="mobile-topbar">
         <button class="mobile-menu-btn" (click)="mobileMenuOpen = true">
           <img *ngIf="hasLogo()" [src]="getLogo()" alt="Logo" class="mobile-logo">
           <i *ngIf="!hasLogo()" class="fas fa-bars"></i>
@@ -35,7 +35,7 @@ import { AuthService } from '../../services/auth.service';
 
       <!-- Mobile backdrop -->
       <div
-        class="mobile-backdrop lg:hidden"
+        class="mobile-backdrop"
         [class.visible]="mobileMenuOpen"
         (click)="mobileMenuOpen = false">
       </div>
