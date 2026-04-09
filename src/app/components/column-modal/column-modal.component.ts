@@ -60,8 +60,8 @@ export class ColumnModalComponent {
 
   endStageTypes = [
     { value: 'none', label: 'Nenhuma (fase normal)' },
-    { value: 'success', label: 'Sucesso (lead convertido)' },
-    { value: 'fail', label: 'Fracasso (lead perdido)' }
+    { value: 'success', label: 'Sucesso (concluído)' },
+    { value: 'fail', label: 'Fracasso (cancelado)' }
   ];
 
   showCreateModal() {

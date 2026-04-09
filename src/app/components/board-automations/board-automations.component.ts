@@ -49,9 +49,9 @@ export class BoardAutomationsComponent implements OnInit, OnDestroy {
     if (!automationOrTrigger) return 'Não especificado';
     const trigger = automationOrTrigger.trigger || automationOrTrigger;
     const descriptions: any = {
-      'new-lead-created': 'Quando um novo lead é criado',
-      'card-enters-phase': 'Quando lead entra em uma fase',
-      'card-in-phase-for-time': 'Quando lead fica muito tempo na fase',
+      'new-lead-created': 'Quando um novo registro é criado',
+      'card-enters-phase': 'Quando registro entra em uma fase',
+      'card-in-phase-for-time': 'Quando registro fica muito tempo na fase',
       'form-not-answered': 'Quando formulário não é respondido',
       'sla-overdue': 'Quando SLA da fase vence'
     };

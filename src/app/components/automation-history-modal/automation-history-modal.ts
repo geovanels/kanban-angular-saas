@@ -103,7 +103,7 @@ export class AutomationHistoryModal implements OnInit, OnDestroy {
 
   getLeadName(leadId: string): string {
     const lead = this.leads.find(l => l.id === leadId);
-    return lead ? (lead.fields?.companyName || lead.fields?.title || 'Lead sem nome') : 'Lead removido';
+    return lead ? (lead.fields?.companyName || lead.fields?.title || 'Sem nome') : 'Registro removido';
   }
 
   formatDate(timestamp: any): string {

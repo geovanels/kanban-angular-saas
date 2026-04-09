@@ -11,9 +11,9 @@
     <div class="bg-white rounded-lg border border-gray-200 mb-4">
       <div class="p-5 border-b border-gray-100">
         <h3 class="text-sm font-semibold text-gray-900 mb-1">
-          <i class="fas fa-link mr-1.5 text-blue-500"></i>Endpoint para Novos Leads
+          <i class="fas fa-link mr-1.5 text-blue-500"></i>Endpoint para Novos Registros
         </h3>
-        <p class="text-xs text-gray-500 mb-3">Use este endpoint para enviar novos leads via API REST.</p>
+        <p class="text-xs text-gray-500 mb-3">Use este endpoint para enviar novos registros via API REST.</p>
         <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
           <div class="flex items-center justify-between mb-1.5">
             <span class="text-xs font-medium text-gray-500">URL do Endpoint:</span>
@@ -81,7 +81,7 @@ Authorization: Bearer {{ apiToken }}
               <tr><td class="px-3 py-2 font-mono text-xs text-blue-700">contactPhone</td><td class="px-3 py-2"><span class="text-gray-400 text-xs">Opcional</span></td><td class="px-3 py-2 text-xs text-gray-600">Telefone do contato</td><td class="px-3 py-2 text-gray-400 text-xs">phone, telefone, celular</td></tr>
               <tr><td class="px-3 py-2 font-mono text-xs text-blue-700">companyName</td><td class="px-3 py-2"><span class="text-gray-400 text-xs">Opcional</span></td><td class="px-3 py-2 text-xs text-gray-600">Nome da empresa</td><td class="px-3 py-2 text-gray-400 text-xs">empresa, company</td></tr>
               <tr><td class="px-3 py-2 font-mono text-xs text-blue-700">cnpj</td><td class="px-3 py-2"><span class="text-gray-400 text-xs">Opcional</span></td><td class="px-3 py-2 text-xs text-gray-600">CNPJ da empresa</td><td class="px-3 py-2 text-gray-400 text-xs">cnpjCompany</td></tr>
-              <tr><td class="px-3 py-2 font-mono text-xs text-blue-700">origem</td><td class="px-3 py-2"><span class="text-gray-400 text-xs">Opcional</span></td><td class="px-3 py-2 text-xs text-gray-600">Origem do lead</td><td class="px-3 py-2 text-gray-400 text-xs">origin, source, fonte</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-xs text-blue-700">origem</td><td class="px-3 py-2"><span class="text-gray-400 text-xs">Opcional</span></td><td class="px-3 py-2 text-xs text-gray-600">Origem do registro</td><td class="px-3 py-2 text-gray-400 text-xs">origin, source, fonte</td></tr>
               <tr><td class="px-3 py-2 font-mono text-xs text-blue-700">temperatura</td><td class="px-3 py-2"><span class="text-gray-400 text-xs">Opcional</span></td><td class="px-3 py-2 text-xs text-gray-600">Temperatura / qualificação</td><td class="px-3 py-2 text-gray-400 text-xs">temperature, qualificacao</td></tr>
             </tbody>
           </table>
@@ -90,7 +90,7 @@ Authorization: Bearer {{ apiToken }}
           <div class="flex items-center gap-1.5"><i class="fas fa-check-circle text-green-500"></i><span><strong>Método:</strong> POST</span></div>
           <div class="flex items-center gap-1.5"><i class="fas fa-check-circle text-green-500"></i><span><strong>Content-Type:</strong> application/json</span></div>
           <div class="flex items-center gap-1.5"><i class="fas fa-check-circle text-green-500"></i><span><strong>Autenticação:</strong> Bearer token no header Authorization</span></div>
-          <div class="flex items-center gap-1.5"><i class="fas fa-check-circle text-green-500"></i><span><strong>Resposta:</strong> Status 201 com leadId</span></div>
+          <div class="flex items-center gap-1.5"><i class="fas fa-check-circle text-green-500"></i><span><strong>Resposta:</strong> Status 201 com registroId</span></div>
         </div>
       </div>
     </div>

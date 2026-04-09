@@ -189,7 +189,7 @@
             <div class="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
               <i class="fas fa-info-circle mb-2 text-gray-400"></i>
               <div>Nenhum histórico de fases disponível</div>
-              <div class="text-xs mt-1">O histórico será registrado quando o lead for movido entre as fases</div>
+              <div class="text-xs mt-1">O histórico será registrado quando o registro for movido entre as fases</div>
             </div>
           </ng-template>
         </div>
@@ -531,7 +531,7 @@
               <ng-container *ngIf="hasRequiredToAdvance(); else finalPhaseMsg">
                 Para avançar, preencha os campos obrigatórios da fase.
               </ng-container>
-              <ng-template #finalPhaseMsg>Lead em fase final. Não é possível movimentar.</ng-template>
+              <ng-template #finalPhaseMsg>Registro em fase final. Não é possível movimentar.</ng-template>
             </div>
           </div>
 

@@ -427,7 +427,7 @@ export class CompanyLinksComponent implements OnInit {
       {
         name: 'Formulário Público',
         url: this.subdomainService.getPublicFormUrl() || `${baseUrl}/form`,
-        description: 'Formulário público para captura de leads',
+        description: 'Formulário público para captura de registros',
         icon: 'fas fa-wpforms',
         category: 'form',
         copyable: true
@@ -437,7 +437,7 @@ export class CompanyLinksComponent implements OnInit {
       {
         name: 'Endpoint Lead Intake',
         url: this.getLeadIntakeUrl(),
-        description: 'Endpoint para envio de leads via API',
+        description: 'Endpoint para envio de registros via API',
         icon: 'fas fa-server',
         category: 'api',
         copyable: true

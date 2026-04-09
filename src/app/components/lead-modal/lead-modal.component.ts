@@ -252,7 +252,7 @@ export class LeadModalComponent {
           this.currentLead.id!,
           {
             type: 'update',
-            text: 'Lead atualizado',
+            text: 'Registro atualizado',
             user: currentUser.displayName || currentUser.email
           }
         );
@@ -305,7 +305,7 @@ export class LeadModalComponent {
           leadRef.id,
           {
             type: 'creation',
-            text: `Lead criado na fase <b>${initialColumn.name}</b>`,
+            text: `Registro criado na fase <b>${initialColumn.name}</b>`,
             user: currentUser.displayName || currentUser.email
           }
         );
@@ -316,7 +316,7 @@ export class LeadModalComponent {
       this.hide();
     } catch (error: any) {
       console.error('Erro ao salvar lead:', error);
-      this.errorMessage = 'Erro ao salvar lead. Tente novamente.';
+      this.errorMessage = 'Erro ao salvar registro. Tente novamente.';
     } finally {
       this.isLoading = false;
     }

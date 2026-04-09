@@ -138,7 +138,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   showColumnSelector = false;
   viewTabs = [
     { key: 'overview', name: 'Visão Geral', icon: 'fa-chart-pie' },
-    { key: 'health', name: 'Saúde dos Leads', icon: 'fa-heartbeat' },
+    { key: 'health', name: 'Saúde do Pipeline', icon: 'fa-heartbeat' },
     { key: 'sla', name: 'SLA', icon: 'fa-clock' },
     { key: 'phases', name: 'Fases', icon: 'fa-columns' },
     { key: 'registros', name: 'Registros', icon: 'fa-users' }

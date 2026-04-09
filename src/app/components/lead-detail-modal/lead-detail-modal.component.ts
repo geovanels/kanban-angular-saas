@@ -117,15 +117,15 @@ export class LeadDetailModalComponent {
         this.loadFormFieldsAsync(),
         this.loadHistoryAsync()
       ]).catch(error => {
-        console.error('Erro ao carregar dados do lead:', error);
-        this.errorMessage = 'Erro ao carregar dados do lead';
+        console.error('Erro ao carregar dados do registro:', error);
+        this.errorMessage = 'Erro ao carregar dados do registro';
         this.isLoadingFields = false;
         this.isLoadingHistory = false;
         this.cdr.detectChanges();
       });
 
     } catch (error) {
-      this.errorMessage = 'Erro ao carregar dados do lead';
+      this.errorMessage = 'Erro ao carregar dados do registro';
       this.isLoadingFields = false;
       this.isLoadingHistory = false;
       this.cdr.detectChanges();
@@ -586,7 +586,7 @@ export class LeadDetailModalComponent {
       this.generatePublicLink();
 
     } catch (error) {
-      this.errorMessage = 'Erro ao carregar dados do lead.';
+      this.errorMessage = 'Erro ao carregar dados do registro.';
     }
   }
 
@@ -1341,7 +1341,7 @@ export class LeadDetailModalComponent {
       this.hide();
 
     } catch (error) {
-      this.errorMessage = 'Erro ao mover lead. Tente novamente.';
+      this.errorMessage = 'Erro ao mover registro. Tente novamente.';
     } finally {
       this.isLoading = false;
     }
@@ -1551,7 +1551,7 @@ export class LeadDetailModalComponent {
       this.hide();
 
     } catch (error) {
-      this.errorMessage = 'Erro ao excluir lead. Tente novamente.';
+      this.errorMessage = 'Erro ao excluir registro. Tente novamente.';
     } finally {
       this.isLoading = false;
     }
