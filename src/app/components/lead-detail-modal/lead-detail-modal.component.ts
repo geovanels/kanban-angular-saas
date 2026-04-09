@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column } from '../../services/firestore.service';
 import { StorageService } from '../../services/storage.service';
 import { SubdomainService } from '../../services/subdomain.service';
+import { NotificationService } from '../../services/notification.service';
 
 export interface LeadHistory {
   id?: string;
@@ -44,6 +45,7 @@ export class LeadDetailModalComponent {
   private subdomainService = inject(SubdomainService);
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
+  private notificationService = inject(NotificationService);
 
   @Input() ownerId: string = '';
   @Input() boardId: string = '';
@@ -80,6 +82,12 @@ export class LeadDetailModalComponent {
   isUploadingComment = false;
   isUploadingAttachment = false;
   showDeleteConfirm = false;
+
+  // Sistema de menções @
+  showMentionDropdown = false;
+  filteredMentionUsers: any[] = [];
+  mentionSelectedIndex = 0;
+  private mentionStartIndex = -1;
 
   // Link público
   publicLink = '';
@@ -1169,6 +1177,16 @@ export class LeadDetailModalComponent {
               user: currentUser.displayName || currentUser.email
             }
           );
+
+          // Notificar novo responsável
+          const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
+          this.notificationService.createNotification({
+            userId: newRespId,
+            type: 'assignment',
+            title: 'Card atribuído a você',
+            message: `"${leadName}" foi atribuído a você por ${currentUser.displayName || currentUser.email}`,
+            metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
+          });
         } else {
           // Responsável foi removido
           updateData.responsibleUserId = '';
@@ -1438,6 +1456,20 @@ export class LeadDetailModalComponent {
         historyData
       );
 
+      // Notificar mencionados no comentário
+      if (this.commentText.includes('@')) {
+        const mentions = this.notificationService.extractMentions(this.commentText, this.users);
+        const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
+        for (const mention of mentions) {
+          this.notificationService.createNotification({
+            userId: mention.uid,
+            type: 'mention',
+            title: 'Você foi mencionado em um comentário',
+            message: `${currentUser.displayName || currentUser.email} mencionou você em "${leadName}"`,
+            metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
+          });
+        }
+      }
 
       // Limpar formulário
       this.commentText = '';
@@ -1451,6 +1483,75 @@ export class LeadDetailModalComponent {
     } finally {
       this.isUploadingComment = false;
     }
+  }
+
+  // --- Menções @ ---
+  onCommentInput(event: Event) {
+    const textarea = event.target as HTMLTextAreaElement;
+    const text = textarea.value;
+    const cursorPos = textarea.selectionStart;
+
+    // Procurar @ antes do cursor
+    const textBeforeCursor = text.substring(0, cursorPos);
+    const lastAt = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAt >= 0) {
+      // Verificar se não há espaço antes do @ (ou é início da string)
+      const charBefore = lastAt > 0 ? textBeforeCursor[lastAt - 1] : ' ';
+      if (charBefore === ' ' || charBefore === '\n' || lastAt === 0) {
+        const searchTerm = textBeforeCursor.substring(lastAt + 1).toLowerCase();
+        // Se não tem quebra de linha nem ponto final no search term
+        if (!searchTerm.includes('\n') && searchTerm.length <= 30) {
+          this.mentionStartIndex = lastAt;
+          this.filteredMentionUsers = this.users.filter(u =>
+            (u.displayName || '').toLowerCase().includes(searchTerm) ||
+            (u.email || '').toLowerCase().includes(searchTerm)
+          ).slice(0, 5);
+          this.showMentionDropdown = this.filteredMentionUsers.length > 0;
+          this.mentionSelectedIndex = 0;
+          return;
+        }
+      }
+    }
+
+    this.showMentionDropdown = false;
+  }
+
+  onCommentKeydown(event: KeyboardEvent) {
+    if (!this.showMentionDropdown) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.mentionSelectedIndex = Math.min(this.mentionSelectedIndex + 1, this.filteredMentionUsers.length - 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.mentionSelectedIndex = Math.max(this.mentionSelectedIndex - 1, 0);
+    } else if (event.key === 'Enter' && this.filteredMentionUsers.length > 0) {
+      event.preventDefault();
+      this.selectMention(this.filteredMentionUsers[this.mentionSelectedIndex]);
+    } else if (event.key === 'Escape') {
+      this.showMentionDropdown = false;
+    }
+  }
+
+  selectMention(user: any) {
+    const name = user.displayName || user.email;
+    const before = this.commentText.substring(0, this.mentionStartIndex);
+    const textarea = document.querySelector('textarea[ngmodel]') as HTMLTextAreaElement;
+    const cursorPos = textarea?.selectionStart || this.commentText.length;
+    const after = this.commentText.substring(cursorPos);
+
+    this.commentText = `${before}@${name} ${after}`;
+    this.showMentionDropdown = false;
+
+    // Reposicionar cursor
+    setTimeout(() => {
+      if (textarea) {
+        const newPos = before.length + name.length + 2; // @name + space
+        textarea.selectionStart = textarea.selectionEnd = newPos;
+        textarea.focus();
+      }
+    });
   }
 
   async uploadAttachment() {

@@ -1154,7 +1154,14 @@ export class AutomationService {
               const deadlineValue = this.findDeadlineValue(lead, formConfigs);
               if (!deadlineValue) continue;
 
-              const deadline = new Date(deadlineValue);
+              // Datas sem hora (YYYY-MM-DD) são tratadas como 18:00 local
+              let deadline: Date;
+              if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineValue.trim())) {
+                const [y, m, d] = deadlineValue.trim().split('-').map(Number);
+                deadline = new Date(y, m - 1, d, 18, 0, 0);
+              } else {
+                deadline = new Date(deadlineValue);
+              }
               if (isNaN(deadline.getTime())) continue;
 
               const deadlineDay = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate()).getTime();

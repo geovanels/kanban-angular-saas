@@ -16,6 +16,7 @@ import { PhaseFormModalComponent } from '../phase-form-modal/phase-form-modal.co
 import { LeadDetailModalComponent } from '../lead-detail-modal/lead-detail-modal.component';
 import { AdvancedFiltersComponent } from '../advanced-filters/advanced-filters.component';
 import { ToastService } from '../toast/toast.service';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-kanban',
@@ -36,6 +37,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
+  private notificationService = inject(NotificationService);
 
   @ViewChild(LeadModalComponent) leadModal!: LeadModalComponent;
   @ViewChild(ColumnModalComponent) columnModal!: ColumnModalComponent;
@@ -136,6 +138,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
                 initialFormFields: this.initialFormFields,
                 phaseFormConfigs: this.phaseFormConfigs
               });
+
+              // Verificar prazos e SLA vencendo amanhã para notificações
+              const deadlineKeys = ['prazo', 'deadline', 'datalimite', 'datavencimento', 'duedate',
+                'vencimento', 'dataentrega', 'dataprazo', 'previsao', 'dataprevisao'];
+              this.notificationService.checkDeadlineWarnings(
+                this.leads, this.columns, this.boardId, this.board?.name || 'Quadro',
+                deadlineKeys,
+                { initialFormFields: this.initialFormFields, phaseFormConfigs: this.phaseFormConfigs }
+              );
             }
           } catch (error) {
             console.warn('Erro nas automações de tempo:', error);
@@ -160,6 +171,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (this.boardId && this.ownerId) {
       this.automationService.stopGlobalLeadMonitor(this.boardId, this.ownerId);
     }
+
+    // Limpar cache de notificações
+    this.notificationService.clearCache();
   }
 
   private initializeApiEndpoint() {
@@ -250,7 +264,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private async loadBoardData() {
     try {
-      // Carregar dados do quadro (implementar se necessário)
+      // Carregar dados do quadro
+      this.board = await this.firestoreService.getBoard(this.ownerId, this.boardId);
       await this.loadUsers();
       await this.debugFirestoreCollections();
       this.isLoading = false;
@@ -2440,8 +2455,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
     if (!deadlineValue) return null;
 
-    // Parsear a data
-    const deadline = new Date(deadlineValue);
+    // Parsear a data (datas sem hora como YYYY-MM-DD são tratadas como 18:00 local)
+    let deadline: Date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineValue.trim())) {
+      const [y, m, d] = deadlineValue.trim().split('-').map(Number);
+      deadline = new Date(y, m - 1, d, 18, 0, 0);
+    } else {
+      deadline = new Date(deadlineValue);
+    }
     if (isNaN(deadline.getTime())) return null;
 
     const now = new Date();

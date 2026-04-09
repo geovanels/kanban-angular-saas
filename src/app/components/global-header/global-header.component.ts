@@ -4,11 +4,12 @@ import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { BrandingService } from '../../services/branding.service';
+import { NotificationBellComponent } from '../notification-bell/notification-bell.component';
 
 @Component({
   selector: 'app-global-header',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NotificationBellComponent],
   template: `
     <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,6 +75,9 @@ import { BrandingService } from '../../services/branding.service';
 
           <!-- User Actions -->
           <div class="flex items-center space-x-4">
+            <!-- Notification Bell -->
+            <app-notification-bell></app-notification-bell>
+
             <div class="flex items-center space-x-2 text-sm text-gray-600">
               @if (currentCompany()) {
                 <i class="fas fa-building text-xs"></i>

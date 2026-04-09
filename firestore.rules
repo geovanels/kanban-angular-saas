@@ -147,6 +147,16 @@ service cloud.firestore {
         }
       }
       
+      // Company notifications
+      match /notifications/{notificationId} {
+        // Usuários podem ler suas próprias notificações
+        allow read: if isAuthenticated() && resource.data.userId == getUserUid();
+        // Membros da empresa podem criar notificações
+        allow create: if isCompanyUser(companyId);
+        // Usuários podem atualizar suas próprias notificações (marcar como lida)
+        allow update: if isAuthenticated() && resource.data.userId == getUserUid();
+      }
+
       // Company settings
       match /settings/{document=**} {
         allow read, write: if isCompanyUser(companyId);

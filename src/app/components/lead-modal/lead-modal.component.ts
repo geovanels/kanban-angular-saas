@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column } from '../../services/firestore.service';
 import { StorageService } from '../../services/storage.service';
 import { MaskService } from '../../services/mask.service';
+import { NotificationService } from '../../services/notification.service';
 
 interface LeadFormField {
   name: string;
@@ -32,6 +33,7 @@ export class LeadModalComponent {
   private storageService = inject(StorageService);
   private fb = inject(FormBuilder);
   private maskService = inject(MaskService);
+  private notificationService = inject(NotificationService);
 
   @Input() ownerId: string = '';
   @Input() boardId: string = '';
@@ -309,6 +311,18 @@ export class LeadModalComponent {
             user: currentUser.displayName || currentUser.email
           }
         );
+
+        // Notificar responsável (se não for o próprio criador)
+        if (newLead.responsibleUserId && newLead.responsibleUserId !== currentUser.uid) {
+          const leadName = formData.contactName || formData.companyName || 'Novo registro';
+          this.notificationService.createNotification({
+            userId: newLead.responsibleUserId,
+            type: 'assignment',
+            title: 'Novo card atribuído a você',
+            message: `"${leadName}" foi criado e atribuído a você por ${currentUser.displayName || currentUser.email}`,
+            metadata: { boardId: this.boardId, leadId: leadRef.id, leadName }
+          });
+        }
 
         this.leadCreated.emit();
       }
