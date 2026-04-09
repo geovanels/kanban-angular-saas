@@ -23,7 +23,6 @@ export class KanbanShellComponent implements OnInit, OnDestroy {
     { path: './reports', name: 'Relatórios', icon: 'fa-chart-bar', exact: false },
     { path: './outbox', name: 'Caixa de Saída', icon: 'fa-paper-plane', exact: false },
     { path: './templates', name: 'Templates', icon: 'fa-envelope', exact: false },
-    { path: './integrations', name: 'Integrações', icon: 'fa-plug', exact: false },
     { path: './api', name: 'API', icon: 'fa-code', exact: false },
   ];
 

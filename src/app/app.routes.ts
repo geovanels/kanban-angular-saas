@@ -69,10 +69,6 @@ export const routes: Routes = [
             loadComponent: () => import('./components/board-templates/board-templates.component').then(m => m.BoardTemplatesComponent)
           },
           {
-            path: 'integrations',
-            loadComponent: () => import('./components/api-links-config/api-links-config.component').then(m => m.ApiLinksConfigComponent)
-          },
-          {
             path: 'api',
             loadComponent: () => import('./components/board-api/board-api.component').then(m => m.BoardApiComponent)
           }
