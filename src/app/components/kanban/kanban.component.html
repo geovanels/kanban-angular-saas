@@ -1,3 +1,44 @@
+<!-- Search & Filters Bar (Desktop) -->
+<div *ngIf="!isLoading" class="kanban-toolbar desktop-board">
+  <div class="flex items-center gap-2 flex-1">
+    <!-- Search -->
+    <div class="toolbar-search">
+      <i class="fas fa-search text-gray-400 text-xs"></i>
+      <input
+        type="text"
+        [(ngModel)]="filterQuery"
+        (ngModelChange)="onFilterQueryChange($event)"
+        placeholder="Procurar cards..."
+        class="toolbar-search-input">
+      <button *ngIf="filterQuery" (click)="filterQuery = ''; onFilterQueryChange('')" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times text-xs"></i>
+      </button>
+    </div>
+
+    <!-- Filter button -->
+    <button (click)="toggleAdvancedFilters()"
+            class="toolbar-btn"
+            [class.active]="showAdvancedFilters || hasActiveFilters()">
+      <i class="fas fa-filter text-xs"></i>
+      <span *ngIf="hasActiveFilters()" class="filter-badge">{{ getDynamicFilterCount() + (filterOnlyMine ? 1 : 0) }}</span>
+    </button>
+
+    <!-- Clear filters -->
+    <button *ngIf="hasActiveFilters()" (click)="clearFilters()" class="toolbar-btn text-red-500 hover:bg-red-50">
+      <i class="fas fa-times text-xs mr-1"></i><span class="text-xs">Limpar</span>
+    </button>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <!-- Move toggle -->
+    <button (click)="toggleCardMove()"
+            class="toolbar-btn"
+            [class.active]="cardMoveEnabled">
+      <i class="fas fa-arrows-alt text-xs"></i>
+    </button>
+  </div>
+</div>
+
 <!-- Desktop Kanban Board -->
 <div *ngIf="!isLoading"
      class="kanban-board desktop-board"

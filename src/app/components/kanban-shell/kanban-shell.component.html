@@ -17,16 +17,6 @@
         <h1 class="board-title">{{ (boardStore.board$ | async)?.name || 'Carregando...' }}</h1>
       </div>
 
-      <!-- Right actions (search + filter + move) -->
-      <div class="nav-actions hidden md:flex">
-        <div class="search-wrap">
-          <i class="fas fa-search search-icon"></i>
-          <input type="text" placeholder="Procurar cards" class="search-input">
-        </div>
-        <button class="nav-action-btn" title="Filtros">
-          <i class="fas fa-filter"></i>
-        </button>
-      </div>
     </div>
 
     <!-- Tab row -->
