@@ -17,8 +17,7 @@
       </ng-container>
     </div>
     <div class="logo-area" *ngIf="collapsed">
-      <img *ngIf="hasCompanyLogo()" [src]="getCompanyLogo()" alt="Logo" class="company-logo-small">
-      <div *ngIf="!hasCompanyLogo()" class="company-initials" [style.background-color]="getPrimaryColor()">
+      <div class="company-initials" [style.background-color]="getPrimaryColor()">
         {{ getCompanyInitials() }}
       </div>
     </div>
