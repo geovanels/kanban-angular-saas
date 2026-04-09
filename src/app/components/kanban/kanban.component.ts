@@ -556,17 +556,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   async loadAllPhaseFormConfigs() {
-    for (const column of this.columns) {
-      try {
-        const config = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
-        if (config?.fields) {
-          this.phaseFormConfigs[column.id!] = config;
-        }
-      } catch (e) {
-        // Ignorar erro se não houver configuração para esta fase
+    const results = await Promise.all(
+      this.columns.map(column =>
+        this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!)
+          .then(config => ({ columnId: column.id!, config }))
+          .catch(() => ({ columnId: column.id!, config: null }))
+      )
+    );
+    for (const { columnId, config } of results) {
+      if (config?.fields) {
+        this.phaseFormConfigs[columnId] = config;
       }
     }
-    
+
     // Recarregar campos disponíveis para filtro após carregar configurações de fases
     this.loadAvailableFilterFields();
   }

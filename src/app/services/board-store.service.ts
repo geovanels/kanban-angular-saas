@@ -208,16 +208,20 @@ export class BoardStoreService implements OnDestroy {
   private async loadCardFieldConfigs() {
     try {
       const columns = this.columns$.value;
+      const results = await Promise.all(
+        columns.map(col =>
+          this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, col.id!)
+            .then(cfg => {
+              const fields = (cfg as any)?.fields || [];
+              const filtered = fields.filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases);
+              return { colId: col.id!, fields: filtered.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) };
+            })
+            .catch(() => ({ colId: col.id!, fields: [] as any[] }))
+        )
+      );
       const map: Record<string, any[]> = {};
-      for (const col of columns) {
-        try {
-          const cfg = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, col.id!);
-          const fields = (cfg as any)?.fields || [];
-          const filteredFields = fields.filter((f: any) => !!f?.showInCard || !!f?.showInAllPhases);
-          map[col.id!] = filteredFields.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
-        } catch {
-          map[col.id!] = [];
-        }
+      for (const { colId, fields } of results) {
+        map[colId] = fields;
       }
       this.phaseCardFields$.next(map);
     } catch {
@@ -228,13 +232,17 @@ export class BoardStoreService implements OnDestroy {
   async loadAllPhaseFormConfigs() {
     const columns = this.columns$.value;
     const configs: Record<string, any> = { ...this.phaseFormConfigs$.value };
-    for (const column of columns) {
-      try {
-        const config = await this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!);
-        if (config) {
-          configs[column.id!] = config;
-        }
-      } catch {}
+    const results = await Promise.all(
+      columns.map(column =>
+        this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!)
+          .then(config => ({ columnId: column.id!, config }))
+          .catch(() => ({ columnId: column.id!, config: null }))
+      )
+    );
+    for (const { columnId, config } of results) {
+      if (config) {
+        configs[columnId] = config;
+      }
     }
     this.phaseFormConfigs$.next(configs);
   }
