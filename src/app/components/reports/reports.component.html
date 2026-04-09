@@ -617,16 +617,11 @@
 </ng-container>
 
 <!-- Inline Reports (used within kanban) -->
-<div *ngIf="boardId && !isStandaloneView()" class="p-4 md:p-8">
-  <div class="max-w-7xl mx-auto">
-
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-900">
-        <i class="fas fa-chart-bar mr-2 text-blue-500"></i>
-        Relatórios - {{ board?.name }}
-      </h2>
-    </div>
+<div *ngIf="boardId && !isStandaloneView()" class="tab-page">
+  <div class="tab-header">
+    <h2 class="tab-title">Relatórios</h2>
+  </div>
+  <div class="tab-content">
 
     <!-- Reusable Advanced Filters Component -->
     <app-advanced-filters
