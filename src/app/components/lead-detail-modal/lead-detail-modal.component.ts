@@ -1504,6 +1504,7 @@ export class LeadDetailModalComponent {
       this.errorMessage = error.message || 'Erro ao adicionar comentário. Tente novamente.';
     } finally {
       this.isUploadingComment = false;
+      this.cdr.detectChanges();
     }
   }
 
