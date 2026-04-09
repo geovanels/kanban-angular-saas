@@ -1456,42 +1456,46 @@ export class LeadDetailModalComponent {
         historyData
       );
 
-      // Notificar responsável do card sobre o comentário
-      const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
-      const commentAuthor = currentUser.displayName || currentUser.email;
-      const notifiedUserIds = new Set<string>();
+      // Salvar texto antes de limpar (para extrair menções)
+      const savedCommentText = this.commentText;
 
-      if (this.currentLead.responsibleUserId) {
-        notifiedUserIds.add(this.currentLead.responsibleUserId);
-        this.notificationService.createNotification({
-          userId: this.currentLead.responsibleUserId,
-          type: 'mention',
-          title: 'Novo comentário no seu card',
-          message: `${commentAuthor} comentou em "${leadName}"`,
-          metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
-        });
-      }
-
-      // Notificar mencionados com @ (além do responsável)
-      if (this.commentText.includes('@')) {
-        const mentions = this.notificationService.extractMentions(this.commentText, this.users);
-        for (const mention of mentions) {
-          if (!notifiedUserIds.has(mention.uid)) {
-            notifiedUserIds.add(mention.uid);
-            this.notificationService.createNotification({
-              userId: mention.uid,
-              type: 'mention',
-              title: 'Você foi mencionado em um comentário',
-              message: `${commentAuthor} mencionou você em "${leadName}"`,
-              metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
-            });
-          }
-        }
-      }
-
-      // Limpar formulário
+      // Limpar formulário imediatamente
       this.commentText = '';
       this.clearAttachment();
+
+      // Notificações em background (não bloqueia o fluxo)
+      try {
+        const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
+        const commentAuthor = currentUser.displayName || currentUser.email;
+        const notifiedUserIds = new Set<string>();
+
+        if (this.currentLead.responsibleUserId) {
+          notifiedUserIds.add(this.currentLead.responsibleUserId);
+          this.notificationService.createNotification({
+            userId: this.currentLead.responsibleUserId,
+            type: 'mention',
+            title: 'Novo comentário no seu card',
+            message: `${commentAuthor} comentou em "${leadName}"`,
+            metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
+          }).catch(() => {});
+        }
+
+        if (savedCommentText.includes('@')) {
+          const mentions = this.notificationService.extractMentions(savedCommentText, this.users);
+          for (const mention of mentions) {
+            if (!notifiedUserIds.has(mention.uid)) {
+              notifiedUserIds.add(mention.uid);
+              this.notificationService.createNotification({
+                userId: mention.uid,
+                type: 'mention',
+                title: 'Você foi mencionado em um comentário',
+                message: `${commentAuthor} mencionou você em "${leadName}"`,
+                metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch {} // Notificações nunca devem travar o comentário
 
       // Recarregar histórico
       await this.loadLeadData();
