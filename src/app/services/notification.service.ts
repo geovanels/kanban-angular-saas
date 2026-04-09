@@ -48,11 +48,22 @@ export class NotificationService {
   get unreadCount() { return this.unreadCount$.asObservable(); }
 
   private getCompanyId(): string | null {
-    return this.subdomainService.getCurrentCompany()?.id || null;
+    const companyId = this.subdomainService.getCurrentCompany()?.id || null;
+    if (!companyId) {
+      // Fallback: tentar obter do localStorage
+      try {
+        const stored = localStorage.getItem('current-company');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return parsed.id || null;
+        }
+      } catch {}
+    }
+    return companyId;
   }
 
-  private getNotificationsRef() {
-    const companyId = this.getCompanyId();
+  private getNotificationsRef(overrideCompanyId?: string) {
+    const companyId = overrideCompanyId || this.getCompanyId();
     if (!companyId) return null;
     return collection(this.firestore, 'companies', companyId, 'notifications');
   }
@@ -354,17 +365,21 @@ export class NotificationService {
   // Extrair menções @NomeUsuário do texto
   extractMentions(text: string, users: { uid: string; displayName: string; email: string }[]): { uid: string; displayName: string }[] {
     const mentions: { uid: string; displayName: string }[] = [];
-    const mentionRegex = /@([\w\s]+?)(?=\s@|$|\s(?:[^@])|\.|,|!|\?)/g;
-    let match: RegExpExecArray | null;
+    const lowerText = text.toLowerCase();
 
-    while ((match = mentionRegex.exec(text)) !== null) {
-      const mentionName = match[1].trim().toLowerCase();
-      const user = users.find(u =>
-        (u.displayName || '').toLowerCase() === mentionName ||
-        (u.email || '').split('@')[0].toLowerCase() === mentionName
-      );
-      if (user && !mentions.some(m => m.uid === user.uid)) {
-        mentions.push({ uid: user.uid, displayName: user.displayName || user.email });
+    // Para cada usuário, verifica se @NomeCompleto aparece no texto
+    for (const user of users) {
+      const displayName = (user.displayName || '').trim();
+      const emailPrefix = (user.email || '').split('@')[0].trim();
+
+      if (displayName && lowerText.includes('@' + displayName.toLowerCase())) {
+        if (!mentions.some(m => m.uid === user.uid)) {
+          mentions.push({ uid: user.uid, displayName: displayName });
+        }
+      } else if (emailPrefix && lowerText.includes('@' + emailPrefix.toLowerCase())) {
+        if (!mentions.some(m => m.uid === user.uid)) {
+          mentions.push({ uid: user.uid, displayName: displayName || user.email });
+        }
       }
     }
 

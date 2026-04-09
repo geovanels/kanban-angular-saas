@@ -1537,9 +1537,11 @@ export class LeadDetailModalComponent {
         // Se não tem quebra de linha nem ponto final no search term
         if (!searchTerm.includes('\n') && searchTerm.length <= 30) {
           this.mentionStartIndex = lastAt;
+          const currentUid = this.authService.getCurrentUser()?.uid;
           this.filteredMentionUsers = this.users.filter(u =>
-            (u.displayName || '').toLowerCase().includes(searchTerm) ||
-            (u.email || '').toLowerCase().includes(searchTerm)
+            u.uid !== currentUid &&
+            ((u.displayName || '').toLowerCase().includes(searchTerm) ||
+            (u.email || '').toLowerCase().includes(searchTerm))
           ).slice(0, 5);
           this.showMentionDropdown = this.filteredMentionUsers.length > 0;
           this.mentionSelectedIndex = 0;
