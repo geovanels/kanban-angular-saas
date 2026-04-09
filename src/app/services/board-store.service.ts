@@ -225,7 +225,7 @@ export class BoardStoreService implements OnDestroy {
     }
   }
 
-  private async loadAllPhaseFormConfigs() {
+  async loadAllPhaseFormConfigs() {
     const columns = this.columns$.value;
     const configs: Record<string, any> = { ...this.phaseFormConfigs$.value };
     for (const column of columns) {

@@ -29,6 +29,7 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
 
   columns: Column[] = [];
   automations: any[] = [];
+  phaseFormConfigs: Record<string, any> = {};
 
   flowConfig: { allowed: Record<string, string[]> } = { allowed: {} };
   flowOrder: string[] = [];
@@ -52,6 +53,7 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
       this.syncFlowOrderWithColumns();
     }));
     this.subs.push(this.boardStore.automations$.subscribe(a => this.automations = a));
+    this.subs.push(this.boardStore.phaseFormConfigs$.subscribe(c => this.phaseFormConfigs = c));
     this.loadFlowConfig();
   }
 
@@ -184,7 +186,14 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
     this.phaseFormModal.showModal(column);
   }
 
-  onPhaseFormConfigSaved() {}
+  onPhaseFormConfigSaved() {
+    this.boardStore.loadAllPhaseFormConfigs();
+  }
+
+  getPhaseFieldCount(phaseId: string): number {
+    const config = this.phaseFormConfigs[phaseId];
+    return config?.fields?.length || 0;
+  }
 
   // Automations drawer
   openPhaseAutomations(phaseId: string) {
