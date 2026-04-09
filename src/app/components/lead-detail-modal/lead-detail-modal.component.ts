@@ -1456,18 +1456,36 @@ export class LeadDetailModalComponent {
         historyData
       );
 
-      // Notificar mencionados no comentário
+      // Notificar responsável do card sobre o comentário
+      const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
+      const commentAuthor = currentUser.displayName || currentUser.email;
+      const notifiedUserIds = new Set<string>();
+
+      if (this.currentLead.responsibleUserId) {
+        notifiedUserIds.add(this.currentLead.responsibleUserId);
+        this.notificationService.createNotification({
+          userId: this.currentLead.responsibleUserId,
+          type: 'mention',
+          title: 'Novo comentário no seu card',
+          message: `${commentAuthor} comentou em "${leadName}"`,
+          metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
+        });
+      }
+
+      // Notificar mencionados com @ (além do responsável)
       if (this.commentText.includes('@')) {
         const mentions = this.notificationService.extractMentions(this.commentText, this.users);
-        const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
         for (const mention of mentions) {
-          this.notificationService.createNotification({
-            userId: mention.uid,
-            type: 'mention',
-            title: 'Você foi mencionado em um comentário',
-            message: `${currentUser.displayName || currentUser.email} mencionou você em "${leadName}"`,
-            metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
-          });
+          if (!notifiedUserIds.has(mention.uid)) {
+            notifiedUserIds.add(mention.uid);
+            this.notificationService.createNotification({
+              userId: mention.uid,
+              type: 'mention',
+              title: 'Você foi mencionado em um comentário',
+              message: `${commentAuthor} mencionou você em "${leadName}"`,
+              metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
+            });
+          }
         }
       }
 

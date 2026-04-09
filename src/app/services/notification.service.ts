@@ -62,10 +62,18 @@ export class NotificationService {
     this.stopListening();
 
     const currentUser = this.authService.getCurrentUser();
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.warn('🔔 Listener não iniciado: usuário não autenticado');
+      return;
+    }
 
     const ref = this.getNotificationsRef();
-    if (!ref) return;
+    if (!ref) {
+      console.warn('🔔 Listener não iniciado: contexto da empresa não encontrado');
+      return;
+    }
+
+    console.log(`🔔 Iniciando listener de notificações para userId=${currentUser.uid}, companyId=${this.getCompanyId()}`);
 
     const q = query(
       ref,
@@ -106,11 +114,19 @@ export class NotificationService {
   // Criar uma notificação
   async createNotification(data: Omit<AppNotification, 'id' | 'createdAt' | 'read' | 'emailSent'>): Promise<void> {
     const ref = this.getNotificationsRef();
-    if (!ref) return;
+    if (!ref) {
+      console.warn('🔔 Notificação não criada: contexto da empresa não encontrado');
+      return;
+    }
 
     // Não notificar o próprio usuário
     const currentUser = this.authService.getCurrentUser();
     if (currentUser && data.userId === currentUser.uid) return;
+
+    if (!data.userId) {
+      console.warn('🔔 Notificação não criada: userId vazio');
+      return;
+    }
 
     try {
       await runInInjectionContext(this.injector, () =>
@@ -121,8 +137,9 @@ export class NotificationService {
           createdAt: serverTimestamp()
         })
       );
+      console.log(`🔔 Notificação criada: [${data.type}] para userId=${data.userId}`);
     } catch (error) {
-      console.error('Erro ao criar notificação:', error);
+      console.error('🔔 Erro ao criar notificação (verifique firebase deploy --only firestore):', error);
     }
   }
 
