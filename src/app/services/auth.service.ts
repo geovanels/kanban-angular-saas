@@ -3,7 +3,7 @@ import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword,
          signOut, signInWithPopup, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously, fetchSignInMethodsForEmail } from '@angular/fire/auth';
 import { GoogleAuthProvider } from 'firebase/auth';
 import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
-import { Observable, map } from 'rxjs';
+import { Observable, BehaviorSubject, map } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -12,8 +12,19 @@ export class AuthService {
   private auth = inject(Auth);
   private firestore = inject(Firestore);
   private injector = inject(Injector);
-  
+
   user$ = user(this.auth);
+
+  // Indica quando o Firebase Auth terminou de restaurar a sessão
+  private _authReady$ = new BehaviorSubject<boolean>(false);
+  authReady$ = this._authReady$.asObservable();
+
+  constructor() {
+    // onAuthStateChanged dispara assim que o Firebase resolve o estado
+    onAuthStateChanged(this.auth, () => {
+      this._authReady$.next(true);
+    });
+  }
   
   async signInWithEmail(email: string, password: string) {
     try {

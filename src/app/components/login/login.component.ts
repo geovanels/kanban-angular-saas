@@ -57,6 +57,14 @@ export class LoginComponent implements OnInit {
   ngOnInit() {
     this.initializeForms();
     this.setupAliasValidation();
+
+    // Se já está autenticado, redirecionar direto
+    this.authService.authReady$.subscribe(ready => {
+      if (ready && this.authService.getCurrentUser()) {
+        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+        this.router.navigateByUrl(returnUrl);
+      }
+    });
   }
 
   private initializeForms() {
