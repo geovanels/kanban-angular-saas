@@ -73,7 +73,8 @@ export class NotificationService {
       return;
     }
 
-    console.log(`🔔 Iniciando listener de notificações para userId=${currentUser.uid}, companyId=${this.getCompanyId()}`);
+    const companyId = this.getCompanyId();
+    console.log(`🔔 Iniciando listener de notificações para userId=${currentUser.uid}, companyId=${companyId}`);
 
     const q = query(
       ref,
@@ -91,8 +92,29 @@ export class NotificationService {
 
         this.notifications$.next(notifications);
         this.unreadCount$.next(notifications.filter(n => !n.read).length);
+        console.log(`🔔 ${notifications.length} notificações carregadas, ${notifications.filter(n => !n.read).length} não lidas`);
       }, (error) => {
-        console.error('Erro ao escutar notificações:', error);
+        console.error('🔔 Erro ao escutar notificações:', error);
+        // Fallback: tentar query simples sem orderBy
+        console.log('🔔 Tentando query simplificada...');
+        const simpleQ = query(ref, where('userId', '==', currentUser.uid));
+        this.unsubscribe = runInInjectionContext(this.injector, () =>
+          onSnapshot(simpleQ, (snap) => {
+            const notifs = snap.docs
+              .map(d => ({ id: d.id, ...d.data() }) as AppNotification)
+              .sort((a, b) => {
+                const ta = a.createdAt?.toDate?.()?.getTime() || 0;
+                const tb = b.createdAt?.toDate?.()?.getTime() || 0;
+                return tb - ta;
+              })
+              .slice(0, 50);
+            this.notifications$.next(notifs);
+            this.unreadCount$.next(notifs.filter(n => !n.read).length);
+            console.log(`🔔 Fallback: ${notifs.length} notificações carregadas`);
+          }, (err) => {
+            console.error('🔔 Fallback também falhou:', err);
+          })
+        );
       })
     );
 
