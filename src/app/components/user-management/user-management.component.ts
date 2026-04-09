@@ -149,7 +149,26 @@ export class UserManagementComponent implements OnInit {
     try {
       // Carregar TODOS os usuários (ativos e pendentes)
       let allUsers = await this.companyService.getAllCompanyUsers(company.id);
-      
+
+      // Auto-corrigir usuários que aceitaram convite mas ficaram como "pending" (bug anterior)
+      const usersToFix = allUsers.filter(user =>
+        user.inviteStatus === 'pending' && user.uid && user.uid.trim() !== ''
+      );
+      if (usersToFix.length > 0) {
+        await Promise.all(usersToFix.map(user =>
+          this.companyService.updateUserInCompany(company!.id, user.email, {
+            inviteStatus: 'accepted',
+            acceptedAt: new Date()
+          }).catch(() => {})
+        ));
+        // Atualizar localmente também
+        allUsers = allUsers.map(user =>
+          usersToFix.some(u => u.email === user.email)
+            ? { ...user, inviteStatus: 'accepted' as const }
+            : user
+        );
+      }
+
       // Separar usuários ativos e convites pendentes
       const activeUsers = allUsers.filter(user => {
         // Considerar ativo se: status é 'accepted', não tem status definido, ou tem uid preenchido (aceitou mas status não atualizou)
