@@ -1179,14 +1179,15 @@ export class LeadDetailModalComponent {
           );
 
           // Notificar novo responsável
-          const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
+          const leadName = this.notificationService.getLeadDisplayName(this.currentLead);
+          console.log('🔔 [Assignment] newRespId:', newRespId, 'currentUser.uid:', currentUser.uid);
           this.notificationService.createNotification({
             userId: newRespId,
             type: 'assignment',
             title: 'Card atribuído a você',
             message: `"${leadName}" foi atribuído a você por ${currentUser.displayName || currentUser.email}`,
             metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
-          });
+          }).catch((err) => { console.error('🔔 Erro notificação assignment:', err); });
         } else {
           // Responsável foi removido
           updateData.responsibleUserId = '';
@@ -1458,47 +1459,57 @@ export class LeadDetailModalComponent {
 
       // Salvar texto antes de limpar (para extrair menções)
       const savedCommentText = this.commentText;
+      const leadForNotif = { ...this.currentLead };
 
-      // Limpar formulário imediatamente
+      // Limpar formulário e resetar estado IMEDIATAMENTE
       this.commentText = '';
       this.clearAttachment();
-
-      // Notificações em background (não bloqueia o fluxo)
-      try {
-        const leadName = this.currentLead.fields?.contactName || this.currentLead.fields?.companyName || 'Card';
-        const commentAuthor = currentUser.displayName || currentUser.email;
-        const notifiedUserIds = new Set<string>();
-
-        if (this.currentLead.responsibleUserId) {
-          notifiedUserIds.add(this.currentLead.responsibleUserId);
-          this.notificationService.createNotification({
-            userId: this.currentLead.responsibleUserId,
-            type: 'mention',
-            title: 'Novo comentário no seu card',
-            message: `${commentAuthor} comentou em "${leadName}"`,
-            metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
-          }).catch(() => {});
-        }
-
-        if (savedCommentText.includes('@')) {
-          const mentions = this.notificationService.extractMentions(savedCommentText, this.users);
-          for (const mention of mentions) {
-            if (!notifiedUserIds.has(mention.uid)) {
-              notifiedUserIds.add(mention.uid);
-              this.notificationService.createNotification({
-                userId: mention.uid,
-                type: 'mention',
-                title: 'Você foi mencionado em um comentário',
-                message: `${commentAuthor} mencionou você em "${leadName}"`,
-                metadata: { boardId: this.boardId, leadId: this.currentLead.id!, leadName }
-              }).catch(() => {});
-            }
-          }
-        }
-      } catch {} // Notificações nunca devem travar o comentário
+      this.isUploadingComment = false;
+      this.cdr.detectChanges();
 
       // Recarregar histórico
-      await this.loadLeadData();
+      this.loadLeadData().catch(() => {});
+
+      // Notificações completamente em background (fire-and-forget, nunca bloqueia)
+      setTimeout(() => {
+        try {
+          const leadName = this.notificationService.getLeadDisplayName(leadForNotif);
+          const commentAuthor = currentUser.displayName || currentUser.email;
+          const notifiedUserIds = new Set<string>();
+
+          console.log('🔔 [Comment] responsibleUserId:', leadForNotif.responsibleUserId, 'currentUser.uid:', currentUser.uid);
+
+          if (leadForNotif.responsibleUserId) {
+            notifiedUserIds.add(leadForNotif.responsibleUserId);
+            this.notificationService.createNotification({
+              userId: leadForNotif.responsibleUserId,
+              type: 'mention',
+              title: 'Novo comentário no seu card',
+              message: `${commentAuthor} comentou em "${leadName}"`,
+              metadata: { boardId: this.boardId, leadId: leadForNotif.id!, leadName }
+            }).catch((err) => { console.error('🔔 Erro notificação comentário:', err); });
+          }
+
+          if (savedCommentText.includes('@')) {
+            const mentions = this.notificationService.extractMentions(savedCommentText, this.users);
+            console.log('🔔 [Comment] Menções encontradas:', mentions);
+            for (const mention of mentions) {
+              if (!notifiedUserIds.has(mention.uid)) {
+                notifiedUserIds.add(mention.uid);
+                this.notificationService.createNotification({
+                  userId: mention.uid,
+                  type: 'mention',
+                  title: 'Você foi mencionado em um comentário',
+                  message: `${commentAuthor} mencionou você em "${leadName}"`,
+                  metadata: { boardId: this.boardId, leadId: leadForNotif.id!, leadName }
+                }).catch((err) => { console.error('🔔 Erro notificação menção:', err); });
+              }
+            }
+          }
+        } catch (notifError) { console.error('🔔 Erro geral notificações:', notifError); }
+      }, 0);
+
+      return; // Sucesso - sai do try antes do catch
 
     } catch (error: any) {
       this.errorMessage = error.message || 'Erro ao adicionar comentário. Tente novamente.';

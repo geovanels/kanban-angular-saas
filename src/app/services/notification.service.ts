@@ -135,15 +135,22 @@ export class NotificationService {
 
   // Criar uma notificação
   async createNotification(data: Omit<AppNotification, 'id' | 'createdAt' | 'read' | 'emailSent'>): Promise<void> {
+    const companyId = this.getCompanyId();
+    console.log(`🔔 createNotification chamado: type=${data.type}, userId=${data.userId}, companyId=${companyId}`);
+
     const ref = this.getNotificationsRef();
     if (!ref) {
-      console.warn('🔔 Notificação não criada: contexto da empresa não encontrado');
+      console.warn('🔔 Notificação não criada: contexto da empresa não encontrado (companyId null)');
       return;
     }
 
     // Não notificar o próprio usuário
     const currentUser = this.authService.getCurrentUser();
-    if (currentUser && data.userId === currentUser.uid) return;
+    console.log(`🔔 currentUser.uid=${currentUser?.uid}, data.userId=${data.userId}, são iguais? ${currentUser?.uid === data.userId}`);
+    if (currentUser && data.userId === currentUser.uid) {
+      console.log('🔔 Notificação ignorada: é o próprio usuário');
+      return;
+    }
 
     if (!data.userId) {
       console.warn('🔔 Notificação não criada: userId vazio');
@@ -151,17 +158,19 @@ export class NotificationService {
     }
 
     try {
+      const docData = {
+        ...data,
+        read: false,
+        emailSent: false,
+        createdAt: serverTimestamp()
+      };
+      console.log('🔔 Salvando notificação no Firestore:', JSON.stringify(docData, null, 2));
       await runInInjectionContext(this.injector, () =>
-        addDoc(ref, {
-          ...data,
-          read: false,
-          emailSent: false,
-          createdAt: serverTimestamp()
-        })
+        addDoc(ref, docData)
       );
-      console.log(`🔔 Notificação criada: [${data.type}] para userId=${data.userId}`);
+      console.log(`🔔 ✅ Notificação criada com sucesso: [${data.type}] para userId=${data.userId}`);
     } catch (error) {
-      console.error('🔔 Erro ao criar notificação (verifique firebase deploy --only firestore):', error);
+      console.error('🔔 ❌ Erro ao criar notificação:', error);
     }
   }
 
@@ -177,6 +186,36 @@ export class NotificationService {
       );
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
+    }
+  }
+
+  // Marcar como não lida
+  async markAsUnread(notificationId: string): Promise<void> {
+    const companyId = this.getCompanyId();
+    if (!companyId) return;
+
+    try {
+      const docRef = doc(this.firestore, 'companies', companyId, 'notifications', notificationId);
+      await runInInjectionContext(this.injector, () =>
+        updateDoc(docRef, { read: false })
+      );
+    } catch (error) {
+      console.error('Erro ao marcar notificação como não lida:', error);
+    }
+  }
+
+  // Excluir notificação
+  async deleteNotification(notificationId: string): Promise<void> {
+    const companyId = this.getCompanyId();
+    if (!companyId) return;
+
+    try {
+      const docRef = doc(this.firestore, 'companies', companyId, 'notifications', notificationId);
+      await runInInjectionContext(this.injector, () =>
+        deleteDoc(docRef)
+      );
+    } catch (error) {
+      console.error('Erro ao excluir notificação:', error);
     }
   }
 
@@ -217,7 +256,7 @@ export class NotificationService {
     for (const lead of leads) {
       if (!lead.responsibleUserId) continue;
 
-      const leadName = lead.fields?.contactName || lead.fields?.companyName || 'Card';
+      const leadName = this.getLeadDisplayName(lead);
 
       // 1. Verificar prazo/deadline
       const deadlineValue = this.findDeadlineValue(lead, deadlineKeys, formConfigs);
@@ -301,6 +340,15 @@ export class NotificationService {
     }
 
     return null;
+  }
+
+  // Obter nome de exibição do lead (suporta variações de campos)
+  getLeadDisplayName(lead: Lead): string {
+    const f = lead.fields || {};
+    return f['companyName'] || f['nameComapny'] || f['nameCompany'] ||
+           f['contactName'] || f['nameContact'] || f['nome'] || f['name'] ||
+           f['empresa'] || f['nomeEmpresa'] || f['nameLead'] || f['nomeLead'] ||
+           f['contactEmail'] || f['emailContact'] || 'Sem título';
   }
 
   // Extrair menções @NomeUsuário do texto

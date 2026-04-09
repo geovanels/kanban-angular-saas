@@ -43,38 +43,54 @@ import { NotificationService, AppNotification } from '../../services/notificatio
               </div>
             } @else {
               @for (notification of notifications; track notification.id) {
-                <button (click)="onNotificationClick(notification)"
-                        class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-50 transition-colors"
-                        [class.bg-blue-50]="!notification.read"
-                        [class.hover:bg-blue-100]="!notification.read">
-                  <div class="flex items-start space-x-3">
-                    <!-- Icon -->
-                    <div class="flex-shrink-0 mt-0.5">
-                      <div class="w-8 h-8 rounded-full flex items-center justify-center"
-                           [ngClass]="getIconBgClass(notification.type)">
-                        <i [class]="getIconClass(notification.type)" class="text-xs"></i>
+                <div class="notif-item border-b border-gray-50 transition-colors"
+                     [class.bg-blue-50]="!notification.read"
+                     [class.hover:bg-blue-100]="!notification.read"
+                     [class.hover:bg-gray-50]="notification.read">
+                  <button (click)="onNotificationClick(notification)"
+                          class="w-full text-left px-4 py-3">
+                    <div class="flex items-start space-x-3">
+                      <!-- Icon -->
+                      <div class="flex-shrink-0 mt-0.5">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center"
+                             [ngClass]="getIconBgClass(notification.type)">
+                          <i [class]="getIconClass(notification.type)" class="text-xs"></i>
+                        </div>
                       </div>
-                    </div>
-                    <!-- Content -->
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-gray-900 truncate">
-                        {{ notification.title }}
-                      </p>
-                      <p class="text-xs text-gray-600 mt-0.5 line-clamp-2">
-                        {{ notification.message }}
-                      </p>
-                      <p class="text-[10px] text-gray-400 mt-1">
-                        {{ formatTime(notification.createdAt) }}
-                      </p>
-                    </div>
-                    <!-- Unread dot -->
-                    @if (!notification.read) {
-                      <div class="flex-shrink-0 mt-1.5">
-                        <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <!-- Content -->
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">
+                          {{ notification.title }}
+                        </p>
+                        <p class="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                          {{ notification.message }}
+                        </p>
+                        <p class="text-[10px] text-gray-400 mt-1">
+                          {{ formatTime(notification.createdAt) }}
+                        </p>
                       </div>
-                    }
+                      <!-- Unread dot -->
+                      @if (!notification.read) {
+                        <div class="flex-shrink-0 mt-1.5">
+                          <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        </div>
+                      }
+                    </div>
+                  </button>
+                  <!-- Actions (visible on hover) -->
+                  <div class="notif-actions">
+                    <button (click)="toggleRead($event, notification)"
+                            class="action-btn"
+                            [title]="notification.read ? 'Marcar como não lida' : 'Marcar como lida'">
+                      <i [class]="notification.read ? 'fas fa-envelope' : 'fas fa-envelope-open'"></i>
+                    </button>
+                    <button (click)="deleteNotification($event, notification)"
+                            class="action-btn action-btn-danger"
+                            title="Excluir notificação">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
                   </div>
-                </button>
+                </div>
               }
             }
           </div>
@@ -88,6 +104,45 @@ import { NotificationService, AppNotification } from '../../services/notificatio
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    .notif-item {
+      position: relative;
+    }
+    .notif-actions {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: none;
+      gap: 2px;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+      padding: 2px;
+    }
+    .notif-item:hover .notif-actions {
+      display: flex;
+    }
+    .action-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 4px;
+      color: #6b7280;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 150ms;
+    }
+    .action-btn:hover {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .action-btn-danger:hover {
+      background: #fef2f2;
+      color: #ef4444;
     }
   `]
 })
@@ -141,6 +196,22 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
 
   async markAllRead() {
     await this.notificationService.markAllAsRead();
+  }
+
+  async toggleRead(event: Event, notification: AppNotification) {
+    event.stopPropagation();
+    if (!notification.id) return;
+    if (notification.read) {
+      await this.notificationService.markAsUnread(notification.id);
+    } else {
+      await this.notificationService.markAsRead(notification.id);
+    }
+  }
+
+  async deleteNotification(event: Event, notification: AppNotification) {
+    event.stopPropagation();
+    if (!notification.id) return;
+    await this.notificationService.deleteNotification(notification.id);
   }
 
   getIconClass(type: string): string {

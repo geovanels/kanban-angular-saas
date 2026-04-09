@@ -314,7 +314,7 @@ export class LeadModalComponent {
 
         // Notificar responsável (se não for o próprio criador)
         if (newLead.responsibleUserId && newLead.responsibleUserId !== currentUser.uid) {
-          const leadName = formData.contactName || formData.companyName || 'Novo registro';
+          const leadName = formData.contactName || formData.companyName || formData.nameComapny || formData.nameCompany || formData.nameContact || formData.nome || formData.name || formData.empresa || formData.nomeEmpresa || formData.nameLead || formData.nomeLead || formData.contactEmail || formData.emailContact || 'Novo registro';
           this.notificationService.createNotification({
             userId: newLead.responsibleUserId,
             type: 'assignment',
