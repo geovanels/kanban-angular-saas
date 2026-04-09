@@ -4,6 +4,7 @@ import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { ToastContainerComponent } from '../toast/toast-container.component';
+import { NotificationBellComponent } from '../notification-bell/notification-bell.component';
 import { BrandingService } from '../../services/branding.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { FirestoreService } from '../../services/firestore.service';
@@ -12,7 +13,7 @@ import { AuthService } from '../../services/auth.service';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, ToastContainerComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent, ToastContainerComponent, NotificationBellComponent],
   template: `
     <div class="app-shell">
       <!-- Mobile top bar (hidden when sidebar is visible) -->
@@ -22,6 +23,12 @@ import { AuthService } from '../../services/auth.service';
           <i *ngIf="!hasLogo()" class="fas fa-bars"></i>
         </button>
         <span class="mobile-title">{{ pageTitle }}</span>
+        <app-notification-bell></app-notification-bell>
+      </div>
+
+      <!-- Desktop notification bell (fixed top-right) -->
+      <div class="desktop-notification-bell">
+        <app-notification-bell></app-notification-bell>
       </div>
 
       <!-- Sidebar -->

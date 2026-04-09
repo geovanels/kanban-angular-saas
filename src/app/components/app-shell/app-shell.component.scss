@@ -89,6 +89,19 @@ $transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   color: #1e293b;
   font-weight: 600;
   font-size: 16px;
+  flex: 1;
+}
+
+// Desktop notification bell (top-right corner)
+.desktop-notification-bell {
+  position: fixed;
+  top: 12px;
+  right: 20px;
+  z-index: 50;
+
+  @media (max-width: 1023px) {
+    display: none !important;
+  }
 }
 
 // Mobile backdrop (hidden on desktop)
