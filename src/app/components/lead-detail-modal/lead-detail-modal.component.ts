@@ -1491,6 +1491,8 @@ export class LeadDetailModalComponent {
           }
 
           if (savedCommentText.includes('@')) {
+            console.log('🔔 [Comment] Texto salvo:', JSON.stringify(savedCommentText));
+            console.log('🔔 [Comment] Users disponíveis:', this.users.map(u => ({ uid: u.uid, displayName: u.displayName, email: u.email })));
             const mentions = this.notificationService.extractMentions(savedCommentText, this.users);
             console.log('🔔 [Comment] Menções encontradas:', mentions);
             for (const mention of mentions) {

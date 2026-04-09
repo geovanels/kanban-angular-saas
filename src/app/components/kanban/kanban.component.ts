@@ -317,6 +317,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
           email: user.email
         }));
 
+      // Sincronizar uid do usuário atual no Firestore se estiver faltando
+      if (this.currentUser?.email && this.currentUser?.uid) {
+        const myRecord = companyUsers.find(u => u.email === this.currentUser!.email);
+        if (myRecord && !myRecord.uid) {
+          console.log('🔄 Sincronizando uid do usuário atual no Firestore...');
+          this.companyService.updateUserInCompany(company.id, this.currentUser.email, {
+            uid: this.currentUser.uid,
+            displayName: this.currentUser.displayName || myRecord.displayName
+          }).catch(() => {});
+        }
+      }
+
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       // Fallback para usuário atual se houver erro

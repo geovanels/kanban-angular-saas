@@ -365,18 +365,20 @@ export class NotificationService {
   // Extrair menções @NomeUsuário do texto
   extractMentions(text: string, users: { uid: string; displayName: string; email: string }[]): { uid: string; displayName: string }[] {
     const mentions: { uid: string; displayName: string }[] = [];
-    const lowerText = text.toLowerCase();
+    const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normalizedText = normalize(text);
 
     // Para cada usuário, verifica se @NomeCompleto aparece no texto
     for (const user of users) {
+      if (!user.uid) continue; // Sem uid, não pode notificar
       const displayName = (user.displayName || '').trim();
       const emailPrefix = (user.email || '').split('@')[0].trim();
 
-      if (displayName && lowerText.includes('@' + displayName.toLowerCase())) {
+      if (displayName && normalizedText.includes('@' + normalize(displayName))) {
         if (!mentions.some(m => m.uid === user.uid)) {
           mentions.push({ uid: user.uid, displayName: displayName });
         }
-      } else if (emailPrefix && lowerText.includes('@' + emailPrefix.toLowerCase())) {
+      } else if (emailPrefix && normalizedText.includes('@' + normalize(emailPrefix))) {
         if (!mentions.some(m => m.uid === user.uid)) {
           mentions.push({ uid: user.uid, displayName: displayName || user.email });
         }
