@@ -1,7 +1,7 @@
-<div class="outbox-page">
+<div class="tab-page">
   <!-- Header -->
-  <div class="outbox-header">
-    <h2 class="text-lg font-semibold text-gray-900">Caixa de Saída</h2>
+  <div class="tab-header">
+    <h2 class="tab-title">Caixa de Saída</h2>
     <button (click)="clearOutbox()" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm rounded-lg font-medium transition-colors">
       <i class="fas fa-trash mr-1.5"></i>Limpar tudo
     </button>
@@ -19,7 +19,7 @@
   </div>
 
   <!-- Content -->
-  <div class="outbox-content">
+  <div class="tab-content">
     <!-- Empty -->
     <div *ngIf="getFilteredEmails().length === 0" class="text-center py-16 text-gray-400">
       <i class="fas fa-paper-plane text-4xl mb-3"></i>

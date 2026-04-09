@@ -12,20 +12,6 @@ import { formatDateTime } from '../../utils/format.utils';
   imports: [CommonModule],
   templateUrl: './board-outbox.component.html',
   styles: [`
-    .outbox-page {
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 120px);
-      background: #f4f5f8;
-    }
-    .outbox-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      background: white;
-      border-bottom: 1px solid #e5e7eb;
-    }
     .outbox-tabs {
       display: flex;
       gap: 0;
@@ -63,11 +49,6 @@ import { formatDateTime } from '../../utils/format.utils';
     .tab-btn.active .tab-count {
       background: #111827;
       color: white;
-    }
-    .outbox-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px 20px;
     }
     .outbox-table {
       width: 100%;

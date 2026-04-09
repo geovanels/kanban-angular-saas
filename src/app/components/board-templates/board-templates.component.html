@@ -1,57 +1,47 @@
-<div class="p-4 md:p-8">
-  <div class="max-w-4xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-900">Templates de Email</h2>
-      <button (click)="createTemplate()" class="px-4 py-2 text-white rounded-lg font-medium transition-colors hover:brightness-90" [style.background-color]="boardStore.getPrimaryColor()">
-        <i class="fas fa-plus mr-2"></i>
-        Novo Template
-      </button>
-    </div>
+<div class="tab-page">
+  <div class="tab-header">
+    <h2 class="tab-title">Templates de Email</h2>
+    <button (click)="createTemplate()" class="text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:brightness-90" [style.background-color]="boardStore.getPrimaryColor()">
+      <i class="fas fa-plus mr-1.5"></i>Novo Template
+    </button>
+  </div>
 
-    <div *ngIf="emailTemplates.length > 0" class="grid gap-4">
+  <div class="tab-content">
+    <div *ngIf="emailTemplates.length > 0" class="space-y-3">
       <div *ngFor="let template of emailTemplates"
-           class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+           class="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
         <div class="flex items-start justify-between">
-          <div class="flex-1">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">
+          <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-semibold text-gray-900 mb-1">
               {{ template.name || 'Template sem nome' }}
             </h3>
-            <p class="text-sm text-gray-600 mb-3">
-              <strong>Assunto:</strong> {{ template.subject || 'Sem assunto' }}
+            <p class="text-sm text-gray-600 mb-1">
+              <span class="text-gray-400">Assunto:</span> {{ template.subject || 'Sem assunto' }}
             </p>
-            <p class="text-xs text-gray-500 mb-4">
-              <strong>Para:</strong> {{ template.recipients || 'Não especificado' }}
+            <p class="text-xs text-gray-400">
+              <span>Para:</span> {{ template.recipients || 'Não especificado' }}
             </p>
-            <div class="flex items-center text-xs text-gray-500 space-x-4">
-              <span>
-                <i class="far fa-calendar-alt mr-1"></i>
-                Criado em {{ formatDate(template.createdAt) }}
-              </span>
-              <span *ngIf="template.updatedAt">
-                <i class="fas fa-edit mr-1"></i>
-                Atualizado em {{ formatDate(template.updatedAt) }}
-              </span>
+            <div class="flex items-center text-xs text-gray-400 mt-2 gap-4">
+              <span><i class="far fa-calendar-alt mr-1"></i>{{ formatDate(template.createdAt) }}</span>
+              <span *ngIf="template.updatedAt"><i class="fas fa-edit mr-1"></i>{{ formatDate(template.updatedAt) }}</span>
             </div>
           </div>
-
-          <div class="flex items-center space-x-2 ml-4">
-            <button (click)="editTemplate(template)" class="text-blue-600 hover:text-blue-800 px-3 py-1 text-sm font-medium">
-              <i class="fas fa-edit mr-1"></i>Editar
+          <div class="flex items-center gap-1 ml-4 flex-shrink-0">
+            <button (click)="editTemplate(template)" class="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded text-sm">
+              <i class="fas fa-edit"></i>
             </button>
-            <button (click)="deleteTemplate(template)" class="text-red-600 hover:text-red-800 px-3 py-1 text-sm font-medium">
-              <i class="fas fa-trash mr-1"></i>Excluir
+            <button (click)="deleteTemplate(template)" class="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-sm">
+              <i class="fas fa-trash"></i>
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <div *ngIf="emailTemplates.length === 0" class="bg-white rounded-xl shadow-sm p-6">
-      <div class="text-center py-12 text-gray-500">
-        <i class="fas fa-envelope text-6xl mb-4"></i>
-        <h3 class="text-xl font-semibold mb-2">Nenhum template encontrado</h3>
-        <p>Crie templates personalizados para automações de email</p>
-      </div>
+    <div *ngIf="emailTemplates.length === 0" class="text-center py-16 text-gray-400">
+      <i class="fas fa-envelope text-4xl mb-3"></i>
+      <h3 class="text-base font-medium text-gray-500 mb-1">Nenhum template encontrado</h3>
+      <p class="text-sm">Crie templates personalizados para automações de email</p>
     </div>
   </div>
 </div>

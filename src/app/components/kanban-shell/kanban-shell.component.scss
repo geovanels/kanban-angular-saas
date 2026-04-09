@@ -183,4 +183,41 @@
 
 .shell-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// ─── Shared tab page layout ───
+
+:host ::ng-deep .tab-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: calc(100vh - 110px);
+}
+
+:host ::ng-deep .tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+:host ::ng-deep .tab-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+:host ::ng-deep .tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  background: #f4f5f8;
 }

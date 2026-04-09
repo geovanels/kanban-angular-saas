@@ -1,17 +1,17 @@
-<div class="p-4 md:p-8">
-  <div class="w-full mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-900">Fluxo de Transições</h2>
-      <div class="flex items-center gap-2">
-        <button (click)="showCreateColumnModal()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-          <i class="fas fa-plus mr-2"></i>Nova Fase
-        </button>
-        <button (click)="saveFlowConfig()" class="text-white px-4 py-2 rounded-lg font-medium transition-colors hover:brightness-90" [style.background-color]="boardStore.getPrimaryColor()">
-          <i class="fas fa-save mr-2"></i>Salvar Fluxo
-        </button>
-      </div>
+<div class="tab-page">
+  <div class="tab-header">
+    <h2 class="tab-title">Fluxo de Transições</h2>
+    <div class="flex items-center gap-2">
+      <button (click)="showCreateColumnModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+        <i class="fas fa-plus mr-1.5"></i>Nova Fase
+      </button>
+      <button (click)="saveFlowConfig()" class="text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:brightness-90" [style.background-color]="boardStore.getPrimaryColor()">
+        <i class="fas fa-save mr-1.5"></i>Salvar Fluxo
+      </button>
     </div>
+  </div>
 
+  <div class="tab-content">
     <!-- Horizontal phase list -->
     <div class="relative w-full">
       <div #flowScroller class="flow-scroll" (scroll)="onFlowScroll()">

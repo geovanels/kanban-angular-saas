@@ -11,17 +11,17 @@ import { VisualFormBuilderComponent } from '../visual-form-builder/visual-form-b
   standalone: true,
   imports: [CommonModule, VisualFormBuilderComponent],
   template: `
-    <div class="form-config-page">
-      <div class="form-config-header">
-        <h2 class="text-lg font-semibold text-gray-900">Formulário inicial do quadro</h2>
-        <button class="px-4 py-2 text-white text-sm rounded-lg transition-colors hover:brightness-90"
+    <div class="tab-page">
+      <div class="tab-header">
+        <h2 class="tab-title">Formulário inicial do quadro</h2>
+        <button class="px-3 py-1.5 text-white text-sm rounded-lg transition-colors hover:brightness-90"
                 [style.background-color]="boardStore.getPrimaryColor()"
                 (click)="save()">
-          <i class="fas fa-save mr-2"></i>Salvar
+          <i class="fas fa-save mr-1.5"></i>Salvar
         </button>
       </div>
 
-      <div class="form-config-body">
+      <div class="form-body">
         <app-visual-form-builder
           [fields]="fields"
           (fieldsChanged)="onFieldsChanged($event)">
@@ -30,26 +30,11 @@ import { VisualFormBuilderComponent } from '../visual-form-builder/visual-form-b
     </div>
   `,
   styles: [`
-    .form-config-page {
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 120px);
-      overflow: hidden;
-    }
-    .form-config-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 20px;
-      background: white;
-      border-bottom: 1px solid #e5e7eb;
-      flex-shrink: 0;
-    }
-    .form-config-body {
+    .form-body {
       flex: 1;
       overflow: hidden;
     }
-    .form-config-body app-visual-form-builder {
+    .form-body app-visual-form-builder {
       display: block;
       height: 100%;
     }
