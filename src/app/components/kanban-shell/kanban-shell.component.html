@@ -6,8 +6,18 @@
 <!-- Shell -->
 <div *ngIf="!(boardStore.isLoading$ | async)" class="kanban-shell">
 
-  <!-- Tab navigation bar -->
+  <!-- Board Header + Tab navigation -->
   <nav class="tab-bar">
+    <!-- Board Title -->
+    <div class="board-header">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="board-icon" [style.background-color]="boardStore.getPrimaryColor()">
+          <i class="fas fa-columns text-white text-xs"></i>
+        </div>
+        <h1 class="board-title">{{ (boardStore.board$ | async)?.name || 'Carregando...' }}</h1>
+      </div>
+    </div>
+
     <div class="tab-bar-inner">
       <!-- Desktop tabs -->
       <div class="hidden md:flex items-center gap-1">

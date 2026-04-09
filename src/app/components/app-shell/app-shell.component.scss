@@ -56,9 +56,20 @@ $transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   padding: 8px;
   border-radius: 8px;
   transition: background 150ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
+  }
+
+  .mobile-logo {
+    height: 28px;
+    width: auto;
+    max-width: 28px;
+    border-radius: 6px;
+    object-fit: cover;
   }
 }
 

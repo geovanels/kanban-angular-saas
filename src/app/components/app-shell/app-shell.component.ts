@@ -1,8 +1,10 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { ToastContainerComponent } from '../toast/toast-container.component';
+import { BrandingService } from '../../services/branding.service';
+import { SubdomainService } from '../../services/subdomain.service';
 
 @Component({
   selector: 'app-shell',
@@ -13,9 +15,10 @@ import { ToastContainerComponent } from '../toast/toast-container.component';
       <!-- Mobile top bar -->
       <div class="mobile-topbar lg:hidden">
         <button class="mobile-menu-btn" (click)="mobileMenuOpen = true">
-          <i class="fas fa-bars"></i>
+          <img *ngIf="hasLogo()" [src]="getLogo()" alt="Logo" class="mobile-logo">
+          <i *ngIf="!hasLogo()" class="fas fa-bars"></i>
         </button>
-        <span class="mobile-title">Task Board</span>
+        <span class="mobile-title">{{ companyName }}</span>
       </div>
 
       <!-- Sidebar -->
@@ -46,17 +49,34 @@ import { ToastContainerComponent } from '../toast/toast-container.component';
   styleUrls: ['./app-shell.component.scss']
 })
 export class AppShellComponent {
-  sidebarCollapsed = false;
+  private brandingService = inject(BrandingService);
+  private subdomainService = inject(SubdomainService);
+
+  sidebarCollapsed = true;
   mobileMenuOpen = false;
 
   constructor() {
     try {
-      this.sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+      const saved = localStorage.getItem('sidebar-collapsed');
+      // Default collapsed, only expand if user explicitly set it
+      this.sidebarCollapsed = saved === null ? true : saved === 'true';
     } catch {}
   }
 
   onSidebarToggle() {
     this.sidebarCollapsed = !this.sidebarCollapsed;
+  }
+
+  hasLogo(): boolean {
+    return this.brandingService.hasLogo();
+  }
+
+  getLogo(): string {
+    return this.brandingService.getLogoUrl();
+  }
+
+  get companyName(): string {
+    return this.subdomainService.getCurrentCompany()?.name || 'Task Board';
   }
 
   @HostListener('window:resize')

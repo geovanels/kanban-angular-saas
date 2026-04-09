@@ -47,6 +47,9 @@ export class BoardStoreService implements OnDestroy {
   private unsubscribers: Array<() => void> = [];
 
   async initialize(boardId: string, ownerId: string) {
+    // Cleanup previous board subscriptions if re-initializing
+    this.cleanup();
+
     this.currentUser = this.authService.getCurrentUser();
     this.boardId = boardId;
     this.ownerId = ownerId || this.currentUser?.uid || '';
@@ -265,9 +268,11 @@ export class BoardStoreService implements OnDestroy {
     return company?.brandingConfig?.primaryColor || '#3B82F6';
   }
 
-  ngOnDestroy() {
+  private cleanup() {
     this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.subscriptions = [];
     this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
     if (this.timeAutomationIntervalId) {
       clearInterval(this.timeAutomationIntervalId);
       this.timeAutomationIntervalId = null;
@@ -275,5 +280,11 @@ export class BoardStoreService implements OnDestroy {
     if (this.boardId && this.ownerId) {
       this.automationService.stopGlobalLeadMonitor(this.boardId, this.ownerId);
     }
+    this._leadsStreamInitialized = false;
+    this._lastLeadsById = {};
+  }
+
+  ngOnDestroy() {
+    this.cleanup();
   }
 }
