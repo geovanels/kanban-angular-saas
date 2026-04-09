@@ -25,6 +25,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   @Input() mobileOpen = false;
   @Output() toggle = new EventEmitter<void>();
   @Output() mobileClose = new EventEmitter<void>();
+  @Output() boardsLoaded = new EventEmitter<Board[]>();
 
   boards: Board[] = [];
   settingsOpen = true;
@@ -38,7 +39,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
     if (user) {
       this.boardsUnsub = this.firestoreService.subscribeToBoards(
         user.uid,
-        (boards) => this.boards = boards
+        (boards) => {
+          this.boards = boards;
+          this.boardsLoaded.emit(boards);
+        }
       );
     }
     try {
