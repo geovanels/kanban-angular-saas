@@ -96,10 +96,6 @@
           <i class="fas fa-envelope"></i>
           <span class="nav-label" *ngIf="!collapsed">SMTP</span>
         </button>
-        <button class="nav-item" [class.active]="isActiveRoute('/settings/integrations')" (click)="navigateTo('/settings/integrations')" [title]="collapsed ? 'Integrações' : ''">
-          <i class="fas fa-plug"></i>
-          <span class="nav-label" *ngIf="!collapsed">Integrações</span>
-        </button>
         <button class="nav-item" [class.active]="isActiveRoute('/settings/users')" (click)="navigateTo('/settings/users')" [title]="collapsed ? 'Usuários' : ''">
           <i class="fas fa-users"></i>
           <span class="nav-label" *ngIf="!collapsed">Usuários</span>

@@ -121,14 +121,19 @@
 <app-column-modal
   [boardId]="boardStore.boardId"
   [ownerId]="boardStore.ownerId"
-  (saved)="onColumnSaved()">
+  [columns]="columns"
+  (columnCreated)="onColumnSaved()"
+  (columnUpdated)="onColumnSaved()"
+  (columnDeleted)="onColumnSaved()"
+  (closeModal)="onColumnSaved()">
 </app-column-modal>
 
 <!-- Phase form modal -->
 <app-phase-form-modal
   [boardId]="boardStore.boardId"
   [ownerId]="boardStore.ownerId"
-  (saved)="onPhaseFormConfigSaved()">
+  (formConfigSaved)="onPhaseFormConfigSaved()"
+  (closeModal)="onPhaseFormConfigSaved()">
 </app-phase-form-modal>
 
 <!-- Automation modal -->
