@@ -149,7 +149,7 @@ service cloud.firestore {
       
       // Company notifications
       match /notifications/{notificationId} {
-        allow read, create, update: if isAuthenticated();
+        allow read, create, update, delete: if isAuthenticated();
       }
 
       // Company settings
