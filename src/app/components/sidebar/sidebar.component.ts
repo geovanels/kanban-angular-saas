@@ -42,7 +42,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
       );
     }
     try {
-      this.collapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+      const saved = localStorage.getItem('sidebar-collapsed-v2');
+      this.collapsed = saved === 'false' ? false : true;
     } catch {}
   }
 
@@ -52,7 +53,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   toggleSidebar() {
     this.collapsed = !this.collapsed;
-    try { localStorage.setItem('sidebar-collapsed', String(this.collapsed)); } catch {}
+    try { localStorage.setItem('sidebar-collapsed-v2', String(this.collapsed)); } catch {}
     this.toggle.emit();
   }
 

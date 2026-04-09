@@ -57,9 +57,8 @@ export class AppShellComponent {
 
   constructor() {
     try {
-      const saved = localStorage.getItem('sidebar-collapsed');
-      // Default collapsed, only expand if user explicitly set it
-      this.sidebarCollapsed = saved === null ? true : saved === 'true';
+      const saved = localStorage.getItem('sidebar-collapsed-v2');
+      this.sidebarCollapsed = saved === 'false' ? false : true;
     } catch {}
   }
 

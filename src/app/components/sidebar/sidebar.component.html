@@ -6,16 +6,18 @@
   <!-- Logo & Collapse Toggle -->
   <div class="sidebar-header">
     <div class="logo-area" *ngIf="!collapsed">
-      <img *ngIf="hasCompanyLogo()" [src]="getCompanyLogo()" alt="Logo" class="company-logo">
-      <div *ngIf="!hasCompanyLogo()" class="company-initials" [style.background-color]="getPrimaryColor()">
-        {{ getCompanyInitials() }}
-      </div>
-      <span class="company-name">{{ company?.name || 'Task Board' }}</span>
+      <!-- Se tem logo, mostrar logo grande -->
+      <img *ngIf="hasCompanyLogo()" [src]="getCompanyLogo()" alt="Logo" class="company-logo-full">
+      <!-- Se não tem logo, mostrar iniciais + nome -->
+      <ng-container *ngIf="!hasCompanyLogo()">
+        <div class="company-initials" [style.background-color]="getPrimaryColor()">
+          {{ getCompanyInitials() }}
+        </div>
+        <span class="company-name">{{ company?.name || 'Task Board' }}</span>
+      </ng-container>
     </div>
     <div class="logo-area" *ngIf="collapsed">
-      <div *ngIf="hasCompanyLogo()" class="company-initials-img">
-        <img [src]="getCompanyLogo()" alt="Logo" class="w-8 h-8 rounded object-cover">
-      </div>
+      <img *ngIf="hasCompanyLogo()" [src]="getCompanyLogo()" alt="Logo" class="company-logo-small">
       <div *ngIf="!hasCompanyLogo()" class="company-initials" [style.background-color]="getPrimaryColor()">
         {{ getCompanyInitials() }}
       </div>
