@@ -1,471 +1,257 @@
-<div class="form-builder h-full flex bg-gray-50">
-  <!-- Painel Esquerdo - Tipos de Campo -->
-  <div class="w-64 bg-white border-r border-gray-200 flex flex-col">
-    <div class="p-4 border-b border-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">Tipos de Campo</h3>
+<div class="form-builder h-full flex">
+  <!-- Painel Esquerdo - Tipos de Campo (slim) -->
+  <div class="field-types-panel">
+    <div class="p-3 border-b border-gray-200">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Adicionar Campo</h3>
     </div>
-    
-    <div class="flex-1 p-3 space-y-2 overflow-y-auto">
-      <div 
+    <div class="flex-1 p-2 space-y-1 overflow-y-auto">
+      <div
         *ngFor="let fieldType of fieldTypes"
-        class="field-type-item p-3 border border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+        class="field-type-item"
         (click)="selectFieldType(fieldType.value)"
         [class.selected]="selectedFieldType === fieldType.value">
-        
-        <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
-            <i [class]="getFieldTypeIcon(fieldType.value)" class="text-gray-600 text-sm"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-900">{{ fieldType.label }}</div>
-            <div class="text-xs text-gray-500">{{ getFieldTypeDescription(fieldType.value) }}</div>
-          </div>
-        </div>
+        <i [class]="getFieldTypeIcon(fieldType.value)" class="text-gray-500 text-xs w-4 text-center"></i>
+        <span class="text-xs text-gray-700">{{ fieldType.label }}</span>
       </div>
     </div>
   </div>
 
-  <!-- Painel Central - Configurações -->
-  <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
-    <div class="p-4 border-b border-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-        {{ selectedField ? 'Propriedades do Campo' : 'Configurações' }}
-      </h3>
-    </div>
-    
-    <div class="flex-1 p-4 overflow-y-auto">
-      <!-- Formulário de Configuração -->
-      <form [formGroup]="fieldsForm" *ngIf="selectedFieldType" class="space-y-4">
-        <!-- Nome do Campo -->
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-            Nome do Campo *
-          </label>
-          <input
-            type="text"
-            formControlName="name"
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Ex: nomeCompleto">
-        </div>
-
-        <!-- Rótulo do Campo -->
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-            Rótulo do Campo *
-          </label>
-          <input
-            type="text"
-            formControlName="label"
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Ex: Nome Completo">
-        </div>
-
-        <!-- Placeholder -->
-        <div *ngIf="!['radio', 'checkbox', 'temperatura', 'file'].includes(selectedFieldType)">
-          <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-            Placeholder
-          </label>
-          <input
-            type="text"
-            formControlName="placeholder"
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            [placeholder]="getPlaceholderExample(selectedFieldType)">
-        </div>
-
-        <!-- Configuração especial para arquivo -->
-        <div *ngIf="selectedFieldType === 'file'">
-          <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-            Configurações do Arquivo
-          </label>
-          <label class="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              [checked]="fieldsForm.get('placeholder')?.value === 'multiple'"
-              (change)="fieldsForm.patchValue({placeholder: $any($event.target).checked ? 'multiple' : ''})"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="text-sm text-gray-700">Permitir múltiplos arquivos</span>
-          </label>
-        </div>
-
-        <!-- Opções (para select e radio) -->
-        <div *ngIf="selectedFieldType === 'select' || selectedFieldType === 'radio'">
-          <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-            Opções *
-          </label>
-          <textarea
-            formControlName="options"
-            rows="4"
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Digite uma opção por linha:&#10;Opção 1&#10;Opção 2&#10;Opção 3"></textarea>
-          <div class="text-xs text-gray-500 mt-1">Uma opção por linha</div>
-        </div>
-
-        <!-- Configuração para Checkbox -->
-        <div *ngIf="selectedFieldType === 'checkbox'">
-          <!-- Opções de Checkbox -->
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-              Opções de Checkbox *
-            </label>
-            <textarea
-              formControlName="options"
-              rows="4"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Digite uma opção por linha:&#10;Opção 1&#10;Opção 2&#10;Opção 3"></textarea>
-            <div class="text-xs text-gray-500 mt-1">Uma opção por linha</div>
-          </div>
-        </div>
-
-        <!-- Informação sobre campo Responsável -->
-        <div *ngIf="selectedFieldType === 'responsavel'" class="p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div class="flex items-start">
-            <i class="fas fa-info-circle text-blue-500 mr-2 mt-0.5"></i>
-            <div class="text-sm text-blue-700">
-              <strong>Campo Responsável:</strong><br>
-              Exibe uma lista com os usuários da empresa para seleção do responsável pelo registro.
-            </div>
-          </div>
-        </div>
-
-        <!-- Informação sobre campo temperatura -->
-        <div *ngIf="selectedFieldType === 'temperatura'" class="p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div class="flex items-start">
-            <i class="fas fa-info-circle text-blue-500 mr-2 mt-0.5"></i>
-            <div class="text-sm text-blue-700">
-              <strong>Campo Temperatura:</strong><br>
-              Este campo criará automaticamente uma lista suspensa com:
-              <ul class="mt-2 space-y-1">
-                <li>🔥 <strong>Quente</strong> - Para leads com alta probabilidade</li>
-                <li>🌤️ <strong>Morno</strong> - Para leads com média probabilidade</li>
-                <li>❄️ <strong>Frio</strong> - Para leads com baixa probabilidade</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <!-- Validações -->
-        <div class="space-y-3">
-          <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Validações</h4>
-          
-          <!-- Campo Obrigatório -->
-          <label class="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              formControlName="required"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="text-sm text-gray-700">Campo obrigatório</span>
-          </label>
-        </div>
-
-        <!-- Configurações de API -->
-        <div class="space-y-3">
-          <h4 class="text-xs font-medium text-gray-700 uppercase tracking-wide">Integração API</h4>
-          
-          <!-- Incluir na API -->
-          <label class="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              formControlName="includeInApi"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="text-sm text-gray-700">Incluir este campo na API</span>
-          </label>
-          
-          <!-- Opções de Exibição -->
-          <div class="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
-            <p class="text-xs text-blue-700 font-medium mb-2">Opções de Exibição</p>
-            
-            <!-- Exibir no Card -->
-            <label class="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                formControlName="showInCard"
-                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-              <span class="text-sm text-gray-700">Exibir no card do registro</span>
-            </label>
-
-            <!-- Exibir em todas as fases -->
-            <label class="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                formControlName="showInAllPhases"
-                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-              <span class="text-sm text-gray-700">Exibir em todas as fases</span>
-            </label>
-
-            <!-- Exibir nos filtros -->
-            <label class="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                formControlName="showInFilters"
-                class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
-              <span class="text-sm text-gray-700">Disponível para filtros</span>
-            </label>
-
-            <!-- Permitir edição em qualquer fase -->
-            <label class="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                formControlName="allowEditInAnyPhase"
-                class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
-              <span class="text-sm text-gray-700">Permitir edição em qualquer fase</span>
-            </label>
-            
-            <p class="text-xs text-blue-600 italic">
-              💡 Campos visíveis no card são automaticamente visíveis em todas as fases
-            </p>
-            <p class="text-xs text-green-600 italic">
-              🌍 Campos globais aparecem separados e podem ser editados em qualquer fase
-            </p>
-          </div>
-
-          <!-- Obrigatório para avançar de fase -->
-          <label class="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              formControlName="requiredToAdvance"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-            <span class="text-sm text-gray-700">Obrigatório para avançar de fase</span>
-          </label>
-          
-          <!-- Nome do campo na API -->
-          <div *ngIf="fieldsForm.get('includeInApi')?.value">
-            <label class="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
-              Nome na API (opcional)
-            </label>
-            <input
-              type="text"
-              formControlName="apiFieldName"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Se vazio, usará o nome do campo">
-            <div class="text-xs text-gray-500 mt-1">Deixe vazio para usar o nome do campo</div>
-          </div>
-        </div>
-
-        <!-- Botões de Ação -->
-        <div class="pt-4 border-t border-gray-200 space-y-3">
-          <button
-            type="button"
-            (click)="addField()"
-            [disabled]="fieldsForm.invalid"
-            class="w-full px-4 py-2 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            [style.background-color]="getPrimaryColor()">
-            {{ editingIndex >= 0 ? 'Atualizar Campo' : 'Adicionar Campo' }}
-          </button>
-          
-          <button
-            type="button"
-            *ngIf="editingIndex >= 0"
-            (click)="cancelEdit()"
-            class="w-full px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">
-            Cancelar
-          </button>
-        </div>
-      </form>
-
-      <!-- Ajuda quando nenhum tipo selecionado -->
-      <div *ngIf="!selectedFieldType" class="text-center py-8">
-        <i class="fas fa-mouse-pointer text-gray-300 text-3xl mb-3"></i>
-        <p class="text-sm text-gray-500">Selecione um tipo de campo à esquerda para começar</p>
+  <!-- Área Principal -->
+  <div class="main-area">
+    <!-- Toolbar -->
+    <div class="main-toolbar">
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-500">{{ fields.length }} campo(s)</span>
+        <button
+          *ngIf="fields.length > 0"
+          (click)="showApiSchema()"
+          class="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1">
+          <i class="fas fa-code"></i> API Schema
+        </button>
       </div>
+      <button
+        *ngIf="fields.length > 0"
+        (click)="showPreview = true"
+        class="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100">
+        <i class="fas fa-eye"></i> Visualizar
+      </button>
     </div>
-  </div>
 
-  <!-- Painel Direito - Visualização -->
-  <div class="flex-1 bg-gray-50 flex flex-col">
-    <div class="p-4 bg-white border-b border-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-        Visualização do Formulário
-      </h3>
-    </div>
-    
-    <!-- Lista de Campos Configurados -->
-    <div class="bg-white border-b border-gray-200 flex-shrink-0" *ngIf="fields.length > 0">
-      <div class="px-4 py-2">
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-xs text-gray-500 uppercase tracking-wide">
-            Campos ({{ fields.length }})
-          </div>
-          <button 
-            *ngIf="fields.length > 0"
-            (click)="showApiSchema()"
-            class="text-xs text-blue-500 hover:text-blue-700 flex items-center space-x-1"
-            title="Ver Schema da API">
-            <i class="fas fa-code"></i>
-            <span>API</span>
-          </button>
+    <!-- Conteúdo: lista de campos + formulário de configuração lado a lado -->
+    <div class="main-content">
+      <!-- Lista de campos configurados -->
+      <div class="fields-list" [class.has-config]="!!selectedFieldType">
+        <div *ngIf="fields.length === 0 && !selectedFieldType" class="empty-state">
+          <i class="fas fa-list-ul text-gray-300 text-3xl mb-2"></i>
+          <p class="text-sm text-gray-400">Selecione um tipo de campo à esquerda para começar</p>
         </div>
-        
-        <div cdkDropList (cdkDropListDropped)="onDrop($event)" class="space-y-1 max-h-32 overflow-y-auto">
+
+        <div cdkDropList (cdkDropListDropped)="onDrop($event)" class="fields-drop-list">
           <div
             *ngFor="let field of fields; let i = index"
             cdkDrag
-            class="field-item flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100 transition-colors">
-            
-            <div class="flex items-center space-x-2 flex-1">
-              <div cdkDragHandle class="cursor-move text-gray-400">
+            class="field-row"
+            [class.editing]="editingIndex === i"
+            (click)="selectField(field, i)">
+
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+              <div cdkDragHandle class="drag-handle">
                 <i class="fas fa-grip-vertical"></i>
               </div>
-              <i [class]="getFieldTypeIcon(field.type)" class="text-gray-500"></i>
-              <span class="font-medium text-gray-900 truncate">{{ field.label }}</span>
-              <span *ngIf="field.required" class="text-red-500 text-xs">*</span>
-              <span *ngIf="field.includeInApi !== false" class="text-blue-500 text-xs" title="Incluído na API">
-                <i class="fas fa-plug"></i>
-              </span>
+              <div class="field-type-badge">
+                <i [class]="getFieldTypeIcon(field.type)" class="text-[10px]"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900 truncate">{{ field.label }}</div>
+                <div class="text-xs text-gray-400">{{ field.name }} · {{ getFieldTypeLabel(field.type) }}</div>
+              </div>
             </div>
 
-            <div class="flex items-center space-x-1 flex-shrink-0">
-              <button
-                (click)="editField(i)"
-                class="p-1 text-gray-400 hover:text-blue-500"
-                title="Editar">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button
-                (click)="openRemoveField(i)"
-                class="p-1 text-gray-400 hover:text-red-500"
-                title="Remover">
-                <i class="fas fa-trash"></i>
+            <div class="flex items-center gap-1.5">
+              <span *ngIf="field.required" class="badge badge-red">Obrigatório</span>
+              <span *ngIf="field.showInCard" class="badge badge-blue">Card</span>
+              <span *ngIf="field.showInFilters" class="badge badge-purple">Filtro</span>
+              <span *ngIf="field.includeInApi !== false" class="badge badge-gray"><i class="fas fa-plug text-[8px]"></i></span>
+              <button (click)="openRemoveField(i); $event.stopPropagation()" class="remove-btn">
+                <i class="fas fa-trash text-[10px]"></i>
               </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-    
-    <!-- Preview do Formulário -->
-    <div class="flex-1 p-6 overflow-y-auto">
-      <!-- Estado vazio -->
-      <div *ngIf="fields.length === 0" class="text-center py-16">
-        <div class="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <i class="fas fa-wpforms text-gray-400 text-2xl"></i>
+
+      <!-- Painel de configuração (aparece quando tipo selecionado) -->
+      <div *ngIf="selectedFieldType" class="config-panel">
+        <div class="config-header">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            {{ editingIndex >= 0 ? 'Editar Campo' : 'Novo Campo' }}
+          </h4>
+          <button (click)="cancelEdit()" class="text-gray-400 hover:text-gray-600 text-xs">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
-        <h4 class="text-lg font-medium text-gray-900 mb-2">Formulário Vazio</h4>
-        <p class="text-gray-500 mb-4">Adicione campos à esquerda para ver a visualização aqui</p>
-      </div>
 
-      <!-- Preview com campos -->
-      <div *ngIf="fields.length > 0" class="max-w-2xl mx-auto">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h4 class="text-lg font-semibold text-gray-900 mb-6">Pré-visualização</h4>
-          
-          <form class="space-y-6">
-            <div *ngFor="let field of fields; let i = index" class="form-field" 
-                 [class.bg-blue-50]="selectedField === field"
-                 [class.border-blue-200]="selectedField === field"
-                 [class.border]="selectedField === field"
-                 [class.p-3]="selectedField === field"
-                 [class.rounded]="selectedField === field"
-                 (click)="selectField(field, i)">
-              
-              <label class="block text-sm font-medium text-gray-900 mb-2">
-                {{ field.label }}
-                <span *ngIf="field.required" class="text-red-500 ml-1">*</span>
+        <div class="config-body">
+          <form [formGroup]="fieldsForm" class="space-y-3">
+            <!-- Nome e Rótulo lado a lado -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="config-label">Nome do Campo *</label>
+                <input type="text" formControlName="name" class="config-input" placeholder="Ex: nomeCompleto">
+              </div>
+              <div>
+                <label class="config-label">Rótulo *</label>
+                <input type="text" formControlName="label" class="config-input" placeholder="Ex: Nome Completo">
+              </div>
+            </div>
+
+            <!-- Placeholder -->
+            <div *ngIf="!['radio', 'checkbox', 'temperatura', 'file'].includes(selectedFieldType)">
+              <label class="config-label">Placeholder</label>
+              <input type="text" formControlName="placeholder" class="config-input" [placeholder]="getPlaceholderExample(selectedFieldType)">
+            </div>
+
+            <!-- Configuração de arquivo -->
+            <div *ngIf="selectedFieldType === 'file'">
+              <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" [checked]="fieldsForm.get('placeholder')?.value === 'multiple'" (change)="fieldsForm.patchValue({placeholder: $any($event.target).checked ? 'multiple' : ''})" class="h-3.5 w-3.5 text-blue-600 rounded border-gray-300">
+                Permitir múltiplos arquivos
               </label>
+            </div>
 
-              <!-- Input Text, Email, Tel, Number, CNPJ, CPF -->
-              <input
-                *ngIf="['text', 'email', 'tel', 'number', 'date', 'time', 'cnpj', 'cpf'].includes(field.type)"
-                [type]="field.type === 'cnpj' || field.type === 'cpf' ? 'text' : field.type"
-                [placeholder]="field.placeholder || getPlaceholderExample(field.type)"
-                [required]="field.required"
-                disabled
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-500 bg-gray-50">
+            <!-- Opções (select/radio/checkbox) -->
+            <div *ngIf="selectedFieldType === 'select' || selectedFieldType === 'radio' || selectedFieldType === 'checkbox'">
+              <label class="config-label">Opções * (uma por linha)</label>
+              <textarea formControlName="options" rows="3" class="config-input" placeholder="Opção 1&#10;Opção 2&#10;Opção 3"></textarea>
+            </div>
 
-              <!-- Textarea -->
-              <textarea
-                *ngIf="field.type === 'textarea'"
-                [placeholder]="field.placeholder || ''"
-                [required]="field.required"
-                disabled
-                rows="3"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md resize-none text-gray-500 bg-gray-50">
-              </textarea>
+            <!-- Info campo Responsável -->
+            <div *ngIf="selectedFieldType === 'responsavel'" class="info-box blue">
+              <i class="fas fa-info-circle mr-1.5"></i>
+              Exibe lista com os usuários da empresa para seleção do responsável.
+            </div>
 
-              <!-- Select -->
-              <select
-                *ngIf="field.type === 'select'"
-                [required]="field.required"
-                disabled
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-500 bg-gray-50">
-                <option value="">Selecione uma opção</option>
-                <option *ngFor="let option of field.options" [value]="option">
-                  {{ option }}
-                </option>
-              </select>
+            <!-- Info campo Temperatura -->
+            <div *ngIf="selectedFieldType === 'temperatura'" class="info-box blue">
+              <i class="fas fa-info-circle mr-1.5"></i>
+              Lista suspensa automática: Quente, Morno, Frio.
+            </div>
 
-              <!-- Campo Temperatura -->
-              <select
-                *ngIf="field.type === 'temperatura'"
-                [required]="field.required"
-                disabled
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-500 bg-gray-50">
-                <option value="">Selecione a temperatura</option>
-                <option *ngFor="let option of (field.options || ['Quente', 'Morno', 'Frio'])" [value]="option">
-                  🌡️ {{ option }}
-                  <span *ngIf="option === 'Quente'">🔥</span>
-                  <span *ngIf="option === 'Morno'">🌤️</span>
-                  <span *ngIf="option === 'Frio'">❄️</span>
-                </option>
-              </select>
+            <!-- Checkboxes de configuração -->
+            <div class="space-y-2 pt-2 border-t border-gray-100">
+              <label class="config-check">
+                <input type="checkbox" formControlName="required" class="config-checkbox">
+                <span>Campo obrigatório</span>
+              </label>
+              <label class="config-check">
+                <input type="checkbox" formControlName="requiredToAdvance" class="config-checkbox">
+                <span>Obrigatório para avançar de fase</span>
+              </label>
+              <label class="config-check">
+                <input type="checkbox" formControlName="showInCard" class="config-checkbox">
+                <span>Exibir no card</span>
+              </label>
+              <label class="config-check">
+                <input type="checkbox" formControlName="showInAllPhases" class="config-checkbox">
+                <span>Exibir em todas as fases</span>
+              </label>
+              <label class="config-check">
+                <input type="checkbox" formControlName="showInFilters" class="config-checkbox">
+                <span>Disponível para filtros</span>
+              </label>
+              <label class="config-check">
+                <input type="checkbox" formControlName="allowEditInAnyPhase" class="config-checkbox">
+                <span>Edição em qualquer fase</span>
+              </label>
+            </div>
 
-              <!-- Radio Buttons -->
-              <div *ngIf="field.type === 'radio'" class="space-y-2">
-                <label *ngFor="let option of field.options; let j = index" class="flex items-center">
-                  <input
-                    type="radio"
-                    [name]="field.name + '_preview'"
-                    [value]="option"
-                    [required]="field.required"
-                    disabled
-                    class="mr-2 text-gray-400">
-                  <span class="text-gray-700">{{ option }}</span>
-                </label>
+            <!-- API -->
+            <div class="space-y-2 pt-2 border-t border-gray-100">
+              <label class="config-check">
+                <input type="checkbox" formControlName="includeInApi" class="config-checkbox">
+                <span>Incluir na API</span>
+              </label>
+              <div *ngIf="fieldsForm.get('includeInApi')?.value">
+                <label class="config-label">Nome na API (opcional)</label>
+                <input type="text" formControlName="apiFieldName" class="config-input" placeholder="Usa nome do campo se vazio">
               </div>
+            </div>
 
-              <!-- Checkbox -->
-              <div *ngIf="field.type === 'checkbox'">
-                <div class="space-y-2">
-                  <label *ngFor="let option of field.options; let j = index" class="flex items-center">
-                    <input
-                      type="checkbox"
-                      [name]="field.name + '_preview_' + j"
-                      [value]="option"
-                      [required]="field.required && j === 0"
-                      disabled
-                      class="mr-2 text-gray-400">
-                    <span class="text-gray-700">{{ option }}</span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- File Upload -->
-              <div *ngIf="field.type === 'file'">
-                <input
-                  type="file"
-                  [multiple]="field.placeholder === 'multiple'"
-                  [required]="field.required"
-                  disabled
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-500 bg-gray-50">
-                <div class="text-xs text-gray-500 mt-1">
-                  {{ field.placeholder === 'multiple' ? 'Múltiplos arquivos permitidos' : 'Upload de arquivo' }}
-                </div>
-              </div>
+            <!-- Botão de ação -->
+            <div class="pt-3">
+              <button type="button" (click)="addField()" [disabled]="fieldsForm.invalid"
+                      class="w-full px-3 py-2 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      [style.background-color]="getPrimaryColor()">
+                {{ editingIndex >= 0 ? 'Atualizar Campo' : 'Adicionar Campo' }}
+              </button>
+              <button type="button" *ngIf="editingIndex >= 0" (click)="cancelEdit()"
+                      class="w-full mt-2 px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+                Cancelar
+              </button>
             </div>
           </form>
         </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Modal de confirmação de remoção de campo -->
-  <div *ngIf="showDeleteConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" (click)="cancelRemoveField()">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" (click)="$event.stopPropagation()">
-      <h3 class="text-lg font-bold text-gray-900 mb-2">Remover campo</h3>
-      <p class="text-sm text-gray-600 mb-6">Tem certeza que deseja remover este campo do formulário?</p>
-      <div class="flex justify-end gap-3">
-        <button class="px-4 py-2 rounded-lg border border-gray-300" (click)="cancelRemoveField()">Cancelar</button>
-        <button class="px-4 py-2 rounded-lg bg-red-600 text-white" (click)="confirmRemoveField()">Remover</button>
+<!-- Modal de Preview -->
+<div *ngIf="showPreview" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" (click)="showPreview = false">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between p-4 border-b border-gray-200">
+      <h3 class="text-base font-semibold text-gray-900">Pré-visualização do Formulário</h3>
+      <button (click)="showPreview = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-6 overflow-y-auto max-h-[calc(80vh-60px)]">
+      <div *ngIf="fields.length === 0" class="text-center py-8 text-gray-400">
+        <i class="fas fa-wpforms text-3xl mb-2"></i>
+        <p class="text-sm">Nenhum campo configurado</p>
       </div>
+      <form *ngIf="fields.length > 0" class="space-y-5">
+        <div *ngFor="let field of fields">
+          <label class="block text-sm font-medium text-gray-900 mb-1.5">
+            {{ field.label }}
+            <span *ngIf="field.required" class="text-red-500 ml-0.5">*</span>
+          </label>
+          <input *ngIf="['text', 'email', 'tel', 'number', 'date', 'time', 'cnpj', 'cpf'].includes(field.type)"
+                 [type]="field.type === 'cnpj' || field.type === 'cpf' ? 'text' : field.type"
+                 [placeholder]="field.placeholder || getPlaceholderExample(field.type)"
+                 disabled class="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-500 bg-gray-50 text-sm">
+          <textarea *ngIf="field.type === 'textarea'" [placeholder]="field.placeholder || ''" disabled rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none text-gray-500 bg-gray-50 text-sm"></textarea>
+          <select *ngIf="field.type === 'select' || field.type === 'temperatura'" disabled
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-500 bg-gray-50 text-sm">
+            <option>Selecione</option>
+            <option *ngFor="let opt of (field.options || ['Quente', 'Morno', 'Frio'])">{{ opt }}</option>
+          </select>
+          <div *ngIf="field.type === 'radio'" class="space-y-1.5">
+            <label *ngFor="let opt of field.options" class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" disabled class="text-gray-400"> {{ opt }}
+            </label>
+          </div>
+          <div *ngIf="field.type === 'checkbox'" class="space-y-1.5">
+            <label *ngFor="let opt of field.options" class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" disabled class="text-gray-400 rounded"> {{ opt }}
+            </label>
+          </div>
+          <div *ngIf="field.type === 'file'" class="text-xs text-gray-400 mt-1">
+            {{ field.placeholder === 'multiple' ? 'Múltiplos arquivos' : 'Upload de arquivo' }}
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmação de remoção -->
+<div *ngIf="showDeleteConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" (click)="cancelRemoveField()">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" (click)="$event.stopPropagation()">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Remover campo</h3>
+    <p class="text-sm text-gray-600 mb-6">Tem certeza que deseja remover este campo do formulário?</p>
+    <div class="flex justify-end gap-3">
+      <button class="px-4 py-2 rounded-lg border border-gray-300" (click)="cancelRemoveField()">Cancelar</button>
+      <button class="px-4 py-2 rounded-lg bg-red-600 text-white" (click)="confirmRemoveField()">Remover</button>
     </div>
   </div>
 </div>

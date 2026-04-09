@@ -40,7 +40,7 @@ export class VisualFormBuilderComponent implements OnInit {
   editingIndex: number = -1;
   selectedFieldType: string = '';
   selectedField: FormField | null = null;
-  // Delete confirmation state
+  showPreview: boolean = false;
   showDeleteConfirm: boolean = false;
   fieldPendingDeleteIndex: number = -1;
   
