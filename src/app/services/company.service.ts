@@ -453,9 +453,11 @@ TaskBoard - Sistema de Gestão Kanban
       const userDoc = await runInInjectionContext(this.injector, () => getDoc(userRef));
       
       if (userDoc.exists()) {
+        const data = userDoc.data();
         return {
-          uid: userDoc.id,
-          ...userDoc.data()
+          ...data,
+          uid: data['uid'] || '',
+          email: userDoc.id
         } as CompanyUser;
       }
       

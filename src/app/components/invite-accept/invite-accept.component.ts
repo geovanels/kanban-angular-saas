@@ -186,19 +186,25 @@ export class InviteAcceptComponent implements OnInit {
       // Tentar processar o convite imediatamente
       console.log('🔄 Debug - Tentando processar convite imediatamente...');
       const inviteProcessed = await this.authService.processPendingInvite(companyId, email, token);
-      
+
       if (inviteProcessed) {
         console.log('✅ Debug - Convite processado com sucesso imediatamente');
       } else {
-        // Se não conseguir processar imediatamente, salvar para tentar depois
-        console.log('💾 Debug - Salvando convite para processamento posterior...');
-        const inviteData = {
-          companyId: companyId,
-          email: email,
-          token: token,
-          timestamp: Date.now()
-        };
-        localStorage.setItem('pendingInvite', JSON.stringify(inviteData));
+        // Fallback: atualizar direto no Firestore se processPendingInvite falhou
+        console.log('🔄 Debug - Fallback: atualizando status diretamente...');
+        try {
+          const currentUser = this.authService.getCurrentUser();
+          await this.companyService.updateUserInCompany(companyId, email, {
+            uid: currentUser?.uid || '',
+            displayName: currentUser?.displayName || this.displayName(),
+            inviteStatus: 'accepted',
+            inviteToken: null,
+            acceptedAt: new Date()
+          });
+          console.log('✅ Debug - Status atualizado via fallback');
+        } catch (fallbackError) {
+          console.error('❌ Debug - Fallback também falhou:', fallbackError);
+        }
       }
 
       console.log('🎉 Debug - Convite aceito com sucesso!');
