@@ -29,6 +29,20 @@
       ]
     },
     {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "emailSent",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "mail",
       "queryScope": "COLLECTION",
       "fields": [
