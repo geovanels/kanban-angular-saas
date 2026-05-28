@@ -217,28 +217,83 @@ export class InviteAcceptComponent implements OnInit {
 
     } catch (error: any) {
       console.error('❌ Debug - Erro ao aceitar convite:', error);
-      
-      let errorMessage = 'Erro ao aceitar convite. Tente novamente.';
-      if (error?.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = 'Este email já está em uso. Faça login em vez disso.';
-            break;
-          case 'auth/weak-password':
-            errorMessage = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Email inválido.';
-            break;
-          default:
-            errorMessage = error.message || errorMessage;
-        }
-      }
-      
-      this.error.set(errorMessage);
+      this.error.set(this.resolveErrorMessage(error));
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async acceptInviteWithGoogle() {
+    const email = this.userEmail();
+    const token = this.inviteToken();
+    const companyId = this.companyId();
+
+    if (!email || !token || !companyId) {
+      this.error.set('Link de convite inválido.');
+      return;
+    }
+
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const result = await this.authService.signInWithGoogle();
+
+      const googleEmail = result.user.email?.toLowerCase();
+      if (googleEmail !== email.toLowerCase()) {
+        throw new Error(`O convite foi enviado para ${email}, mas você entrou com ${result.user.email}. Use a conta Google correta.`);
+      }
+
+      const company = this.company();
+      if (company) {
+        this.subdomainService.setCurrentCompany(company);
+      }
+
+      const inviteProcessed = await this.authService.processPendingInvite(companyId, email, token);
+
+      if (!inviteProcessed) {
+        try {
+          await this.companyService.updateUserInCompany(companyId, email, {
+            uid: result.user.uid,
+            displayName: result.user.displayName || this.displayName(),
+            inviteStatus: 'accepted',
+            inviteToken: null,
+            acceptedAt: new Date()
+          });
+        } catch (fallbackError) {
+          console.error('❌ Debug - Fallback Google também falhou:', fallbackError);
+          throw fallbackError;
+        }
+      }
+
+      this.success.set(true);
+      setTimeout(() => {
+        this.router.navigate(['/dashboard']);
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('❌ Debug - Erro ao aceitar convite com Google:', error);
+      this.error.set(this.resolveErrorMessage(error));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private resolveErrorMessage(error: any): string {
+    const fallback = 'Erro ao aceitar convite. Tente novamente.';
+    if (error?.code) {
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          return 'Este email já está em uso. Faça login em vez disso.';
+        case 'auth/weak-password':
+          return 'A senha é muito fraca. Use pelo menos 6 caracteres.';
+        case 'auth/invalid-email':
+          return 'Email inválido.';
+        case 'auth/popup-closed-by-user':
+          return 'Janela de login fechada antes de concluir.';
+      }
+    }
+    return error?.message || fallback;
   }
 
   goToLogin() {
