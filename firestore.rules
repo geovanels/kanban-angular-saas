@@ -76,8 +76,17 @@ service cloud.firestore {
         // Também permite leitura adicional se já for membro da empresa
         allow read: if isAuthenticated() && isCompanyUser(companyId);
 
-        // Allow creating/updating/deleting users if can manage users
-        allow create, update, delete: if canManageUsers(companyId);
+        // Allow creating/deleting users if can manage users or is company owner
+        allow create, delete: if isCompanyOwner(companyId) || canManageUsers(companyId);
+
+        // Update: admins/owners podem alterar qualquer campo
+        // O próprio usuário pode auto-aceitar e atualizar dados do próprio perfil
+        allow update: if isCompanyOwner(companyId)
+          || canManageUsers(companyId)
+          || (isAuthenticated()
+              && userEmail == getUserEmail()
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['uid', 'inviteStatus', 'acceptedAt', 'inviteToken', 'displayName', 'photoURL']));
       }
       
       // Company boards subcollection  
@@ -166,8 +175,10 @@ service cloud.firestore {
     
     // Users collection (global user profiles)
     match /users/{userId} {
-      // Users can read/write their own profile
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Authenticated users can read any profile (needed for user sync)
+      allow read: if isAuthenticated();
+      // Users can only write their own profile
+      allow write: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // Public collections that can be read by anyone

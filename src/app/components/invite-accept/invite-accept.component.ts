@@ -158,11 +158,17 @@ export class InviteAcceptComponent implements OnInit {
       if (!result.success && result.error?.includes('email-already-in-use')) {
         console.log('👤 Debug - Email já existe, tentando fazer login...');
         result = await this.authService.signInWithEmail(email, pwd);
-        
+
         if (!result.success) {
           throw new Error('Email já cadastrado. Verifique sua senha ou faça login normalmente.');
         }
-        
+
+        // Garantir que o displayName do Firebase Auth fique preenchido
+        const currentUser = this.authService.getCurrentUser();
+        if (currentUser && !currentUser.displayName) {
+          await this.authService.updateUserProfile({ displayName: name });
+        }
+
         console.log('✅ Debug - Login realizado com sucesso');
       } else if (!result.success) {
         throw new Error(result.error);
