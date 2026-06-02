@@ -50,6 +50,7 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
     { value: 'email', label: 'E-mail' },
     { value: 'tel', label: 'Telefone' },
     { value: 'number', label: 'Número' },
+    { value: 'currency', label: 'Moeda (R$)' },
     { value: 'cnpj', label: 'CNPJ' },
     { value: 'cpf', label: 'CPF' },
     { value: 'temperatura', label: 'Temperatura' },
@@ -239,6 +240,7 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       'email': 'fas fa-envelope',
       'tel': 'fas fa-phone',
       'number': 'fas fa-hashtag',
+      'currency': 'fas fa-dollar-sign',
       'cnpj': 'fas fa-building',
       'cpf': 'fas fa-id-card',
       'temperatura': 'fas fa-thermometer-half',
@@ -260,6 +262,7 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       'email': 'Campo de e-mail com validação',
       'tel': 'Telefone com máscara DDD Brasil',
       'number': 'Campo numérico',
+      'currency': 'Valor monetário com máscara R$',
       'cnpj': 'CNPJ com máscara e validação',
       'cpf': 'CPF com máscara e validação',
       'temperatura': 'Lista suspensa (Quente, Morno, Frio)',
@@ -404,6 +407,20 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
     this.resetForm();
   }
 
+  onFieldTypeChange(newType: string) {
+    if (!newType) return;
+    this.selectedFieldType = newType;
+    this.fieldsForm.patchValue({ type: newType }, { emitEvent: false });
+    // Limpar opções quando troca para um tipo que não usa
+    if (!['select', 'radio', 'checkbox'].includes(newType)) {
+      this.fieldsForm.patchValue({ options: '' }, { emitEvent: false });
+    }
+    // Limpar isDeadline se mudou para tipo não-data
+    if (!newType.startsWith('date')) {
+      this.fieldsForm.patchValue({ isDeadline: false }, { emitEvent: false });
+    }
+  }
+
   getPrimaryColor(): string {
     const company = this.subdomainService.getCurrentCompany();
     return company?.primaryColor || company?.brandingConfig?.primaryColor || '#3B82F6';
@@ -415,6 +432,7 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       'email': 'Ex: usuario@exemplo.com',
       'tel': 'Ex: (11) 99999-9999',
       'number': 'Ex: 123',
+      'currency': 'Ex: R$ 1.234,56',
       'cnpj': 'Ex: 00.000.000/0000-00',
       'cpf': 'Ex: 000.000.000-00',
       'textarea': 'Ex: Digite suas observações...',
@@ -452,6 +470,7 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       'email': 'email',
       'tel': 'phone',
       'number': 'number',
+      'currency': 'currency',
       'cnpj': 'cnpj',
       'cpf': 'cpf',
       'temperatura': 'enum',
@@ -490,6 +509,11 @@ export class VisualFormBuilderComponent implements OnInit, OnChanges {
       case 'tel':
         rules.format = 'phone';
         rules.mask = '(00) 00000-0000';
+        break;
+      case 'currency':
+        rules.format = 'currency';
+        rules.currency = 'BRL';
+        rules.locale = 'pt-BR';
         break;
       case 'temperatura':
       case 'select':

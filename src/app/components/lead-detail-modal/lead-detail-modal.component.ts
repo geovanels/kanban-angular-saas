@@ -6,6 +6,7 @@ import { FirestoreService, Lead, Column } from '../../services/firestore.service
 import { StorageService } from '../../services/storage.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { NotificationService } from '../../services/notification.service';
+import { formatCurrencyBRL, parseCurrencyToNumber } from '../../utils/format.utils';
 
 export interface LeadHistory {
   id?: string;
@@ -91,6 +92,8 @@ export class LeadDetailModalComponent {
 
   // Link público
   publicLink = '';
+  // Conjunto de phaseIds que possuem formulário configurado
+  phasesWithForm: Set<string> = new Set();
   private unsubscribeHistory: (() => void) | null = null;
   // Configuração do formulário inicial (somente leitura)
   initialFormConfig: any | null = null;
@@ -309,6 +312,13 @@ export class LeadDetailModalComponent {
       
       // TERCEIRO: Buscar campos globais em TODAS as configurações de fase (não apenas a atual) - EM PARALELO
       try {
+        // Resetar conjunto de fases com formulário (será preenchido abaixo)
+        this.phasesWithForm = new Set();
+        const currentLeadColumnId = this.currentLead?.columnId;
+        if (currentLeadColumnId && (this.currentFormFields?.length || 0) > 0) {
+          this.phasesWithForm.add(currentLeadColumnId);
+        }
+
         // Buscar configurações de todas as fases em paralelo para melhor performance
         const otherColumns = this.columns.filter(col => col.id !== this.currentLead?.columnId);
 
@@ -316,15 +326,18 @@ export class LeadDetailModalComponent {
           const cacheKey = `phase_${this.boardId}_${column.id}`;
           return this.getCachedFormConfig(cacheKey, () =>
             this.firestoreService.getPhaseFormConfig(this.ownerId, this.boardId, column.id!)
-          ).catch(() => null); // Retornar null em caso de erro
+          )
+            .then(cfg => ({ columnId: column.id!, cfg }))
+            .catch(() => ({ columnId: column.id!, cfg: null }));
         });
 
         const phaseConfigs = await Promise.all(phaseConfigPromises);
 
-        phaseConfigs.forEach((phaseConfig) => {
-          if (!phaseConfig) return;
-
-          const phaseFields = (phaseConfig as any)?.fields || [];
+        phaseConfigs.forEach(({ columnId, cfg }) => {
+          const phaseFields = (cfg as any)?.fields || [];
+          if (phaseFields.length > 0) {
+            this.phasesWithForm.add(columnId);
+          }
 
           phaseFields.forEach((field: any) => {
             const isGlobalCandidate = field.allowEditInAnyPhase === true;
@@ -423,6 +436,12 @@ export class LeadDetailModalComponent {
 
 
           formConfig[field.name] = shouldDisable ? [{ value: responsibleValue, disabled: true }] : [responsibleValue];
+        } else if (field.type === 'currency') {
+          const formattedCurrency = currentValue !== '' && currentValue !== null && currentValue !== undefined
+            ? formatCurrencyBRL(currentValue) : '';
+          formConfig[field.name] = shouldDisable
+            ? [{ value: formattedCurrency, disabled: true }]
+            : [formattedCurrency];
         } else {
           // Outros tipos de campo - processamento normal
           formConfig[field.name] = shouldDisable ? [{ value: currentValue ?? '', disabled: true }] : [currentValue ?? ''];
@@ -708,6 +727,11 @@ export class LeadDetailModalComponent {
     if (field.type === 'responsavel' && value) {
       const user = this.users.find(u => u.uid === value || u.id === value);
       return user ? (user.displayName || user.email || user.name) : value;
+    }
+
+    if (field.type === 'currency') {
+      const formatted = formatCurrencyBRL(value);
+      return formatted || 'Não informado';
     }
 
     return value !== null && value !== undefined ? String(value) : 'Não informado';
@@ -1010,6 +1034,7 @@ export class LeadDetailModalComponent {
         }
 
         const item = {
+          phaseId: phase.phaseId,
           phaseName: column.name,
           phaseColor: column.color,
           enteredAt: enteredAt.toLocaleString('pt-BR'),
@@ -1034,6 +1059,7 @@ export class LeadDetailModalComponent {
           || new Date();
         
         const fallbackItem = {
+          phaseId: currentColumn.id,
           phaseName: currentColumn.name,
           phaseColor: currentColumn.color,
           enteredAt: (enteredAt instanceof Date ? enteredAt : new Date(enteredAt)).toLocaleString('pt-BR'),
@@ -1132,6 +1158,10 @@ export class LeadDetailModalComponent {
       // Mapear todos os campos relevantes (fase atual + globais)
       const relevantFields = this.getAllRelevantFields();
       relevantFields.forEach((f: any) => {
+        // Converter campo monetário (R$ X.XXX,YY) para número antes de persistir
+        if (f.type === 'currency' && mapped.hasOwnProperty(f.name)) {
+          mapped[f.name] = parseCurrencyToNumber(mapped[f.name]);
+        }
         if (f.apiFieldName && f.apiFieldName !== f.name && mapped.hasOwnProperty(f.name)) {
           mapped[f.apiFieldName] = mapped[f.name];
           delete mapped[f.name];
@@ -1219,7 +1249,7 @@ export class LeadDetailModalComponent {
             const isGlobal = this.getGlobalFields().some((f: any) => (f.apiFieldName || f.name) === k);
             let beforeVal = beforeFields[k] ?? '';
             let afterVal = mapped[k] ?? '';
-            
+
             // Se o campo representa responsável, mostrar nome do usuário
             const isResp = relevantFields.some((f: any) => (f.apiFieldName === k || f.name === k) && (f.type === 'responsavel' || f.originalType === 'responsavel'));
             if (isResp) {
@@ -1228,7 +1258,13 @@ export class LeadDetailModalComponent {
               beforeVal = beforeUser?.displayName || beforeVal;
               afterVal = afterUser?.displayName || afterVal;
             }
-            
+
+            // Para campos monetários, formatar como BRL
+            if (field && field.type === 'currency') {
+              beforeVal = beforeVal !== '' && beforeVal !== null ? formatCurrencyBRL(beforeVal) : '';
+              afterVal = afterVal !== '' && afterVal !== null ? formatCurrencyBRL(afterVal) : '';
+            }
+
             const fieldType = isGlobal ? ' (Global)' : ' (Fase atual)';
             return `<li><strong>${label}${fieldType}:</strong> "${beforeVal}" → "${afterVal}"</li>`;
           }).join('');
@@ -1470,43 +1506,26 @@ export class LeadDetailModalComponent {
       // Recarregar histórico
       this.loadLeadData().catch(() => {});
 
-      // Notificações completamente em background (fire-and-forget, nunca bloqueia)
+      // Notificações: apenas para usuários explicitamente mencionados (@usuario) no comentário
       setTimeout(() => {
         try {
+          if (!savedCommentText.includes('@')) return;
           const leadName = this.notificationService.getLeadDisplayName(leadForNotif);
           const commentAuthor = currentUser.displayName || currentUser.email;
+          const mentions = this.notificationService.extractMentions(savedCommentText, this.users);
           const notifiedUserIds = new Set<string>();
-
-          console.log('🔔 [Comment] responsibleUserId:', leadForNotif.responsibleUserId, 'currentUser.uid:', currentUser.uid);
-
-          if (leadForNotif.responsibleUserId) {
-            notifiedUserIds.add(leadForNotif.responsibleUserId);
+          for (const mention of mentions) {
+            // Não notificar o próprio autor do comentário
+            if (mention.uid === currentUser.uid) continue;
+            if (notifiedUserIds.has(mention.uid)) continue;
+            notifiedUserIds.add(mention.uid);
             this.notificationService.createNotification({
-              userId: leadForNotif.responsibleUserId,
+              userId: mention.uid,
               type: 'mention',
-              title: 'Novo comentário no seu card',
-              message: `${commentAuthor} comentou em "${leadName}"`,
+              title: 'Você foi mencionado em um comentário',
+              message: `${commentAuthor} mencionou você em "${leadName}"`,
               metadata: { boardId: this.boardId, leadId: leadForNotif.id!, leadName }
-            }).catch((err) => { console.error('🔔 Erro notificação comentário:', err); });
-          }
-
-          if (savedCommentText.includes('@')) {
-            console.log('🔔 [Comment] Texto salvo:', JSON.stringify(savedCommentText));
-            console.log('🔔 [Comment] Users disponíveis:', this.users.map(u => ({ uid: u.uid, displayName: u.displayName, email: u.email })));
-            const mentions = this.notificationService.extractMentions(savedCommentText, this.users);
-            console.log('🔔 [Comment] Menções encontradas:', mentions);
-            for (const mention of mentions) {
-              if (!notifiedUserIds.has(mention.uid)) {
-                notifiedUserIds.add(mention.uid);
-                this.notificationService.createNotification({
-                  userId: mention.uid,
-                  type: 'mention',
-                  title: 'Você foi mencionado em um comentário',
-                  message: `${commentAuthor} mencionou você em "${leadName}"`,
-                  metadata: { boardId: this.boardId, leadId: leadForNotif.id!, leadName }
-                }).catch((err) => { console.error('🔔 Erro notificação menção:', err); });
-              }
-            }
+            }).catch((err) => { console.error('🔔 Erro notificação menção:', err); });
           }
         } catch (notifError) { console.error('🔔 Erro geral notificações:', notifError); }
       }, 0);
@@ -1636,20 +1655,25 @@ export class LeadDetailModalComponent {
     const currentColumn = this.getCurrentColumn();
     if (!currentColumn) return;
 
-    // Gerar link público usando o SubdomainService
+    this.publicLink = this.buildPhaseFormLink(currentColumn.id!) || '';
+  }
+
+  buildPhaseFormLink(phaseId: string): string | null {
+    if (!this.currentLead || !phaseId) return null;
     const company = this.subdomainService.getCurrentCompany();
-    if (company) {
-      const isDev = this.subdomainService.isDevelopment();
-      
-      if (isDev) {
-        // Em desenvolvimento: /form?subdomain=X&outros_params
-        const baseUrl = this.subdomainService.getBaseUrl();
-        this.publicLink = `${baseUrl}/form?subdomain=${company.subdomain}&companyId=${company.id}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
-      } else {
-        // Em produção: https://subdomain.taskboard.com.br/form?params
-        this.publicLink = `https://${company.subdomain}.taskboard.com.br/form?companyId=${company.id}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${currentColumn.id}`;
-      }
+    if (!company) return null;
+
+    const isDev = this.subdomainService.isDevelopment();
+    if (isDev) {
+      const baseUrl = this.subdomainService.getBaseUrl();
+      return `${baseUrl}/form?subdomain=${company.subdomain}&companyId=${company.id}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${phaseId}`;
     }
+    return `https://${company.subdomain}.taskboard.com.br/form?companyId=${company.id}&userId=${this.ownerId}&boardId=${this.boardId}&leadId=${this.currentLead.id}&columnId=${phaseId}`;
+  }
+
+  getPhaseFormLink(phaseId: string): string | null {
+    if (!this.phasesWithForm.has(phaseId)) return null;
+    return this.buildPhaseFormLink(phaseId);
   }
 
   copyPublicLink() {
@@ -1672,6 +1696,13 @@ export class LeadDetailModalComponent {
     const selectedValue = event.target.value;
     const selectedIndex = event.target.selectedIndex;
     const selectedOption = event.target.options[selectedIndex];
+  }
+
+  onCurrencyInput(event: Event, fieldName: string) {
+    const input = event.target as HTMLInputElement;
+    const formatted = formatCurrencyBRL(input.value);
+    input.value = formatted;
+    this.leadForm.get(fieldName)?.setValue(formatted, { emitEvent: false });
   }
 
   async deleteLead() {

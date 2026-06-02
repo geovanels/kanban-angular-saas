@@ -7,6 +7,7 @@ import { CompanyService } from '../../services/company.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { ToastService } from '../toast/toast.service';
 import { AuthService } from '../../services/auth.service';
+import { formatCurrencyBRL, parseCurrencyToNumber } from '../../utils/format.utils';
 
 @Component({
   selector: 'app-public-form',
@@ -40,6 +41,11 @@ import { AuthService } from '../../services/auth.service';
             <span class="text-xs text-gray-500" *ngIf="companyName()">{{ companyName() }}</span>
           </div>
 
+          <div *ngIf="readOnly()" class="px-6 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800 flex items-center gap-2">
+            <i class="fas fa-eye"></i>
+            <span>Modo consulta: o registro já avançou desta fase. As respostas estão somente para visualização.</span>
+          </div>
+
           <div class="p-6">
             <div *ngIf="loading()" class="text-sm text-gray-500">Carregando...</div>
             <div *ngIf="!loading() && !fieldsLoaded()" class="text-sm text-gray-500">Nenhum campo configurado para esta fase.</div>
@@ -52,6 +58,10 @@ import { AuthService } from '../../services/auth.service';
                   <input *ngSwitchCase="'email'" type="email" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <input *ngSwitchCase="'tel'" type="tel" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <input *ngSwitchCase="'number'" type="number" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <input *ngSwitchCase="'currency'" type="text" inputmode="decimal" [formControlName]="f.name"
+                         (input)="onCurrencyInput($event, f.name)"
+                         placeholder="R$ 0,00"
+                         class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <textarea *ngSwitchCase="'textarea'" rows="3" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
                   <select *ngSwitchCase="'select'" [formControlName]="f.name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Selecione...</option>
@@ -84,7 +94,7 @@ import { AuthService } from '../../services/auth.service';
                 </ng-container>
               </div>
 
-              <div class="pt-2">
+              <div class="pt-2" *ngIf="!readOnly()">
                 <button type="submit" [disabled]="saving()" class="px-4 py-2 text-white rounded-lg" [style.background-color]="primaryColor()">
                   {{ saving() ? 'Enviando...' : 'Enviar' }}
                 </button>
@@ -114,6 +124,7 @@ export class PublicFormComponent implements OnInit {
   saving = signal(false);
   fieldsLoaded = signal(false);
   submitted = signal(false);
+  readOnly = signal(false);
   companyName = signal<string | null>(null);
   primaryColor = signal<string>(this.subdomain.getCurrentCompany()?.brandingConfig?.primaryColor || '#3B82F6');
   companyLogo: string | null = null;
@@ -205,6 +216,12 @@ export class PublicFormComponent implements OnInit {
       // Continuar mesmo se não conseguir carregar o lead
     }
 
+    // Se o columnId do link for diferente da fase atual do lead,
+    // o formulário deve servir apenas para consulta (somente leitura)
+    if (this.lead && this.columnId && this.lead.columnId && this.columnId !== this.lead.columnId) {
+      this.readOnly.set(true);
+    }
+
     try {
       // Preferir formulário da fase
       const phaseCfg = await this.fs.getPhaseFormConfig(this.userId, this.boardId, this.columnId);
@@ -237,7 +254,7 @@ export class PublicFormComponent implements OnInit {
       this.currentFields.forEach((f: any) => {
         const key = f.apiFieldName || f.name;
         const val = (this.lead as any)?.fields?.[key] ?? '';
-        
+
         if (f.type === 'checkbox') {
           // Para checkboxes, criar controles individuais para cada opção
           (f.options || []).forEach((opt: string, i: number) => {
@@ -246,6 +263,8 @@ export class PublicFormComponent implements OnInit {
             const isChecked = Array.isArray(val) ? val.includes(opt) : false;
             formGroup[checkboxName] = [isChecked];
           });
+        } else if (f.type === 'currency') {
+          formGroup[f.name] = [val !== '' ? formatCurrencyBRL(val) : ''];
         } else {
           formGroup[f.name] = [val];
         }
@@ -256,6 +275,9 @@ export class PublicFormComponent implements OnInit {
         }
       });
       this.form = this.fb.group(formGroup);
+      if (this.readOnly()) {
+        this.form.disable({ emitEvent: false });
+      }
       this.fieldsLoaded.set(this.currentFields.length > 0);
     } catch (error) {
       this.currentFields = [];
@@ -270,7 +292,7 @@ export class PublicFormComponent implements OnInit {
     const mapped: any = {};
     this.currentFields.forEach((f: any) => {
       const apiKey = f.apiFieldName || f.name;
-      
+
       if (f.type === 'checkbox') {
         // Para checkboxes, coletar todas as opções selecionadas
         const selectedOptions: string[] = [];
@@ -281,6 +303,8 @@ export class PublicFormComponent implements OnInit {
           }
         });
         mapped[apiKey] = selectedOptions;
+      } else if (f.type === 'currency') {
+        mapped[apiKey] = parseCurrencyToNumber(values[f.name]);
       } else {
         mapped[apiKey] = values[f.name];
       }
@@ -288,8 +312,16 @@ export class PublicFormComponent implements OnInit {
     return mapped;
   }
 
+  onCurrencyInput(event: Event, fieldName: string) {
+    const input = event.target as HTMLInputElement;
+    const formatted = formatCurrencyBRL(input.value);
+    input.value = formatted;
+    this.form.get(fieldName)?.setValue(formatted, { emitEvent: false });
+  }
+
   async onSubmit() {
     if (!this.lead || !this.leadId) return;
+    if (this.readOnly()) return;
     this.saving.set(true);
     try {
       const mapped = this.mapFormToLeadFields();
@@ -342,7 +374,7 @@ export class PublicFormComponent implements OnInit {
             const label = field?.label || this.humanizeKey(k);
             let beforeVal = beforeFields[k] ?? '';
             let afterVal = mapped[k] ?? '';
-            
+
             // Se o campo representa responsável, mostrar nome do usuário
             if (field && (field.type === 'responsavel' || field.originalType === 'responsavel')) {
               const beforeUser = this.companyUsers.find(u => u.uid === beforeVal || u.email === beforeVal);
@@ -350,7 +382,13 @@ export class PublicFormComponent implements OnInit {
               beforeVal = beforeUser?.displayName || beforeVal;
               afterVal = afterUser?.displayName || afterVal;
             }
-            
+
+            // Para campos monetários, formatar como BRL
+            if (field && field.type === 'currency') {
+              beforeVal = beforeVal !== '' && beforeVal !== null ? formatCurrencyBRL(beforeVal) : '';
+              afterVal = afterVal !== '' && afterVal !== null ? formatCurrencyBRL(afterVal) : '';
+            }
+
             // Para arrays (checkbox), formatar melhor
             if (Array.isArray(afterVal)) {
               afterVal = afterVal.join(', ');
@@ -358,7 +396,7 @@ export class PublicFormComponent implements OnInit {
             if (Array.isArray(beforeVal)) {
               beforeVal = beforeVal.join(', ');
             }
-            
+
             return `<li><strong>${label}:</strong> "${beforeVal}" → "${afterVal}"</li>`;
           }).join('');
 

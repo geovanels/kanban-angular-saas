@@ -69,16 +69,26 @@
                   </textarea>
                   
                   <!-- Campo de número -->
-                  <input 
-                    *ngIf="field.fieldType === 'number'" 
+                  <input
+                    *ngIf="field.fieldType === 'number'"
                     type="number"
                     [formControlName]="field.formControlName"
                     [placeholder]="field.placeholder || ''"
                     class="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                  
+
+                  <!-- Campo de moeda (BRL) -->
+                  <input
+                    *ngIf="field.fieldType === 'currency'"
+                    type="text"
+                    inputmode="decimal"
+                    [formControlName]="field.formControlName"
+                    (input)="onCurrencyInput($event, field.formControlName)"
+                    placeholder="R$ 0,00"
+                    class="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+
                   <!-- Campo de data -->
-                  <input 
-                    *ngIf="field.fieldType === 'date'" 
+                  <input
+                    *ngIf="field.fieldType === 'date'"
                     type="date"
                     [formControlName]="field.formControlName"
                     class="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
@@ -176,6 +186,14 @@
                   <i class="fas fa-clock text-blue-500 w-3"></i>
                   <span>Duração: {{ phase.duration }}</span>
                 </div>
+                <a *ngIf="getPhaseFormLink(phase.phaseId) as formUrl"
+                   [href]="formUrl"
+                   target="_blank"
+                   rel="noopener"
+                   class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline">
+                  <i class="fas fa-external-link-alt w-3"></i>
+                  <span>Ver formulário da fase</span>
+                </a>
               </div>
 
               <!-- Seta para próxima fase -->
@@ -246,16 +264,26 @@
                 </textarea>
                 
                 <!-- Campo de número -->
-                <input 
-                  *ngIf="field.type === 'number'" 
+                <input
+                  *ngIf="field.type === 'number'"
                   type="number"
                   [formControlName]="field.name"
                   [placeholder]="field.placeholder || ''"
                   class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                
+
+                <!-- Campo de moeda (BRL) -->
+                <input
+                  *ngIf="field.type === 'currency'"
+                  type="text"
+                  inputmode="decimal"
+                  [formControlName]="field.name"
+                  (input)="onCurrencyInput($event, field.name)"
+                  placeholder="R$ 0,00"
+                  class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+
                 <!-- Campo de data -->
-                <input 
-                  *ngIf="field.type === 'date'" 
+                <input
+                  *ngIf="field.type === 'date'"
                   type="date"
                   [formControlName]="field.name"
                   class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
@@ -343,16 +371,26 @@
                   </textarea>
                   
                   <!-- Campo de número -->
-                  <input 
-                    *ngIf="field.type === 'number'" 
+                  <input
+                    *ngIf="field.type === 'number'"
                     type="number"
                     [formControlName]="field.name"
                     [placeholder]="field.placeholder || ''"
                     class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
-                  
+
+                  <!-- Campo de moeda (BRL) -->
+                  <input
+                    *ngIf="field.type === 'currency'"
+                    type="text"
+                    inputmode="decimal"
+                    [formControlName]="field.name"
+                    (input)="onCurrencyInput($event, field.name)"
+                    placeholder="R$ 0,00"
+                    class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+
                   <!-- Campo de data -->
-                  <input 
-                    *ngIf="field.type === 'date'" 
+                  <input
+                    *ngIf="field.type === 'date'"
                     type="date"
                     [formControlName]="field.name"
                     class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">

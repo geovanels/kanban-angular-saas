@@ -94,6 +94,16 @@
 
         <div class="config-body">
           <form [formGroup]="fieldsForm" class="space-y-3">
+            <!-- Tipo do campo (permite alterar) -->
+            <div>
+              <label class="config-label">Tipo do Campo *</label>
+              <select formControlName="type"
+                      (change)="onFieldTypeChange($any($event.target).value)"
+                      class="config-input">
+                <option *ngFor="let ft of fieldTypes" [value]="ft.value">{{ ft.label }}</option>
+              </select>
+            </div>
+
             <!-- Nome e Rótulo lado a lado -->
             <div class="grid grid-cols-2 gap-3">
               <div>
