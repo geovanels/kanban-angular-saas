@@ -152,13 +152,17 @@ export class CompanyService {
   
   async addUserToCompany(companyId: string, userEmail: string, role: 'admin' | 'manager' | 'user', displayName?: string): Promise<void> {
     try {
-      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      // Normaliza o email para lowercase: doc ID, campo email e link de convite
+      // ficam todos consistentes. Firebase Auth retorna o email no token sem
+      // garantia de case, então comparações na rule precisam bater exatamente.
+      const normalizedEmail = userEmail.trim().toLowerCase();
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', normalizedEmail);
       // Usar nome fornecido ou extrair do email como fallback
-      const userName = displayName?.trim() || this.extractNameFromEmail(userEmail);
-      
+      const userName = displayName?.trim() || this.extractNameFromEmail(normalizedEmail);
+
       const companyUser: CompanyUser = {
         uid: '', // Será preenchido quando o usuário fizer login
-        email: userEmail,
+        email: normalizedEmail,
         displayName: userName,
         role,
         permissions: this.getPermissionsByRole(role),
@@ -166,11 +170,11 @@ export class CompanyService {
         inviteStatus: 'pending', // Novo campo para controlar status do convite
         inviteToken: this.generateInviteToken() // Token único para o convite
       };
-      
+
       await setDoc(userRef, companyUser);
-      
+
       try {
-        await this.sendInvitationEmail(userEmail, role, companyId, companyUser.inviteToken!, userName);
+        await this.sendInvitationEmail(normalizedEmail, role, companyId, companyUser.inviteToken!, userName);
       } catch (emailError: any) {
         console.error('Erro ao enviar email de convite:', emailError);
         let errorMessage = 'Usuário adicionado com sucesso, mas houve erro ao enviar email de convite.';
@@ -407,9 +411,57 @@ TaskBoard - Sistema de Gestão Kanban
     }
   }
 
+  async syncUsersFromGlobal(companyId: string, ownerEmail: string): Promise<{ added: number; updated: number; errors: string[] }> {
+    const result = { added: 0, updated: 0, errors: [] as string[] };
+
+    try {
+      // 1. Buscar usuários da empresa
+      console.log('🔄 [Sync] Passo 1: Buscando usuários da empresa...');
+      const companyUsers = await this.getAllCompanyUsers(companyId);
+      console.log('🔄 [Sync] Encontrados:', companyUsers.length, 'usuários na empresa');
+
+      // 2. Para cada usuário sem uid, buscar na coleção global /users/
+      for (const companyUser of companyUsers) {
+        if (companyUser.uid && companyUser.uid.trim() !== '') {
+          console.log(`🔄 [Sync] ${companyUser.email}: já tem uid (${companyUser.uid})`);
+          continue;
+        }
+
+        console.log(`🔄 [Sync] ${companyUser.email}: uid vazio, buscando perfil global...`);
+        try {
+          const globalUsersRef = collection(this.firestore, 'users');
+          const q = query(globalUsersRef, where('email', '==', companyUser.email), limit(1));
+          const snap = await getDocs(q);
+
+          if (!snap.empty) {
+            const uid = snap.docs[0].id;
+            const displayName = snap.docs[0].data()['displayName'] || companyUser.displayName;
+            console.log(`🔄 [Sync] ${companyUser.email}: encontrado uid=${uid}, atualizando...`);
+
+            const userRef = doc(this.firestore, 'companies', companyId, 'users', companyUser.email);
+            await updateDoc(userRef, { uid, displayName, inviteStatus: 'accepted' });
+            result.updated++;
+            console.log(`✅ [Sync] ${companyUser.email}: atualizado com sucesso`);
+          } else {
+            console.log(`⚠️ [Sync] ${companyUser.email}: sem perfil global (precisa fazer login)`);
+          }
+        } catch (err: any) {
+          console.error(`❌ [Sync] ${companyUser.email}: erro -`, err.message);
+          result.errors.push(`${companyUser.email}: ${err.message}`);
+        }
+      }
+
+      return result;
+    } catch (error: any) {
+      console.error('❌ [Sync] Erro geral:', error.message);
+      throw new Error('Erro ao sincronizar usuários: ' + error.message);
+    }
+  }
+
   async removeUserFromCompany(companyId: string, userEmail: string): Promise<void> {
     try {
-      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      const normalizedEmail = userEmail.trim().toLowerCase();
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', normalizedEmail);
       await runInInjectionContext(this.injector, () => deleteDoc(userRef));
     } catch (error) {
       console.error('Erro ao deletar documento:', error);
@@ -419,7 +471,8 @@ TaskBoard - Sistema de Gestão Kanban
 
   async updateUserRole(companyId: string, userEmail: string, newRole: 'admin' | 'manager' | 'user'): Promise<void> {
     try {
-      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      const normalizedEmail = userEmail.trim().toLowerCase();
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', normalizedEmail);
       await updateDoc(userRef, {
         role: newRole,
         permissions: this.getPermissionsByRole(newRole)
@@ -431,16 +484,17 @@ TaskBoard - Sistema de Gestão Kanban
 
   async updateUserInCompany(companyId: string, userEmail: string, updates: Partial<CompanyUser>): Promise<void> {
     try {
-      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
-      
+      const normalizedEmail = userEmail.trim().toLowerCase();
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', normalizedEmail);
+
       // Verificar se o documento existe antes de atualizar
       const userDoc = await runInInjectionContext(this.injector, () => getDoc(userRef));
       if (!userDoc.exists()) {
-        throw new Error(`Usuário ${userEmail} não encontrado na empresa ${companyId}`);
+        throw new Error(`Usuário ${normalizedEmail} não encontrado na empresa ${companyId}`);
       }
-      
+
       await updateDoc(userRef, updates);
-      
+
     } catch (error) {
       console.error('❌ Erro ao atualizar usuário na empresa:', error);
       throw error;
@@ -449,7 +503,8 @@ TaskBoard - Sistema de Gestão Kanban
 
   async getCompanyUser(companyId: string, userEmail: string): Promise<CompanyUser | null> {
     try {
-      const userRef = doc(this.firestore, 'companies', companyId, 'users', userEmail);
+      const normalizedEmail = userEmail.trim().toLowerCase();
+      const userRef = doc(this.firestore, 'companies', companyId, 'users', normalizedEmail);
       const userDoc = await runInInjectionContext(this.injector, () => getDoc(userRef));
       
       if (userDoc.exists()) {

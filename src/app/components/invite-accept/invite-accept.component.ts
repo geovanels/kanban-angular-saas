@@ -37,13 +37,18 @@ export class InviteAcceptComponent implements OnInit {
 
   async ngOnInit() {
     const token = this.route.snapshot.queryParamMap.get('token');
-    const email = this.route.snapshot.queryParamMap.get('email');
+    const rawEmail = this.route.snapshot.queryParamMap.get('email');
     const companyId = this.route.snapshot.queryParamMap.get('companyId');
-    
-    if (!token || !email || !companyId) {
+
+    if (!token || !rawEmail || !companyId) {
       this.error.set('Link de convite inválido ou expirado.');
       return;
     }
+
+    // Normaliza email para casar com doc ID/regra do Firestore (que dependem de
+    // case exato). Convites antigos com case misto ainda funcionam porque o doc
+    // ID novo é sempre lowercase.
+    const email = rawEmail.trim().toLowerCase();
 
     this.inviteToken.set(token);
     this.userEmail.set(email);
@@ -193,6 +198,7 @@ export class InviteAcceptComponent implements OnInit {
       console.log('🔄 Debug - Tentando processar convite imediatamente...');
       const inviteProcessed = await this.authService.processPendingInvite(companyId, email, token);
 
+      let updateOk = inviteProcessed;
       if (inviteProcessed) {
         console.log('✅ Debug - Convite processado com sucesso imediatamente');
       } else {
@@ -202,15 +208,20 @@ export class InviteAcceptComponent implements OnInit {
           const currentUser = this.authService.getCurrentUser();
           await this.companyService.updateUserInCompany(companyId, email, {
             uid: currentUser?.uid || '',
-            displayName: currentUser?.displayName || this.displayName(),
             inviteStatus: 'accepted',
             inviteToken: null,
             acceptedAt: new Date()
           });
           console.log('✅ Debug - Status atualizado via fallback');
+          updateOk = true;
         } catch (fallbackError) {
           console.error('❌ Debug - Fallback também falhou:', fallbackError);
+          throw fallbackError;
         }
+      }
+
+      if (!updateOk) {
+        throw new Error('Não foi possível atualizar o convite. Tente novamente ou contate o administrador.');
       }
 
       console.log('🎉 Debug - Convite aceito com sucesso!');
@@ -261,7 +272,6 @@ export class InviteAcceptComponent implements OnInit {
         try {
           await this.companyService.updateUserInCompany(companyId, email, {
             uid: result.user.uid,
-            displayName: result.user.displayName || this.displayName(),
             inviteStatus: 'accepted',
             inviteToken: null,
             acceptedAt: new Date()

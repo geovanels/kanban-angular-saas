@@ -2,7 +2,7 @@ import { Injectable, inject, Injector, runInInjectionContext } from '@angular/co
 import { Auth, user, signInWithEmailAndPassword, createUserWithEmailAndPassword,
          signOut, signInWithPopup, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously, fetchSignInMethodsForEmail } from '@angular/fire/auth';
 import { GoogleAuthProvider } from 'firebase/auth';
-import { Firestore, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, setDoc, updateDoc, collectionGroup, query, where, getDocs } from '@angular/fire/firestore';
 import { Observable, BehaviorSubject, map } from 'rxjs';
 
 @Injectable({
@@ -21,9 +21,47 @@ export class AuthService {
 
   constructor() {
     // onAuthStateChanged dispara assim que o Firebase resolve o estado
-    onAuthStateChanged(this.auth, () => {
+    onAuthStateChanged(this.auth, (u) => {
       this._authReady$.next(true);
+      // Garantir que qualquer convite pendente em qualquer empresa seja auto-aceito
+      if (u?.email && u?.uid) {
+        this.autoAcceptPendingInvites(u.email, u.uid).catch(() => {});
+      }
     });
+  }
+
+  /**
+   * Localiza o usuário autenticado em qualquer empresa onde esteja como `pending` e
+   * promove o registro para `accepted`. Roda sempre que o estado de autenticação muda
+   * (login, signup, recarregamento). Idempotente.
+   */
+  private async autoAcceptPendingInvites(email: string, uid: string): Promise<void> {
+    try {
+      const usersGroupRef = runInInjectionContext(this.injector, () =>
+        collectionGroup(this.firestore, 'users')
+      );
+      const q = runInInjectionContext(this.injector, () =>
+        query(usersGroupRef, where('email', '==', email))
+      );
+      const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
+
+      const updates: Promise<any>[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data() as any;
+        const needsUidUpdate = !data.uid || data.uid !== uid;
+        const needsStatusUpdate = data.inviteStatus === 'pending';
+        if (needsUidUpdate || needsStatusUpdate) {
+          const patch: any = { uid, inviteStatus: 'accepted' };
+          if (needsStatusUpdate && !data.acceptedAt) patch.acceptedAt = new Date();
+          updates.push(
+            runInInjectionContext(this.injector, () => updateDoc(docSnap.ref, patch))
+          );
+        }
+      });
+      if (updates.length) await Promise.all(updates);
+    } catch {
+      // Silencioso — não bloquear a app por falha de auto-aceite
+    }
   }
   
   async signInWithEmail(email: string, password: string) {
@@ -31,6 +69,10 @@ export class AuthService {
       console.log('🔐 [signInWithEmail] Tentando login com email:', email);
       const result = await signInWithEmailAndPassword(this.auth, email, password);
       console.log('✅ [signInWithEmail] Login com email realizado com sucesso');
+
+      // Criar ou atualizar perfil global do usuário no Firestore
+      await this.createOrUpdateUser(result.user);
+
       return { success: true, user: result.user };
     } catch (error: any) {
       console.error('❌ [signInWithEmail] Erro no login:', {
@@ -139,10 +181,13 @@ export class AuthService {
   async signUpWithEmail(email: string, password: string, displayName: string) {
     try {
       const result = await createUserWithEmailAndPassword(this.auth, email, password);
-      
+
       // Atualizar perfil
       await this.updateUserProfile({ displayName });
-      
+
+      // Garantir criação do doc global /users/{uid} (necessário para sync/menções/etc)
+      await this.createOrUpdateUser(result.user);
+
       return { success: true, user: result.user };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -405,9 +450,11 @@ export class AuthService {
 
       console.log('📝 processPendingInvite - Atualizando status do convite...');
 
+      // Só campos liberados pela rule de self-update para evitar rejeição.
+      // displayName/photoURL ficam por conta do admin/fluxo de perfil — o nome
+      // que o admin digitou no convite já está no doc.
       const updateData = {
         uid: currentUser.uid,
-        displayName: currentUser.displayName || companyUser.displayName,
         inviteStatus: 'accepted' as const,
         inviteToken: '',
         acceptedAt: new Date()

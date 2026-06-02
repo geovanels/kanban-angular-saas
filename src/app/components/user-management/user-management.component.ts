@@ -34,6 +34,10 @@ export class UserManagementComponent implements OnInit {
   inviteError = signal<string | null>(null);
   inviteSuccess = signal<string | null>(null);
   
+  // Sync
+  syncLoading = signal(false);
+  syncResult = signal<string | null>(null);
+
   // Confirmation modals
   showConfirmModal = signal(false);
   confirmAction = signal<(() => void) | null>(null);
@@ -74,6 +78,16 @@ export class UserManagementComponent implements OnInit {
 
         // Forçar adição do usuário à empresa
         await this.companyService.addUserToCompany(company.id, currentUser.email, role);
+      } else {
+        // Usuário existe — garantir que o uid está atualizado
+        const existingUser = existingUsers.find(u => u.email === currentUser.email);
+        if (existingUser && (!existingUser.uid || existingUser.uid !== currentUser.uid)) {
+          await this.companyService.updateUserInCompany(company.id, currentUser.email, {
+            uid: currentUser.uid,
+            displayName: currentUser.displayName || existingUser.displayName,
+            inviteStatus: 'accepted'
+          });
+        }
       }
     } catch (error) {
       console.error('Error in forceAddCurrentUser:', error);
@@ -277,7 +291,7 @@ export class UserManagementComponent implements OnInit {
   }
 
   async inviteUser() {
-    const email = this.inviteEmail().trim();
+    const email = this.inviteEmail().trim().toLowerCase();
     const name = this.inviteName().trim();
     const role = this.inviteRole();
     const company = this.currentCompany();
@@ -582,6 +596,39 @@ export class UserManagementComponent implements OnInit {
       'Marcar como Aceito',
       'btn-success'
     );
+  }
+
+  async syncUsers() {
+    const company = this.currentCompany();
+    if (!company?.id) return;
+
+    this.syncLoading.set(true);
+    this.syncResult.set(null);
+
+    try {
+      const result = await this.companyService.syncUsersFromGlobal(
+        company.id,
+        company.ownerEmail || ''
+      );
+
+      const messages: string[] = [];
+      if (result.added > 0) messages.push(`${result.added} usuário(s) adicionado(s)`);
+      if (result.updated > 0) messages.push(`${result.updated} usuário(s) atualizado(s)`);
+      if (result.errors.length > 0) messages.push(`${result.errors.length} erro(s)`);
+      if (messages.length === 0) messages.push('Todos os usuários já estão sincronizados');
+
+      this.syncResult.set(messages.join(', '));
+
+      // Recarregar lista
+      await this.loadCompanyUsers();
+
+      setTimeout(() => this.syncResult.set(null), 5000);
+    } catch (error: any) {
+      this.syncResult.set('Erro: ' + (error.message || 'falha ao sincronizar'));
+      setTimeout(() => this.syncResult.set(null), 5000);
+    } finally {
+      this.syncLoading.set(false);
+    }
   }
 
   formatDate(date: any): string {
