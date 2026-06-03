@@ -133,6 +133,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
   funnelStages: FunnelStage[] = [];
   leadsOverTimeChart: { label: string; value: number }[] = [];
 
+  // Campos configurados do formulário inicial (do doc initialForm/config)
+  initialFormFields: any[] = [];
+
   // Column management for registros table
   availableColumns: any[] = [];
   selectedColumns: string[] = [];
@@ -206,14 +209,18 @@ export class ReportsComponent implements OnInit, OnDestroy {
       this.board = boards.find(b => b.id === this.boardId) || null;
 
       // Load registros, columns, and form config in parallel
-      const [registros, columns] = await Promise.all([
+      const [registros, columns, initialFormConfig] = await Promise.all([
         this.firestoreService.getLeads(this.ownerId, this.boardId),
-        this.firestoreService.getColumns(this.ownerId, this.boardId)
+        this.firestoreService.getColumns(this.ownerId, this.boardId),
+        this.firestoreService.getInitialFormConfig(this.boardId)
       ]);
 
       this.records = registros;
       this.columns = columns;
       this.users = []; // Será implementado posteriormente
+      // Campos configurados do formulário inicial (chaves reais usadas em lead.fields).
+      // Necessário para resolver o valor pelo campo correto, evitando cópias legadas.
+      this.initialFormFields = (initialFormConfig as any)?.fields || [];
 
       // Note: Form field configuration now handled by AdvancedFiltersComponent
 
@@ -535,7 +542,9 @@ export class ReportsComponent implements OnInit, OnDestroy {
     this.availableColumns.push(...systemColumns);
 
     // Add form fields from the board's initial form configuration
-    const formFields = (this.board as any)?.initialFormFields || [];
+    const formFields = (this.initialFormFields && this.initialFormFields.length)
+      ? this.initialFormFields
+      : ((this.board as any)?.initialFormFields || []);
 
     // First, add common form fields that we know exist
     const commonFormFields = [
@@ -688,11 +697,13 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     const candidates: string[] = [];
     if (key) candidates.push(key);
+    const matchedGroups = new Set<string>();
 
     const keyLower = (key || '').toLowerCase();
     // Se a chave é canônica ou um sinônimo, inclui o grupo inteiro
-    Object.values(synonymsGroup).forEach(group => {
+    Object.entries(synonymsGroup).forEach(([groupKey, group]) => {
       if (group.some(g => g.toLowerCase() === keyLower)) {
+        matchedGroups.add(groupKey);
         group.forEach(k => { if (!candidates.includes(k)) candidates.push(k); });
       }
     });
@@ -708,9 +719,23 @@ export class ReportsComponent implements OnInit, OnDestroy {
     ];
     for (const m of labelMapHints) {
       if (m.words.some(w => hint.includes(w))) {
+        matchedGroups.add(m.groupKey);
         synonymsGroup[m.groupKey].forEach(k => { if (!candidates.includes(k)) candidates.push(k); });
       }
     }
+
+    // PRIORIDADE: usar a chave do campo REALMENTE configurado no formulário para
+    // cada grupo semântico (igual ao card do Kanban). Isso evita pegar uma cópia
+    // legada (ex.: 'companyName' com valor antigo) quando o campo de fato usado é
+    // outro (ex.: 'empresa' com o valor atual).
+    matchedGroups.forEach(groupKey => {
+      const configuredKey = this.getConfiguredFieldKey(groupKey, synonymsGroup);
+      if (configuredKey) {
+        const idx = candidates.findIndex(c => c.toLowerCase() === configuredKey.toLowerCase());
+        if (idx > -1) candidates.splice(idx, 1);
+        candidates.unshift(configuredKey);
+      }
+    });
 
     // IMPORTANTE: o nível superior de lead.fields é a fonte da verdade (é onde a
     // edição grava). Containers aninhados (leadData/data/fields.fields) são
@@ -742,6 +767,41 @@ export class ReportsComponent implements OnInit, OnDestroy {
       const value = fields[original];
       if (value !== undefined && value !== null && String(value).trim() !== '') {
         return value;
+      }
+    }
+    return undefined;
+  }
+
+  // Acha a chave (apiFieldName||name) do campo configurado no formulário inicial
+  // que corresponde a um grupo semântico (companyName, contactEmail, etc.),
+  // casando por sinônimo de chave ou por palavras do label.
+  private getConfiguredFieldKey(groupKey: string, synonymsGroup: Record<string, string[]>): string | undefined {
+    if (!this.initialFormFields?.length) return undefined;
+    const syns = (synonymsGroup[groupKey] || []).map(s => s.toLowerCase());
+    const labelWordsByGroup: Record<string, string[]> = {
+      companyName: ['empresa'],
+      contactName: ['contato'],
+      contactEmail: ['email', 'e-mail'],
+      contactPhone: ['telefone', 'celular', 'whatsapp', 'fone'],
+      cnpj: ['cnpj']
+    };
+    const labelWords = labelWordsByGroup[groupKey] || [];
+    const normalize = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // 1) match direto por chave (apiFieldName/name) entre os sinônimos
+    for (const f of this.initialFormFields) {
+      const fk = (f.apiFieldName || f.name || '');
+      if (syns.includes(fk.toLowerCase()) || syns.some(s => normalize(s) === normalize(fk))) {
+        return f.apiFieldName || f.name;
+      }
+    }
+    // 2) match por palavras do label (evita o grupo errado, ex.: "nome da empresa")
+    for (const f of this.initialFormFields) {
+      const lbl = (f.label || '').toLowerCase();
+      if (!lbl) continue;
+      if (groupKey === 'contactName' && lbl.includes('empresa')) continue; // não confundir com empresa
+      if (labelWords.some(w => lbl.includes(w))) {
+        return f.apiFieldName || f.name;
       }
     }
     return undefined;
