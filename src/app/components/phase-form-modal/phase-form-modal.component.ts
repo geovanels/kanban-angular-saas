@@ -12,10 +12,10 @@ import { SubdomainService } from '../../services/subdomain.service';
   template: `
     <div *ngIf="isVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
          (click)="onCloseModal()">
-      <div class="bg-white rounded-lg p-6 w-full max-w-7xl max-h-[95vh] overflow-hidden" 
+      <div class="bg-white rounded-lg w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden"
            (click)="$event.stopPropagation()">
-        
-        <div class="flex justify-between items-center mb-4">
+
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h2 class="text-xl font-bold text-gray-800">
             Configurar Formulário da Fase: {{ currentColumn?.name }}
           </h2>
@@ -24,15 +24,17 @@ import { SubdomainService } from '../../services/subdomain.service';
           </button>
         </div>
 
-        <!-- Visual Form Builder -->
-        <app-visual-form-builder
-          #formBuilder
-          [fields]="formFields"
-          (fieldsChanged)="onFieldsChanged($event)">
-        </app-visual-form-builder>
+        <!-- Visual Form Builder (área scrollável) -->
+        <div class="flex-1 min-h-0 overflow-hidden">
+          <app-visual-form-builder
+            #formBuilder
+            [fields]="formFields"
+            (fieldsChanged)="onFieldsChanged($event)">
+          </app-visual-form-builder>
+        </div>
 
         <!-- Action Buttons -->
-        <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+        <div class="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
           <button
             type="button"
             (click)="onCloseModal()"

@@ -101,9 +101,26 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
         if (!allowed[fromId]) allowed[fromId] = [];
         if (!allowed[fromId].includes(toId)) allowed[fromId].push(toId);
       }
-      await this.firestoreService.saveFlowConfig(this.boardStore.boardId, { allowed, edges: this.flowEdges, order: this.flowOrder });
+
+      // Persistir o reordenamento das fases atualizando column.order de cada coluna,
+      // pois o kanban e o próprio fluxo (no reload) ordenam por esse campo.
+      const orderUpdates = this.flowOrder.map((phaseId, index) => {
+        const column = this.getColumnById(phaseId);
+        if (!column || column.order === index) return null;
+        return this.firestoreService.updateColumn(
+          this.boardStore.ownerId,
+          this.boardStore.boardId,
+          phaseId,
+          { order: index, updatedAt: new Date() }
+        );
+      }).filter(Boolean) as Promise<any>[];
+
+      await Promise.all([
+        this.firestoreService.saveFlowConfig(this.boardStore.boardId, { allowed, edges: this.flowEdges, order: this.flowOrder }),
+        ...orderUpdates
+      ]);
+
       this.flowConfig = { allowed };
-      this.toast.success('Fluxo salvo com sucesso.');
     } catch (error) {
       console.error('Erro ao salvar fluxo:', error);
       this.toast.error('Erro ao salvar fluxo.');
@@ -136,12 +153,16 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
   completeEdge(toId: string) {
     if (!this.pendingFromId || this.pendingFromId === toId) { this.pendingFromId = null; return; }
     const exists = this.flowEdges.some(e => e.fromId === this.pendingFromId && e.toId === toId);
-    if (!exists) this.flowEdges.push({ fromId: this.pendingFromId, toId });
+    if (!exists) {
+      this.flowEdges.push({ fromId: this.pendingFromId, toId });
+      this.scheduleAutoSave();
+    }
     this.pendingFromId = null;
   }
 
   removeEdge(edge: { fromId: string; toId: string }) {
     this.flowEdges = this.flowEdges.filter(e => !(e.fromId === edge.fromId && e.toId === edge.toId));
+    this.scheduleAutoSave();
   }
 
   hasOutgoingConnections(phaseId: string): boolean {
@@ -165,6 +186,7 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
     this.isManualReorder = true;
     [this.flowOrder[index - 1], this.flowOrder[index]] = [this.flowOrder[index], this.flowOrder[index - 1]];
     this.isManualReorder = false;
+    this.scheduleAutoSave();
   }
 
   movePhaseDown(index: number, event?: Event) {
@@ -173,6 +195,16 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
     this.isManualReorder = true;
     [this.flowOrder[index], this.flowOrder[index + 1]] = [this.flowOrder[index + 1], this.flowOrder[index]];
     this.isManualReorder = false;
+    this.scheduleAutoSave();
+  }
+
+  private saveDebounceTimer: any = null;
+  private scheduleAutoSave(delay: number = 400) {
+    if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
+    this.saveDebounceTimer = setTimeout(() => {
+      this.saveDebounceTimer = null;
+      this.saveFlowConfig();
+    }, delay);
   }
 
   // Column modal
@@ -181,6 +213,11 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
   }
 
   onColumnSaved() {}
+
+  onColumnCreatedOrDeleted() {
+    // Aguardar columns$ propagar a nova coluna no flowOrder antes de salvar
+    this.scheduleAutoSave(700);
+  }
 
   // Phase form
   async showColumnForm(column: Column) {
@@ -282,7 +319,9 @@ export class BoardFlowComponent implements OnInit, OnDestroy {
   }
 
   onPhaseCardClick(phaseId: string, event: Event) {
-    // Could open column edit modal
+    const column = this.getColumnById(phaseId);
+    if (!column) return;
+    this.columnModal.showEditModal(column);
   }
 
   // Scrollbar

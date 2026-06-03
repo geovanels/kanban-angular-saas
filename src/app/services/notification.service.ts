@@ -368,17 +368,25 @@ export class NotificationService {
     const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const normalizedText = normalize(text);
 
-    // Para cada usuário, verifica se @NomeCompleto aparece no texto
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Casa @token com fronteira: precedido por início/separador e seguido por algo que NÃO seja
+    // letra/número/_/./- (assim "@maria" não casa dentro de "@mariasilva").
+    const mentionMatches = (token: string): boolean => {
+      if (!token) return false;
+      const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])@${escapeRegex(token)}(?![\\p{L}\\p{N}_.\\-])`, 'u');
+      return pattern.test(normalizedText);
+    };
+
     for (const user of users) {
       if (!user.uid) continue; // Sem uid, não pode notificar
       const displayName = (user.displayName || '').trim();
       const emailPrefix = (user.email || '').split('@')[0].trim();
 
-      if (displayName && normalizedText.includes('@' + normalize(displayName))) {
+      if (displayName && mentionMatches(normalize(displayName))) {
         if (!mentions.some(m => m.uid === user.uid)) {
-          mentions.push({ uid: user.uid, displayName: displayName });
+          mentions.push({ uid: user.uid, displayName });
         }
-      } else if (emailPrefix && normalizedText.includes('@' + normalize(emailPrefix))) {
+      } else if (emailPrefix && mentionMatches(normalize(emailPrefix))) {
         if (!mentions.some(m => m.uid === user.uid)) {
           mentions.push({ uid: user.uid, displayName: displayName || user.email });
         }
@@ -410,23 +418,22 @@ export class NotificationService {
     if (!ref) return;
 
     try {
-      // Buscar notificações não lidas e não enviadas por email
-      const q = query(ref, where('read', '==', false), where('emailSent', '==', false));
+      // Buscar apenas notificações do usuário atual não lidas e não enviadas por email
+      const currentUser = this.authService.getCurrentUser();
+      if (!currentUser) return;
+
+      const q = query(ref, where('userId', '==', currentUser.uid), where('read', '==', false), where('emailSent', '==', false));
       const snapshot = await runInInjectionContext(this.injector, () => getDocs(q));
 
       if (snapshot.empty) return;
 
-      // Agrupar por userId
-      const byUser = new Map<string, AppNotification[]>();
-      snapshot.docs.forEach(d => {
-        const data = { id: d.id, ...d.data() } as AppNotification;
-        const list = byUser.get(data.userId) || [];
-        list.push(data);
-        byUser.set(data.userId, list);
-      });
+      const notifications = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as AppNotification);
 
-      // Buscar usuários da empresa para resolver userId → email
+      // Buscar dados do usuário atual para resolver email
       const companyUsers = await this.companyService.getCompanyUsers(companyId);
+      const user = companyUsers.find(u => u.uid === currentUser.uid);
+      if (!user?.email) return;
+
       const company = this.subdomainService.getCurrentCompany();
       const companyName = company?.name || 'Sistema';
       const primaryColor = (company as any)?.primaryColor || (company as any)?.brandingConfig?.primaryColor || '#4F46E5';
@@ -434,39 +441,29 @@ export class NotificationService {
         ? this.subdomainService.getCompanyUrl(company.subdomain)
         : '';
 
-      for (const [userId, notifications] of byUser.entries()) {
-        // Encontrar email do usuário pelo UID
-        const user = companyUsers.find(u => u.uid === userId);
-        if (!user?.email) continue;
+      const userName = user.displayName || user.email.split('@')[0];
 
-        const userName = user.displayName || user.email.split('@')[0];
+      // Gerar HTML do email
+      const html = this.buildDigestEmailHtml(notifications, userName, companyName, primaryColor, companyUrl);
 
-        // Gerar HTML do email
-        const html = this.buildDigestEmailHtml(notifications, userName, companyName, primaryColor, companyUrl);
+      // Enviar email
+      await firstValueFrom(this.smtpService.sendEmail({
+        to: user.email,
+        subject: `${notifications.length} notificação${notifications.length > 1 ? 'ões' : ''} pendente${notifications.length > 1 ? 's' : ''} — ${companyName}`,
+        html
+      }));
 
-        // Enviar email
-        try {
-          await firstValueFrom(this.smtpService.sendEmail({
-            to: user.email,
-            subject: `${notifications.length} notificação${notifications.length > 1 ? 'ões' : ''} pendente${notifications.length > 1 ? 's' : ''} — ${companyName}`,
-            html
-          }));
-
-          // Marcar como emailSent
-          const batch = writeBatch(this.firestore);
-          notifications.forEach(n => {
-            if (n.id) {
-              const docRef = doc(this.firestore, 'companies', companyId, 'notifications', n.id);
-              batch.update(docRef, { emailSent: true });
-            }
-          });
-          await batch.commit();
-
-          console.log(`📧 Digest enviado para ${user.email} com ${notifications.length} notificações`);
-        } catch (emailError) {
-          console.warn(`Erro ao enviar digest para ${user.email}:`, emailError);
+      // Marcar como emailSent
+      const batch = writeBatch(this.firestore);
+      notifications.forEach(n => {
+        if (n.id) {
+          const docRef = doc(this.firestore, 'companies', companyId, 'notifications', n.id);
+          batch.update(docRef, { emailSent: true });
         }
-      }
+      });
+      await batch.commit();
+
+      console.log(`📧 Digest enviado para ${user.email} com ${notifications.length} notificações`);
     } catch (error) {
       console.error('Erro ao processar email digest:', error);
     }

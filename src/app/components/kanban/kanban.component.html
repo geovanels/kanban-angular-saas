@@ -30,17 +30,27 @@
   </div>
 
   <div class="flex items-center gap-2">
-    <!-- Move toggle -->
-    <button (click)="toggleCardMove()"
-            class="toolbar-btn"
-            [class.active]="cardMoveEnabled">
-      <i class="fas fa-arrows-alt text-xs"></i>
-    </button>
+    <!-- View toggle (Kanban / Tabela) -->
+    <div class="view-toggle">
+      <button (click)="toggleViewMode('kanban')"
+              class="toolbar-btn"
+              [class.active]="viewMode === 'kanban'"
+              title="Visualização Kanban">
+        <i class="fas fa-columns text-xs"></i>
+      </button>
+      <button (click)="toggleViewMode('table')"
+              class="toolbar-btn"
+              [class.active]="viewMode === 'table'"
+              title="Visualização em Tabela">
+        <i class="fas fa-table text-xs"></i>
+      </button>
+    </div>
+
   </div>
 </div>
 
 <!-- Desktop Kanban Board -->
-<div *ngIf="!isLoading"
+<div *ngIf="!isLoading && viewMode === 'kanban'"
      class="kanban-board desktop-board"
      #kanbanBoard
      (mousedown)="onKanbanMouseDown($event)"
@@ -80,7 +90,6 @@
         class="kanban-card"
         [style.border-left-color]="getColumnBorderColor(column)"
         cdkDrag
-        [cdkDragDisabled]="!cardMoveEnabled"
         [cdkDragData]="lead.id"
         (cdkDragStarted)="onLeadDragStarted()"
         (cdkDragEnded)="onLeadDragEnded()">
@@ -158,6 +167,66 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Desktop Table View -->
+<div *ngIf="!isLoading && viewMode === 'table'" class="kanban-table-wrap desktop-board">
+  <table class="kanban-table">
+    <thead>
+      <tr>
+        <th (click)="sortTableBy('title')">
+          Título
+          <i *ngIf="tableSortField === 'title'" class="fas ml-1 text-[10px]"
+             [class.fa-arrow-up]="tableSortDir === 'asc'"
+             [class.fa-arrow-down]="tableSortDir === 'desc'"></i>
+        </th>
+        <th (click)="sortTableBy('phase')">
+          Fase
+          <i *ngIf="tableSortField === 'phase'" class="fas ml-1 text-[10px]"
+             [class.fa-arrow-up]="tableSortDir === 'asc'"
+             [class.fa-arrow-down]="tableSortDir === 'desc'"></i>
+        </th>
+        <th (click)="sortTableBy('responsible')">
+          Responsável
+          <i *ngIf="tableSortField === 'responsible'" class="fas ml-1 text-[10px]"
+             [class.fa-arrow-up]="tableSortDir === 'asc'"
+             [class.fa-arrow-down]="tableSortDir === 'desc'"></i>
+        </th>
+        <th (click)="sortTableBy('daysInPhase')" class="text-right">
+          Dias na fase
+          <i *ngIf="tableSortField === 'daysInPhase'" class="fas ml-1 text-[10px]"
+             [class.fa-arrow-up]="tableSortDir === 'asc'"
+             [class.fa-arrow-down]="tableSortDir === 'desc'"></i>
+        </th>
+        <th (click)="sortTableBy('createdAt')">
+          Criado em
+          <i *ngIf="tableSortField === 'createdAt'" class="fas ml-1 text-[10px]"
+             [class.fa-arrow-up]="tableSortDir === 'asc'"
+             [class.fa-arrow-down]="tableSortDir === 'desc'"></i>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let lead of getFlatDisplayedLeads(); trackBy: trackByLeadId"
+          (click)="onCardClick(lead)"
+          class="kanban-table-row">
+        <td class="font-medium text-gray-900">{{ getTableTitle(lead) }}</td>
+        <td>
+          <span class="inline-flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full"
+                  [style.background-color]="getColumnById(lead.columnId)?.color || '#94a3b8'"></span>
+            <span>{{ getColumnById(lead.columnId)?.name || '—' }}</span>
+          </span>
+        </td>
+        <td class="text-gray-600">{{ getLeadResponsibleName(lead) || '—' }}</td>
+        <td class="text-right text-gray-600">{{ getDaysSince(lead.movedToCurrentColumnAt) }}d</td>
+        <td class="text-gray-600">{{ getCreatedAtLabel(lead) }}</td>
+      </tr>
+      <tr *ngIf="getFlatDisplayedLeads().length === 0">
+        <td colspan="5" class="text-center text-gray-400 py-10">Nenhum registro</td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 
 <!-- FAB "Novo lead" (Pipefy-style bottom-left pill) -->
@@ -368,7 +437,7 @@
 
     <div class="mb-6 p-3 bg-gray-50 rounded-lg">
       <label class="flex items-center space-x-2 cursor-pointer">
-        <input type="checkbox" [(ngModel)]="filterOnlyMine" (ngModelChange)="toggleOnlyMine()"
+        <input type="checkbox" [(ngModel)]="pendingFilterOnlyMine"
                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
         <span class="text-sm text-gray-700 font-medium">Mostrar apenas meus registros</span>
       </label>
@@ -382,27 +451,27 @@
 
         <input *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'tel' || field.type === 'number' || field.type === 'cnpj' || field.type === 'cpf'"
                [type]="field.type === 'number' ? 'number' : 'text'"
-               [value]="dynamicFilters[field.name] || ''"
-               (input)="setDynamicFilter(field.name, $any($event.target).value)"
+               [value]="getPendingDynamicFilterValue(field.name)"
+               (input)="setPendingDynamicFilter(field.name, $any($event.target).value)"
                [placeholder]="'Filtrar por ' + field.label.toLowerCase()"
                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
 
         <input *ngIf="field.type === 'date'" type="date"
-               [value]="dynamicFilters[field.name] || ''"
-               (input)="setDynamicFilter(field.name, $any($event.target).value)"
+               [value]="getPendingDynamicFilterValue(field.name)"
+               (input)="setPendingDynamicFilter(field.name, $any($event.target).value)"
                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
 
         <select *ngIf="field.type === 'select' || field.type === 'radio'"
-                [value]="dynamicFilters[field.name] || ''"
-                (change)="setDynamicFilter(field.name, $any($event.target).value)"
+                [value]="getPendingDynamicFilterValue(field.name)"
+                (change)="setPendingDynamicFilter(field.name, $any($event.target).value)"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
           <option value="">Todos</option>
           <option *ngFor="let option of getFieldOptions(field)" [value]="option">{{ option }}</option>
         </select>
 
         <select *ngIf="field.type === 'temperatura'"
-                [value]="dynamicFilters[field.name] || ''"
-                (change)="setDynamicFilter(field.name, $any($event.target).value)"
+                [value]="getPendingDynamicFilterValue(field.name)"
+                (change)="setPendingDynamicFilter(field.name, $any($event.target).value)"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
           <option value="">Todas as temperaturas</option>
           <option value="Quente">Quente</option>
@@ -411,8 +480,8 @@
         </select>
 
         <div *ngIf="field.type === 'checkbox'" class="flex items-center space-x-2">
-          <input type="checkbox" [checked]="dynamicFilters[field.name] === true"
-                 (change)="setDynamicFilter(field.name, $any($event.target).checked)"
+          <input type="checkbox" [checked]="pendingDynamicFilters[field.name] === true"
+                 (change)="setPendingDynamicFilter(field.name, $any($event.target).checked)"
                  class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
           <span class="text-sm text-gray-700">Apenas marcados</span>
         </div>
@@ -428,8 +497,8 @@
     </div>
 
     <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-      <button (click)="clearFilters()" class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Limpar</button>
-      <button (click)="toggleAdvancedFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">Aplicar</button>
+      <button (click)="clearPendingFilters()" class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Limpar</button>
+      <button (click)="applyAdvancedFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">Aplicar</button>
     </div>
   </div>
 </div>

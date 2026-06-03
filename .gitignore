@@ -27,3 +27,4 @@ functions/node_modules/
 # Screenshots and media (development only)
 prints/
 screenshots/
+.vercel

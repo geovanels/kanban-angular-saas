@@ -1,19 +1,42 @@
 <app-config-header title="Gerenciar Usuários">
     @if (canManageUsers()) {
-      <button 
-        class="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        [style.background-color]="getPrimaryColor()"
-        (click)="showInviteFormToggle()"
-        [disabled]="inviteLoading()">
-        <i class="fas fa-plus mr-1"></i>
-        Convidar Usuário
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          class="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          style="background-color: #6B7280;"
+          (click)="syncUsers()"
+          [disabled]="syncLoading()">
+          @if (syncLoading()) {
+            <i class="fas fa-spinner fa-spin mr-1"></i>
+            Sincronizando...
+          } @else {
+            <i class="fas fa-sync mr-1"></i>
+            Sincronizar Usuários
+          }
+        </button>
+        <button
+          class="text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          [style.background-color]="getPrimaryColor()"
+          (click)="showInviteFormToggle()"
+          [disabled]="inviteLoading()">
+          <i class="fas fa-plus mr-1"></i>
+          Convidar Usuário
+        </button>
+      </div>
     }
   </app-config-header>
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
       <div class="p-6">
+        <!-- Sync Result -->
+        @if (syncResult()) {
+          <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-sm">
+            <i class="fas fa-info-circle mr-2"></i>
+            {{ syncResult() }}
+          </div>
+        }
+
         <!-- Invite Form -->
         @if (showInviteForm()) {
           <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

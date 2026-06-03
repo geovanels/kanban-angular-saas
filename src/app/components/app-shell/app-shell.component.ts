@@ -1,4 +1,4 @@
-import { Component, HostListener, inject, OnDestroy } from '@angular/core';
+import { Component, HostListener, inject, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
@@ -9,6 +9,7 @@ import { BrandingService } from '../../services/branding.service';
 import { SubdomainService } from '../../services/subdomain.service';
 import { FirestoreService } from '../../services/firestore.service';
 import { AuthService } from '../../services/auth.service';
+import { CompanyService } from '../../services/company.service';
 
 @Component({
   selector: 'app-shell',
@@ -59,9 +60,11 @@ import { AuthService } from '../../services/auth.service';
   `,
   styleUrls: ['./app-shell.component.scss']
 })
-export class AppShellComponent implements OnDestroy {
+export class AppShellComponent implements OnDestroy, OnInit {
   private brandingService = inject(BrandingService);
   private subdomainService = inject(SubdomainService);
+  private authService = inject(AuthService);
+  private companyService = inject(CompanyService);
   private router = inject(Router);
   private routerSub?: Subscription;
 
@@ -81,6 +84,43 @@ export class AppShellComponent implements OnDestroy {
     this.routerSub = this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => this.updatePageTitle(e.urlAfterRedirects || e.url));
+  }
+
+  async ngOnInit() {
+    // Sincronizar uid do usuário atual na subcoleção da empresa (fire-and-forget)
+    this.syncCurrentUserUid().catch(() => {});
+  }
+
+  private async syncCurrentUserUid() {
+    const currentUser = this.authService.getCurrentUser();
+    const company = this.subdomainService.getCurrentCompany();
+    if (!currentUser?.email || !currentUser?.uid || !company?.id) return;
+
+    try {
+      const companyUser = await this.companyService.getCompanyUser(company.id, currentUser.email);
+      if (companyUser) {
+        const needsUidUpdate = !companyUser.uid || companyUser.uid !== currentUser.uid;
+        const needsStatusUpdate = companyUser.inviteStatus === 'pending';
+        if (needsUidUpdate || needsStatusUpdate) {
+          await this.companyService.updateUserInCompany(company.id, currentUser.email, {
+            uid: currentUser.uid,
+            inviteStatus: 'accepted',
+            ...(needsStatusUpdate && !companyUser.acceptedAt ? { acceptedAt: new Date() } : {})
+          });
+        }
+      } else {
+        // Usuário logado mas não existe na empresa — criar
+        const role = currentUser.email === company.ownerEmail ? 'admin' : 'user';
+        await this.companyService.addUserToCompany(company.id, currentUser.email, role, currentUser.displayName || '');
+        await this.companyService.updateUserInCompany(company.id, currentUser.email, {
+          uid: currentUser.uid,
+          inviteStatus: 'accepted',
+          acceptedAt: new Date()
+        });
+      }
+    } catch {
+      // Silencioso — não bloquear a app
+    }
   }
 
   ngOnDestroy() {

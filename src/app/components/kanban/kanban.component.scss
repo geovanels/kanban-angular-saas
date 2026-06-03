@@ -8,6 +8,10 @@
   background: white;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
+
+  @media (min-width: 1024px) {
+    padding-right: 80px;
+  }
 }
 
 .toolbar-search {
@@ -79,6 +83,73 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
+}
+
+// ─── View toggle (Kanban / Tabela) ───
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+
+  .toolbar-btn {
+    border: none;
+    border-radius: 0;
+    padding: 6px 10px;
+  }
+
+  .toolbar-btn + .toolbar-btn {
+    border-left: 1px solid #e5e7eb;
+  }
+}
+
+// ─── Table view ───
+.kanban-table-wrap {
+  padding: 16px 12px;
+  height: calc(100vh - 110px);
+  overflow: auto;
+}
+
+.kanban-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
+
+  thead {
+    background: #f9fafb;
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      color: #374151;
+      border-bottom: 1px solid #e5e7eb;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+
+      &:hover { background: #f3f4f6; }
+    }
+  }
+
+  tbody {
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .kanban-table-row {
+      cursor: pointer;
+      transition: background 120ms;
+      &:hover { background: #f8fafc; }
+    }
+
+    tr:last-child td { border-bottom: none; }
+  }
 }
 
 // ─── Kanban Board (Pipefy-style) ───
@@ -344,6 +415,11 @@
   bottom: 24px;
   left: 88px;  // 64px sidebar collapsed + 24px margin
   z-index: 40;
+  transition: left 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  :host-context(.sidebar-expanded) & {
+    left: 264px;  // 240px sidebar expanded + 24px margin
+  }
   display: flex;
   align-items: center;
   gap: 8px;

@@ -9,7 +9,7 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 lg:pr-20">
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center space-x-4">
             <button 

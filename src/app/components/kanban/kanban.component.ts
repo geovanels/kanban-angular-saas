@@ -65,8 +65,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
   displayedLeadsByColumn: Record<string, Lead[]> = {};
   // Ordem local por coluna (ids) – persistido em localStorage por board
   leadOrderByColumn: Record<string, string[]> = {};
-  // Controle de mover cards
-  cardMoveEnabled = true;
+  // Modo de visualização
+  viewMode: 'kanban' | 'table' = 'kanban';
+  tableSortField: string = 'createdAt';
+  tableSortDir: 'asc' | 'desc' = 'desc';
   currentUser: any = null;
   boardId: string = '';
   ownerId: string = '';
@@ -116,8 +118,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
     
     if (this.currentUser && this.boardId && this.ownerId) {
-      // Load saved filters first
-      this.loadFilterState();
       this.loadBoardData();
       this.subscribeToRealtimeUpdates();
       this.initializeApiEndpoint();
@@ -1016,11 +1016,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     setTimeout(() => { this.isDraggingLead = false; }, 0);
   }
 
-  toggleCardMove() {
-    this.cardMoveEnabled = !this.cardMoveEnabled;
-    if (!this.cardMoveEnabled) this.isDraggingLead = false;
-  }
-
   @HostListener('window:mouseup')
   onWindowMouseUpForCards() {
     // Garante término do drag do card caso mouseup ocorra fora da lista
@@ -1726,6 +1721,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
   availableFilterFields: any[] = [];
   showAdvancedFilters: boolean = false;
 
+  // Estado pendente do modal de filtros avançados (só aplica ao clicar em "Aplicar")
+  pendingFilterOnlyMine: boolean = false;
+  pendingDynamicFilters: Record<string, any> = {};
+
 
   toggleOnlyMine() {
     this.filterOnlyMine = !this.filterOnlyMine;
@@ -1736,6 +1735,31 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.filterQuery = '';
     this.filterOnlyMine = false;
     this.dynamicFilters = {};
+    this.applyFilters();
+  }
+
+  // --- Filtros pendentes do modal ---
+  setPendingDynamicFilter(fieldName: string, value: any) {
+    if (value === null || value === undefined || value === '') {
+      delete this.pendingDynamicFilters[fieldName];
+    } else {
+      this.pendingDynamicFilters[fieldName] = value;
+    }
+  }
+
+  getPendingDynamicFilterValue(fieldName: string): any {
+    return this.pendingDynamicFilters[fieldName] ?? '';
+  }
+
+  clearPendingFilters() {
+    this.pendingFilterOnlyMine = false;
+    this.pendingDynamicFilters = {};
+  }
+
+  applyAdvancedFilters() {
+    this.filterOnlyMine = this.pendingFilterOnlyMine;
+    this.dynamicFilters = { ...this.pendingDynamicFilters };
+    this.showAdvancedFilters = false;
     this.applyFilters();
   }
 
@@ -2049,51 +2073,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
    * Apply filters and update the displayed leads
    */
   applyFilters() {
-    // Rebuild displayed leads with current filters
     this.rebuildDisplayedLeads();
-    
-    // Trigger change detection to update the UI
     this.cdr.detectChanges();
-    
-    // Save filter state to localStorage
-    this.saveFilterState();
-  }
-
-  /**
-   * Save filter state to localStorage
-   */
-  private saveFilterState() {
-    if (!this.boardId) return;
-    
-    try {
-      const filterState = {
-        filterQuery: this.filterQuery,
-        filterOnlyMine: this.filterOnlyMine,
-        dynamicFilters: this.dynamicFilters
-      };
-      localStorage.setItem(`kanban-filters-${this.boardId}`, JSON.stringify(filterState));
-    } catch (error) {
-      console.warn('Could not save filter state to localStorage:', error);
-    }
-  }
-
-  /**
-   * Load filter state from localStorage
-   */
-  private loadFilterState() {
-    if (!this.boardId) return;
-    
-    try {
-      const saved = localStorage.getItem(`kanban-filters-${this.boardId}`);
-      if (saved) {
-        const filterState = JSON.parse(saved);
-        this.filterQuery = filterState.filterQuery || '';
-        this.filterOnlyMine = filterState.filterOnlyMine || false;
-        this.dynamicFilters = filterState.dynamicFilters || {};
-      }
-    } catch (error) {
-      console.warn('Could not load filter state from localStorage:', error);
-    }
   }
 
   /**
@@ -2822,6 +2803,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   toggleAdvancedFilters() {
+    if (!this.showAdvancedFilters) {
+      // Abrindo modal: copiar estado atual para pendente
+      this.pendingFilterOnlyMine = this.filterOnlyMine;
+      this.pendingDynamicFilters = { ...this.dynamicFilters };
+    }
     this.showAdvancedFilters = !this.showAdvancedFilters;
   }
 
@@ -2903,6 +2889,89 @@ export class KanbanComponent implements OnInit, OnDestroy {
                   fields['emailContact'] ||
                   'Sem título';
     return title;
+  }
+
+  // ─── Table view ───
+  toggleViewMode(mode: 'kanban' | 'table') {
+    this.viewMode = mode;
+  }
+
+  getTableTitle(lead: Lead): string {
+    // Usa o mesmo critério do card do kanban (primeiro campo configurado para o card),
+    // para que a tabela reflita o título atual mostrado no card.
+    const cardFields = this.getCardFieldsForLead(lead);
+    const first = cardFields.find(f => f.value !== undefined && f.value !== null && `${f.value}`.trim() !== '');
+    if (first) return String(first.value);
+    return this.getLeadTitle(lead);
+  }
+
+  getFlatDisplayedLeads(): Lead[] {
+    const all: Lead[] = [];
+    for (const colId of Object.keys(this.displayedLeadsByColumn)) {
+      all.push(...this.displayedLeadsByColumn[colId]);
+    }
+    return this.sortLeadsForTable(all);
+  }
+
+  private sortLeadsForTable(leads: Lead[]): Lead[] {
+    const dir = this.tableSortDir === 'asc' ? 1 : -1;
+    const field = this.tableSortField;
+    return [...leads].sort((a, b) => {
+      let va: any, vb: any;
+      switch (field) {
+        case 'title':
+          va = this.getTableTitle(a).toLowerCase();
+          vb = this.getTableTitle(b).toLowerCase();
+          break;
+        case 'phase':
+          va = (this.getColumnById(a.columnId)?.name || '').toLowerCase();
+          vb = (this.getColumnById(b.columnId)?.name || '').toLowerCase();
+          break;
+        case 'responsible':
+          va = this.getLeadResponsibleName(a).toLowerCase();
+          vb = this.getLeadResponsibleName(b).toLowerCase();
+          break;
+        case 'daysInPhase':
+          va = this.getDaysSince((a as any).movedToCurrentColumnAt);
+          vb = this.getDaysSince((b as any).movedToCurrentColumnAt);
+          break;
+        case 'createdAt':
+        default:
+          va = this.getDateValue((a as any).createdAt);
+          vb = this.getDateValue((b as any).createdAt);
+          break;
+      }
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }
+
+  private getDateValue(d: any): number {
+    if (!d) return 0;
+    if (d.seconds) return d.seconds * 1000;
+    if (d.toDate) return d.toDate().getTime();
+    const t = new Date(d).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+
+  sortTableBy(field: string) {
+    if (this.tableSortField === field) {
+      this.tableSortDir = this.tableSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.tableSortField = field;
+      this.tableSortDir = 'asc';
+    }
+  }
+
+  getCreatedAtLabel(lead: Lead): string {
+    const d = (lead as any).createdAt;
+    if (!d) return '';
+    let date: Date;
+    if (d.seconds) date = new Date(d.seconds * 1000);
+    else if (d.toDate) date = d.toDate();
+    else date = new Date(d);
+    return isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR');
   }
 
 }
