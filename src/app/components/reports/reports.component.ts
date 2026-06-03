@@ -676,7 +676,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
   // componente Kanban: junta campos de containers aninhados, casa por sinônimo,
   // por dica de label e com matching case-insensitive/fuzzy.
   private readFieldValue(lead: Lead, key: string, labelHint?: string): string {
-    const fields = this.collectLeadFields(lead);
     if (!key && !labelHint) return '-';
 
     const synonymsGroup: Record<string, string[]> = {
@@ -713,7 +712,24 @@ export class ReportsComponent implements OnInit, OnDestroy {
       }
     }
 
-    // Mapas para matching case-insensitive e fuzzy (sem caracteres especiais)
+    // IMPORTANTE: o nível superior de lead.fields é a fonte da verdade (é onde a
+    // edição grava). Containers aninhados (leadData/data/fields.fields) são
+    // legados/importação e podem ficar desatualizados. Por isso resolvemos
+    // primeiro no topo e só caímos para o merge aninhado se não encontrar nada.
+    const topLevel = this.isPlainObject((lead as any)?.fields) ? (lead as any).fields : {};
+    const fromTop = this.matchFieldValue(topLevel, candidates);
+    if (fromTop !== undefined) return String(fromTop);
+
+    const fromNested = this.matchFieldValue(this.collectLeadFields(lead), candidates);
+    if (fromNested !== undefined) return String(fromNested);
+
+    return '-';
+  }
+
+  // Procura o primeiro candidato presente no objeto de campos, com matching
+  // case-insensitive e fuzzy (ignorando caracteres especiais).
+  private matchFieldValue(fields: Record<string, any>, candidates: string[]): any {
+    if (!this.isPlainObject(fields)) return undefined;
     const lowerMap: Record<string, string> = Object.keys(fields).reduce((acc: any, k: string) => { acc[k.toLowerCase()] = k; return acc; }, {});
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
     const normalizedMap: Record<string, string> = Object.keys(fields).reduce((acc: any, k: string) => { acc[normalize(k)] = k; return acc; }, {});
@@ -725,11 +741,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
       const original = lowerMap[lk] || normalizedMap[normalize(candidate)] || candidate;
       const value = fields[original];
       if (value !== undefined && value !== null && String(value).trim() !== '') {
-        return String(value);
+        return value;
       }
     }
-
-    return '-';
+    return undefined;
   }
 
   // Junta os campos do lead a partir de múltiplos containers possíveis e achata
