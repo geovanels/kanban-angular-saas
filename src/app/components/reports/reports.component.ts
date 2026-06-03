@@ -591,7 +591,8 @@ export class ReportsComponent implements OnInit, OnDestroy {
         this.selectedColumns = [
           'contactName',
           'contactEmail',
-          'companyName', 
+          'contactPhone',
+          'companyName',
           'currentPhase',
           'createdAt',
           'status'
@@ -599,7 +600,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
       }
     } catch (error) {
       console.warn('Could not load selected columns from localStorage:', error);
-      this.selectedColumns = ['contactName', 'contactEmail', 'companyName', 'currentPhase', 'createdAt', 'status'];
+      this.selectedColumns = ['contactName', 'contactEmail', 'contactPhone', 'companyName', 'currentPhase', 'createdAt', 'status'];
     }
   }
 
