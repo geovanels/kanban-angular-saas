@@ -659,43 +659,116 @@ export class ReportsComponent implements OnInit, OnDestroy {
         return this.readFieldValue(lead, 'cnpj');
       
       default:
-        // For dynamic form fields, try to get from fields object
-        const value = lead.fields?.[column.key];
-        if (value !== undefined && value !== null && value !== '') {
-          return String(value);
-        }
-        
+        // For dynamic/initial form fields, use the robust resolver (handles
+        // casing, nested containers and label hints) instead of an exact lookup.
+        const resolved = this.readFieldValue(lead, column.key, column.label);
+        if (resolved !== '-') return resolved;
+
         // Fallback to nested property access
         const nestedValue = this.getNestedProperty(lead, column.field);
         return nestedValue ? String(nestedValue) : '-';
     }
   }
 
-  // Method inspired by the Kanban component's readFieldValue
-  private readFieldValue(lead: Lead, key: string): string {
-    if (!lead.fields) return '-';
+  // Resolve um valor de campo do lead de forma robusta, espelhando a lógica do
+  // componente Kanban: junta campos de containers aninhados, casa por sinônimo,
+  // por dica de label e com matching case-insensitive/fuzzy.
+  private readFieldValue(lead: Lead, key: string, labelHint?: string): string {
+    const fields = this.collectLeadFields(lead);
+    if (!key && !labelHint) return '-';
 
-    // Synonyms mapping based on Kanban component
     const synonymsGroup: Record<string, string[]> = {
       companyName: ['companyName','empresa','nomeEmpresa','nameCompany','company','company_name','empresa_nome','nameComapny'],
-      contactName: ['contactName','name','nome','nomeLead','nameLead','leadName'],
-      contactEmail: ['contactEmail','email','emailLead','contatoEmail','leadEmail'],
-      contactPhone: ['contactPhone','phone','telefone','celular','phoneLead','telefoneContato'],
+      contactName: ['contactName','nameContact','name','nome','nomeContato','nomeLead','nameLead','leadName','nomeCompleto'],
+      contactEmail: ['contactEmail','emailContact','email','emailLead','contatoEmail','leadEmail','e-mail'],
+      contactPhone: ['contactPhone','phoneContact','phone','telefone','celular','whatsapp','phoneLead','telefoneContato'],
       cnpj: ['cnpj','cnpjCompany','cnpjEmpresa','companyCnpj']
     };
 
-    // Get all possible field names for this key
-    const candidates = synonymsGroup[key] || [key];
-    
-    // Try each candidate until we find a value
+    const candidates: string[] = [];
+    if (key) candidates.push(key);
+
+    const keyLower = (key || '').toLowerCase();
+    // Se a chave é canônica ou um sinônimo, inclui o grupo inteiro
+    Object.values(synonymsGroup).forEach(group => {
+      if (group.some(g => g.toLowerCase() === keyLower)) {
+        group.forEach(k => { if (!candidates.includes(k)) candidates.push(k); });
+      }
+    });
+
+    // Se o label sugere o significado, inclui o grupo correspondente
+    const hint = (labelHint || '').toLowerCase();
+    const labelMapHints: Array<{ words: string[]; groupKey: keyof typeof synonymsGroup }> = [
+      { words: ['empresa'], groupKey: 'companyName' },
+      { words: ['contato','nome do contato','responsável','responsavel'], groupKey: 'contactName' },
+      { words: ['email','e-mail'], groupKey: 'contactEmail' },
+      { words: ['telefone','celular','whatsapp','whats'], groupKey: 'contactPhone' },
+      { words: ['cnpj'], groupKey: 'cnpj' }
+    ];
+    for (const m of labelMapHints) {
+      if (m.words.some(w => hint.includes(w))) {
+        synonymsGroup[m.groupKey].forEach(k => { if (!candidates.includes(k)) candidates.push(k); });
+      }
+    }
+
+    // Mapas para matching case-insensitive e fuzzy (sem caracteres especiais)
+    const lowerMap: Record<string, string> = Object.keys(fields).reduce((acc: any, k: string) => { acc[k.toLowerCase()] = k; return acc; }, {});
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedMap: Record<string, string> = Object.keys(fields).reduce((acc: any, k: string) => { acc[normalize(k)] = k; return acc; }, {});
+
+    const visited = new Set<string>();
     for (const candidate of candidates) {
-      const value = lead.fields[candidate];
+      const lk = candidate.toLowerCase();
+      if (visited.has(lk)) continue; visited.add(lk);
+      const original = lowerMap[lk] || normalizedMap[normalize(candidate)] || candidate;
+      const value = fields[original];
       if (value !== undefined && value !== null && String(value).trim() !== '') {
         return String(value);
       }
     }
-    
+
     return '-';
+  }
+
+  // Junta os campos do lead a partir de múltiplos containers possíveis e achata
+  // objetos aninhados (espelha collectLeadFields do Kanban).
+  private collectLeadFields(lead: Lead): Record<string, any> {
+    const base = ((lead as any)?.fields || {}) as any;
+    const containers = ['fields', 'leadData', 'data', 'payload'];
+    const merged: Record<string, any> = {};
+    const candidates: any[] = [base];
+    containers.forEach(k => { if (this.isPlainObject(base[k])) candidates.push(base[k]); });
+    if (this.isPlainObject(base.fields?.fields)) candidates.push(base.fields.fields);
+    for (const obj of candidates) {
+      for (const [k, v] of Object.entries(obj)) {
+        if (merged[k] === undefined && v !== undefined && v !== null && `${v}`.trim?.() !== '') merged[k] = v;
+      }
+    }
+    const deep = this.flattenObject(base, 3);
+    for (const [k, v] of Object.entries(deep)) {
+      if (merged[k] === undefined && v !== undefined && v !== null && `${v}`.trim?.() !== '') merged[k] = v;
+    }
+    return merged;
+  }
+
+  private isPlainObject(value: any): boolean {
+    return value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private flattenObject(source: any, maxDepth: number = 3): Record<string, any> {
+    const out: Record<string, any> = {};
+    if (!this.isPlainObject(source) || maxDepth < 0) return out;
+    for (const [key, val] of Object.entries(source)) {
+      if (this.isPlainObject(val) && maxDepth > 0) {
+        const nested = this.flattenObject(val, maxDepth - 1);
+        for (const [nk, nv] of Object.entries(nested)) {
+          if (out[nk] === undefined) out[nk] = nv;
+        }
+      } else if (val !== undefined && val !== null) {
+        out[key] = val as any;
+      }
+    }
+    return out;
   }
 
   private getNestedProperty(obj: any, path: string): any {
