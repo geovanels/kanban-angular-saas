@@ -6,6 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { FirestoreService, Lead, Column, Board } from '../../services/firestore.service';
 import { CompanyBreadcrumbComponent } from '../company-breadcrumb/company-breadcrumb.component';
 import { AdvancedFiltersComponent } from '../advanced-filters/advanced-filters.component';
+import * as XLSX from 'xlsx';
 
 
 interface SLAIndicator {
@@ -1064,59 +1065,41 @@ export class ReportsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Preparar dados para exportação
+    // Usa as mesmas colunas selecionadas na tabela (e o mesmo resolvedor de valores)
+    const columns = this.getSelectedColumns();
     const exportData = this.filteredRecords.map(record => {
-      const data: any = {};
-      
-      // Campos básicos
-      data['ID'] = record.id;
-      data['Fase'] = this.getColumnName(record.columnId);
-      data['Responsável'] = record.responsibleUserId || 'Não atribuído';
-      data['Data de Criação'] = record.createdAt ? new Date(record.createdAt.toDate()).toLocaleDateString('pt-BR') : '';
-      
-      // Campos dinâmicos
-      if (record.fields) {
-        Object.entries(record.fields).forEach(([key, value]) => {
-          data[key] = value || '';
-        });
-      }
-      
-      return data;
+      const row: any = {};
+      columns.forEach(column => {
+        const value = this.getColumnValue(record, column);
+        row[column.label] = value === '-' ? '' : value;
+      });
+      return row;
     });
 
-    // Criar conteúdo CSV
     if (exportData.length === 0) {
       alert('Não há dados para exportar.');
       return;
     }
 
-    const headers = Object.keys(exportData[0]);
-    const csvContent = [
-      headers.join(','),
-      ...exportData.map(row => 
-        headers.map(header => {
-          const value = row[header] || '';
-          // Escapar aspas e envolver em aspas se contiver vírgula
-          const escapedValue = String(value).replace(/"/g, '""');
-          return escapedValue.includes(',') ? `"${escapedValue}"` : escapedValue;
-        }).join(',')
-      )
-    ].join('\n');
+    // Gerar planilha .xlsx nativa
+    const headers = columns.map(c => c.label);
+    const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
 
-    // Criar e baixar arquivo
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    
+    // Largura aproximada das colunas com base no conteúdo
+    worksheet['!cols'] = headers.map(header => {
+      const maxLen = Math.max(
+        header.length,
+        ...exportData.map(row => String(row[header] ?? '').length)
+      );
+      return { wch: Math.min(Math.max(maxLen + 2, 10), 60) };
+    });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Registros');
+
     const boardName = this.board?.name || 'Board';
     const currentDate = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
-    link.setAttribute('download', `${boardName}_Relatório_${currentDate}.csv`);
-    
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    XLSX.writeFile(workbook, `${boardName}_Relatório_${currentDate}.xlsx`);
   }
 
   // Dynamic Charts Methods
