@@ -683,6 +683,24 @@ export class LeadDetailModalComponent {
     this.formReady = true;
   }
 
+  // Opções de um campo select/radio incluindo o valor atualmente salvo, caso ele
+  // não esteja na lista configurada (ex.: origem "Plataforma" salva mas ausente
+  // das opções). Sem isso o <select> não casa a opção e fica vazio, mesmo com valor.
+  getSelectOptions(field: any): any[] {
+    const type = (field?.type || field?.fieldType || '').toLowerCase();
+    let opts: any[] = (type === 'temperatura' && (!field?.options || field.options.length === 0))
+      ? ['Quente', 'Morno', 'Frio']
+      : [...(field?.options || [])];
+
+    const controlName = field?.formControlName || field?.name;
+    const current = this.leadForm?.get(controlName)?.value;
+    if (current !== undefined && current !== null && String(current).trim() !== '' &&
+        !opts.some(o => String(o) === String(current))) {
+      opts = [current, ...opts];
+    }
+    return opts;
+  }
+
   getCurrentColumn(): Column | null {
     if (!this.currentLead) return null;
     return this.columns.find(col => col.id === this.currentLead!.columnId) || null;

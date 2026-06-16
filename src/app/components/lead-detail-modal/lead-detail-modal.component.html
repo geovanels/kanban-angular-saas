@@ -99,7 +99,7 @@
                     [formControlName]="field.formControlName"
                     class="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Selecione...</option>
-                    <option *ngFor="let option of field.options" [value]="option">{{ option }}</option>
+                    <option *ngFor="let option of getSelectOptions(field)" [value]="option">{{ option }}</option>
                   </select>
 
                   <!-- Campo Responsável -->
@@ -294,7 +294,7 @@
                   [formControlName]="field.name"
                   class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                   <option value="">Selecione...</option>
-                  <option *ngFor="let option of (field.type === 'temperatura' && (!field.options || field.options.length === 0) ? ['Quente','Morno','Frio'] : field.options)" [value]="option">{{ option }}</option>
+                  <option *ngFor="let option of getSelectOptions(field)" [value]="option">{{ option }}</option>
                 </select>
 
                 <!-- Campo Radio -->
@@ -401,7 +401,7 @@
                     [formControlName]="field.name"
                     class="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Selecione...</option>
-                    <option *ngFor="let option of (field.type === 'temperatura' && (!field.options || field.options.length === 0) ? ['Quente','Morno','Frio'] : field.options)" [value]="option">{{ option }}</option>
+                    <option *ngFor="let option of getSelectOptions(field)" [value]="option">{{ option }}</option>
                   </select>
 
                   <!-- Campo radio -->

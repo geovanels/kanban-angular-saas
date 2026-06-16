@@ -244,9 +244,10 @@ exports.leadIntakeHttp = onRequest({
       }
     });
 
-    // Se não tiver origem definida, usar "Contato pelo Site" como padrão para leads via API
+    // Regra de origem: o contato do site envia explicitamente origem="Contato pelo Site".
+    // Quando a origem chega vazia, o lead veio da plataforma -> padrão "Plataforma".
     if (!processedFields['origem'] || (typeof processedFields['origem'] === 'string' && processedFields['origem'].trim() === '')) {
-      processedFields['origem'] = 'Contato pelo Site';
+      processedFields['origem'] = 'Plataforma';
     }
 
     const normalized = { fields: processedFields };
