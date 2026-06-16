@@ -1849,12 +1849,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
     
     
     // Filtrar apenas campos apropriados para filtro
-    this.availableFilterFields = allFields.filter(field => {
+    const filtered = allFields.filter(field => {
       const supportedTypes = ['text', 'email', 'select', 'radio', 'checkbox', 'date', 'number', 'tel', 'cnpj', 'cpf', 'temperatura'];
       const isSupported = supportedTypes.includes(field.type.toLowerCase());
       return isSupported;
     });
-    
+
+    // Filtro embutido de Responsável (sempre disponível, independente do formulário).
+    // Usa a chave reservada __responsible__ e casa com lead.responsibleUserId.
+    const responsibleFilter = { name: '__responsible__', label: 'Responsável', type: 'responsavel', source: 'system' };
+
+    this.availableFilterFields = [responsibleFilter, ...filtered];
   }
 
   // Obter opções disponíveis para um campo
@@ -1999,7 +2004,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
   // Obter valor de um campo específico do lead
   private getLeadFieldValue(lead: Lead, fieldName: string): any {
     if (!lead || !fieldName) return undefined;
-    
+
+    // Filtro embutido de Responsável: casar pelo id do responsável do lead
+    if (fieldName === '__responsible__') {
+      return (lead as any).responsibleUserId || '';
+    }
+
     // Verificar em fields (campos do formulário)
     if (lead.fields && lead.fields[fieldName] !== undefined) {
       return lead.fields[fieldName];
@@ -2040,7 +2050,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
         
       case 'select':
       case 'radio':
-        // Correspondência exata
+      case 'responsavel':
+        // Correspondência exata (responsavel casa pelo id do usuário)
         return leadStr === filterStr;
         
       case 'checkbox':
