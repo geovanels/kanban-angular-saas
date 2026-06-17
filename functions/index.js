@@ -681,6 +681,10 @@ exports.onLeadCreated = onDocumentCreated({
 
       logger.info(`📋 Automações encontradas: ${automationsSnapshot.size}`);
 
+      if (automationsSnapshot.empty) {
+        logger.info(`⚠️ Nenhuma automação de novo lead configurada para board ${boardId}`);
+      }
+
       // Executar cada automação
       for (const autoDoc of automationsSnapshot.docs) {
         const automation = { id: autoDoc.id, ...autoDoc.data() };
@@ -703,10 +707,6 @@ exports.onLeadCreated = onDocumentCreated({
     } finally {
       // Remover flag de processamento
       await leadRef.update({ _automationProcessing: admin.firestore.FieldValue.delete() });
-    }
-
-    if (automationsSnapshot.empty) {
-      logger.info(`⚠️ Nenhuma automação de novo lead configurada para board ${boardId}`);
     }
 
   } catch (error) {
@@ -855,14 +855,18 @@ async function executeSendEmailAction(action, leadData, companyId, boardId, lead
 
     // Processar destinatários
     const recipientFromTemplate = processEmailTemplate(template.recipients || '', leadData);
-    const fallbackEmails = [
-      leadData.fields?.contactEmail,
-      leadData.fields?.email,
-      leadData.fields?.emailLead,
-      leadData.fields?.contatoEmail
-    ].filter(email => email && email.includes('@'));
+    const isEmail = (v) => typeof v === 'string' && v.includes('@') && !v.includes('{{');
 
-    const recipients = recipientFromTemplate || fallbackEmails[0];
+    // Se o template já resolveu um email válido, usa ele
+    let recipients = isEmail(recipientFromTemplate) ? recipientFromTemplate : '';
+
+    // Caso contrário, buscar o email do lead de forma robusta (a chave varia
+    // conforme o campo configurado no formulário; não dá para depender de uma
+    // lista fixa). Tenta sinônimos conhecidos e, por fim, varre todos os campos.
+    if (!recipients) {
+      recipients = resolveLeadEmail(leadData);
+    }
+
     if (!recipients) {
       throw new Error('Destinatário não definido');
     }
@@ -966,6 +970,37 @@ async function executeSendEmailAction(action, leadData, companyId, boardId, lead
     logger.error('❌ Erro ao enviar email:', error);
     throw error;
   }
+}
+
+// Resolve o email do lead de forma robusta: a chave do campo de email varia
+// conforme o formulário (apiFieldName), então não dá para depender de uma lista
+// fixa. Tenta sinônimos conhecidos (case-insensitive) e, por último, varre todos
+// os campos procurando o primeiro valor que pareça um email.
+function resolveLeadEmail(leadData) {
+  const fields = (leadData && leadData.fields) || {};
+  const synonyms = ['contactEmail', 'emailContact', 'email', 'e-mail', 'emailLead', 'leadEmail', 'contatoEmail', 'emailContato', 'mail'];
+  const looksLikeEmail = (v) => typeof v === 'string' && /\S+@\S+\.\S+/.test(v.trim());
+
+  // 1) Chave conhecida (case-insensitive)
+  const lowerMap = {};
+  for (const k of Object.keys(fields)) lowerMap[k.toLowerCase()] = k;
+  for (const syn of synonyms) {
+    const orig = lowerMap[syn.toLowerCase()];
+    const val = orig ? fields[orig] : undefined;
+    if (typeof val === 'string' && val.includes('@')) return val.trim();
+  }
+
+  // 2) Varredura: primeiro campo que pareça um email
+  for (const val of Object.values(fields)) {
+    if (looksLikeEmail(val)) return val.trim();
+  }
+
+  // 3) Campos na raiz do lead
+  for (const val of [leadData && leadData.contactEmail, leadData && leadData.email]) {
+    if (typeof val === 'string' && val.includes('@')) return val.trim();
+  }
+
+  return '';
 }
 
 // Função para processar template com variáveis do lead
