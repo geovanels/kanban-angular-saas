@@ -319,6 +319,18 @@ export class PublicFormComponent implements OnInit {
     this.form.get(fieldName)?.setValue(formatted, { emitEvent: false });
   }
 
+  // Evita o formulário ficar travado em "Salvando..." para sempre quando um
+  // write do Firestore não resolve (ex.: rede corporativa bloqueando streaming).
+  // Estoura com erro após o timeout para o usuário ver a falha e tentar de novo.
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout (${ms / 1000}s): ${label}`)), ms)
+      )
+    ]);
+  }
+
   async onSubmit() {
     if (!this.lead || !this.leadId) return;
     if (this.readOnly()) return;
@@ -349,7 +361,7 @@ export class PublicFormComponent implements OnInit {
               this.fs.setCompanyContext(company);
             }
             
-            await this.fs.addLeadHistory(
+            await this.withTimeout(this.fs.addLeadHistory(
               this.userId,
               this.boardId,
               this.leadId,
@@ -358,7 +370,7 @@ export class PublicFormComponent implements OnInit {
                 text: `Responsável alterado para <strong>${selectedUser?.displayName || 'Ninguém'}</strong> via formulário público`,
                 user: 'Formulário Público'
               }
-            );
+            ), 10000, 'histórico de responsável');
           }
         }
       } catch {}
@@ -408,7 +420,7 @@ export class PublicFormComponent implements OnInit {
             this.fs.setCompanyContext(company);
           }
           
-          await this.fs.addLeadHistory(
+          await this.withTimeout(this.fs.addLeadHistory(
             this.userId,
             this.boardId,
             this.leadId,
@@ -417,17 +429,26 @@ export class PublicFormComponent implements OnInit {
               text: `Formulário público preenchido:<ul class="list-disc ml-4">${changesList}</ul>`,
               user: 'Formulário Público'
             }
-          );
+          ), 10000, 'histórico de alterações');
         }
       } catch (error) {
         console.warn('Erro ao registrar histórico:', error);
       }
 
-      await this.fs.updateLead(this.userId, this.boardId, this.leadId, updates);
+      await this.withTimeout(
+        this.fs.updateLead(this.userId, this.boardId, this.leadId, updates),
+        20000,
+        'salvar formulário'
+      );
       this.saving.set(false);
       this.submitted.set(true);
-    } catch (e) {
-      try { this.toast.error('Erro ao salvar formulário.'); } catch {}
+    } catch (e: any) {
+      const isTimeout = `${e?.message || ''}`.includes('Timeout');
+      try {
+        this.toast.error(isTimeout
+          ? 'A conexão está demorando para responder. Verifique sua rede e tente novamente.'
+          : 'Erro ao salvar formulário. Tente novamente.');
+      } catch {}
       this.saving.set(false);
     }
   }

@@ -1,9 +1,9 @@
 import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom, APP_INITIALIZER } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, HTTP_INTERCEPTORS } from '@angular/common/http';
-import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
+import { provideFirebaseApp, initializeApp, getApp } from '@angular/fire/app';
 import { provideAuth, getAuth, connectAuthEmulator } from '@angular/fire/auth';
-import { provideFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
+import { provideFirestore, getFirestore, initializeFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 import { provideStorage, getStorage, connectStorageEmulator } from '@angular/fire/storage';
 import { provideFunctions, getFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
 import { ReactiveFormsModule } from '@angular/forms';
@@ -67,7 +67,18 @@ export const appConfig: ApplicationConfig = {
       return auth;
     }),
     provideFirestore(() => {
-      const db = getFirestore();
+      // Usa auto-detect de long-polling: quando a conexão de streaming (WebChannel)
+      // é bloqueada por firewall/proxy/extensão (comum em rede corporativa no
+      // desktop), o Firestore cai para long-polling (HTTP), evitando que os
+      // writes fiquem pendurados sem resolver — o que travava o envio do formulário.
+      let db;
+      try {
+        db = initializeFirestore(getApp(), { experimentalAutoDetectLongPolling: true });
+      } catch {
+        // initializeFirestore só pode ser chamado uma vez por app; se já foi
+        // inicializado, reutiliza a instância existente.
+        db = getFirestore();
+      }
       if (shouldUseEmulators()) {
         connectFirestoreEmulator(db, '127.0.0.1', 8080);
       }
