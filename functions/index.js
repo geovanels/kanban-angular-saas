@@ -940,7 +940,7 @@ async function executeSendEmailAction(action, leadData, companyId, boardId, lead
     }
 
     // Enviar email
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: smtpConfig.host,
       port: smtpConfig.port || 587,
       secure: false,
