@@ -413,6 +413,14 @@ export class SmtpConfigComponent implements OnInit {
       return;
     }
 
+    // Validar formato do email (texto solto como "teste" chega ao SMTP e
+    // retorna o erro técnico "No recipients defined")
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.testEmail.trim())) {
+      this.showError(`"${this.testEmail}" não é um email válido. Informe um endereço completo, ex.: nome@empresa.com.br`);
+      return;
+    }
+    this.testEmail = this.testEmail.trim();
+
     // Salvar configurações primeiro se necessário
     if (this.smtpForm.dirty) {
       await this.saveConfiguration();
