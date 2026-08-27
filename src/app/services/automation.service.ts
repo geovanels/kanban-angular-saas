@@ -107,6 +107,10 @@ export class AutomationService {
 
   // Processar automações quando um novo lead é criado
   async processNewLeadAutomations(lead: Lead, boardId: string, ownerId: string): Promise<void> {
+    // Delegado à Cloud Function onLeadCreated (lock transacional no servidor).
+    // Processar aqui também marcava executedAutomations sem enviar e fazia o
+    // servidor pular o envio — resultado: nenhum email saía.
+    return;
     try {
 
       // Chave única para lock de processamento de novo lead
@@ -215,6 +219,8 @@ export class AutomationService {
 
   // Processar automações quando um lead muda de fase
   async processPhaseChangeAutomations(lead: Lead, newColumnId: string, oldColumnId: string, boardId: string, ownerId: string): Promise<void> {
+    // Delegado à Cloud Function onLeadUpdated (mesma razão do novo lead acima).
+    return;
     try {
       // Chave única para lock de processamento de mudança de fase
       const phaseChangeLockKey = `phasechange_${ownerId}_${boardId}_${lead.id}_${newColumnId}`;
@@ -282,11 +288,7 @@ export class AutomationService {
   private async executeAction(action: AutomationAction, lead: Lead, boardId: string, ownerId: string, automation: Automation): Promise<void> {
     switch (action.type) {
       case 'send-email':
-        // Envio de email agora é responsabilidade exclusiva das Cloud Functions
-        // (onLeadCreated/onLeadUpdated/processTimeBasedAutomations), que têm lock
-        // transacional. Executar aqui também gerava emails duplicados, pois a
-        // dedupe dos dois motores usa coleções diferentes (mail vs outbox).
-        console.log('📧 send-email delegado ao servidor (Cloud Functions), pulando envio no cliente');
+        await this.executeSendEmailAction(action, lead, boardId, ownerId);
         break;
       
       case 'move-to-phase':
