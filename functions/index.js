@@ -1184,7 +1184,7 @@ async function processTimeAutomationsForBoard(companyId, boardId) {
       .collection('boards').doc(boardId)
       .collection('automations')
       .where('active', '==', true)
-      .where('triggerType', 'in', ['card-in-phase-for-time', 'sla-overdue', 'form-not-answered'])
+      .where('triggerType', 'in', ['card-in-phase-for-time', 'sla-overdue', 'form-not-answered', 'form-answered', 'deadline-overdue'])
       .get();
 
     if (automationsSnapshot.empty) {
@@ -1290,6 +1290,31 @@ async function processTimeAutomationForLead(automation, leadData, companyId, boa
       // Verificar se formulário não foi respondido
       shouldExecute = await checkFormNotAnswered(companyId, boardId, leadData.columnId, leadData);
     }
+  } else if (triggerType === 'form-answered') {
+    // Dispara quando ao menos um campo do formulário da fase foi preenchido
+    const waitDays = triggerDays && triggerDays > 0 ? triggerDays : 0;
+    if (daysPassed >= waitDays) {
+      shouldExecute = await checkFormAnswered(companyId, boardId, leadData.columnId, leadData);
+    }
+  } else if (triggerType === 'deadline-overdue') {
+    // Dispara quando o campo de prazo do lead está vencido (dia anterior ou antes)
+    const deadlineValue = await findLeadDeadlineValue(companyId, boardId, leadData);
+    if (deadlineValue) {
+      const trimmed = String(deadlineValue).trim();
+      let deadline;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        const [y, m, d] = trimmed.split('-').map(Number);
+        deadline = new Date(y, m - 1, d, 18, 0, 0);
+      } else {
+        deadline = new Date(trimmed);
+      }
+      if (!isNaN(deadline.getTime())) {
+        const deadlineDay = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate()).getTime();
+        const nowDate = new Date(now);
+        const today = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
+        shouldExecute = deadlineDay < today;
+      }
+    }
   }
 
   if (shouldExecute) {
@@ -1356,4 +1381,68 @@ async function checkFormNotAnswered(companyId, boardId, phaseId, leadData) {
     logger.error('❌ Erro ao verificar formulário não respondido:', error);
     return false;
   }
+}
+
+// Verifica se o formulário da fase foi respondido (ao menos um campo preenchido).
+// Tenta tanto apiFieldName quanto name, como o antigo motor do cliente fazia.
+async function checkFormAnswered(companyId, boardId, phaseId, leadData) {
+  try {
+    const formConfigDoc = await admin.firestore()
+      .collection('companies').doc(companyId)
+      .collection('boards').doc(boardId)
+      .collection('phaseFormConfigs').doc(phaseId)
+      .get();
+
+    if (!formConfigDoc.exists) return false;
+    const fields = (formConfigDoc.data() || {}).fields || [];
+    if (fields.length === 0) return false;
+
+    return fields.some((field) => {
+      const keys = [field.apiFieldName, field.name].filter(Boolean);
+      for (const key of keys) {
+        const value = leadData.fields?.[key];
+        if (value !== undefined && value !== null && value !== '') {
+          const strValue = String(value).trim();
+          if (strValue !== '' && strValue !== 'undefined' && strValue !== 'null') return true;
+        }
+      }
+      return false;
+    });
+  } catch (error) {
+    logger.error('❌ Erro ao verificar formulário respondido:', error);
+    return false;
+  }
+}
+
+// Resolve o valor de prazo/deadline do lead: primeiro por convenção de nome de
+// campo, depois por campos marcados isDeadline nos formulários configurados.
+async function findLeadDeadlineValue(companyId, boardId, leadData) {
+  const fields = leadData.fields || {};
+  const deadlineKeys = ['prazo', 'deadline', 'datalimite', 'datavencimento', 'duedate',
+    'vencimento', 'dataentrega', 'dataprazo', 'previsao', 'dataprevisao'];
+
+  for (const [key, val] of Object.entries(fields)) {
+    if (!val) continue;
+    const norm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (deadlineKeys.some((dk) => norm.includes(dk))) return String(val);
+  }
+
+  try {
+    const boardRef = admin.firestore()
+      .collection('companies').doc(companyId)
+      .collection('boards').doc(boardId);
+    const [initialSnap, phaseSnap] = await Promise.all([
+      boardRef.collection('initialForm').doc('config').get(),
+      boardRef.collection('phaseFormConfigs').get()
+    ]);
+    const all = [];
+    if (initialSnap.exists) all.push(...(((initialSnap.data() || {}).fields) || []));
+    phaseSnap.forEach((d) => all.push(...(((d.data() || {}).fields) || [])));
+    const deadlineField = all.find((f) => f && f.isDeadline === true && f.type === 'date');
+    if (deadlineField) {
+      const key = deadlineField.apiFieldName || deadlineField.name;
+      return fields[key] ? String(fields[key]) : null;
+    }
+  } catch (e) { /* segue sem deadline */ }
+  return null;
 }

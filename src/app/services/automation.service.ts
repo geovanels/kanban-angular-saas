@@ -52,6 +52,9 @@ export class AutomationService {
 
   // Inicializar monitor global para automações de novos leads
   public initializeGlobalLeadMonitor(boardId: string, ownerId: string): void {
+    // Motor de automação do navegador desativado: todos os gatilhos rodam nas
+    // Cloud Functions (onLeadCreated/onLeadUpdated/processTimeBasedAutomations).
+    return;
     const monitorKey = `${ownerId}_${boardId}`;
 
     if (this.globalLeadMonitors.has(monitorKey)) {
@@ -747,6 +750,10 @@ export class AutomationService {
 
   // Método para processar automações de tempo (SLA, tempo em fase)
   async processTimeBasedAutomations(leads: Lead[], columns: Column[], boardId: string, ownerId: string, formConfigs?: { initialFormFields?: any[], phaseFormConfigs?: Record<string, any> }): Promise<void> {
+    // Delegado à Cloud Function processTimeBasedAutomations (roda a cada 5 min
+    // no servidor e agora cobre todos os gatilhos, incl. form-answered e
+    // deadline-overdue). Processar aqui duplicava/roubava execuções.
+    return;
     const lockKey = `${ownerId}-${boardId}`;
 
     // Verificar se já está executando para este board

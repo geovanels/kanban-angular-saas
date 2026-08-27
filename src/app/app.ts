@@ -1,13 +1,15 @@
 import { Component, signal, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import { SubdomainService } from './services/subdomain.service';
 import { FirestoreService } from './services/firestore.service';
 import { BrandingService } from './services/branding.service';
+import { UpdateCheckService } from './services/update-check.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, CommonModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -15,10 +17,12 @@ export class App implements OnInit {
   private subdomainService = inject(SubdomainService);
   private firestoreService = inject(FirestoreService);
   private brandingService = inject(BrandingService);
+  protected updateCheck = inject(UpdateCheckService);
   
   protected readonly title = signal('Sistema Kanban');
 
   async ngOnInit() {
+    this.updateCheck.start();
     try {
       // Inicializar contexto da empresa baseado no subdomínio
       const company = await this.subdomainService.initializeFromSubdomain();

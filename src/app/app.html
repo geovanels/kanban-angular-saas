@@ -1,1 +1,7 @@
 <router-outlet></router-outlet>
+
+<div *ngIf="updateCheck.updateAvailable()" class="update-banner">
+  <i class="fas fa-arrow-rotate-right"></i>
+  <span>Nova versão do sistema disponível.</span>
+  <button (click)="updateCheck.reload()">Atualizar agora</button>
+</div>
