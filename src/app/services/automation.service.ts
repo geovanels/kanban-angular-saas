@@ -282,7 +282,11 @@ export class AutomationService {
   private async executeAction(action: AutomationAction, lead: Lead, boardId: string, ownerId: string, automation: Automation): Promise<void> {
     switch (action.type) {
       case 'send-email':
-        await this.executeSendEmailAction(action, lead, boardId, ownerId);
+        // Envio de email agora é responsabilidade exclusiva das Cloud Functions
+        // (onLeadCreated/onLeadUpdated/processTimeBasedAutomations), que têm lock
+        // transacional. Executar aqui também gerava emails duplicados, pois a
+        // dedupe dos dois motores usa coleções diferentes (mail vs outbox).
+        console.log('📧 send-email delegado ao servidor (Cloud Functions), pulando envio no cliente');
         break;
       
       case 'move-to-phase':
